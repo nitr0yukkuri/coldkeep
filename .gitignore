@@ -73,3 +73,15 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+# --- Python / Data Collection (ここから追加分) ---
+__pycache__/
+*.pyc
+venv/
+.env
+
+# --- ColdKeep Audio Data (重すぎるので無視) ---
+dataset/
+*.wav
+
+# --- Editors ---
+.vscode/
