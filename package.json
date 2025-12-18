@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@react-native/new-app-screen": "0.83.0",
+    "expo": "^54.0.29",
+    "expo-av": "^16.0.8",
+    "expo-file-system": "^19.0.21",
+    "expo-sharing": "^14.0.8",
     "react": "19.2.0",
     "react-native": "0.83.0",
     "react-native-fast-tflite": "^1.6.1",

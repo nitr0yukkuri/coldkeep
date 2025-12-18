@@ -1,53 +1,108 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTensorflowModel } from 'react-native-fast-tflite';
+import { View, Text, StyleSheet, TouchableOpacity, Button, Alert } from 'react-native';
+import { Audio } from 'expo-av';
+import * as Sharing from 'expo-sharing';
 
-// ★重要: simple_model.tflite を App.tsx と同じ場所に置いてください
-// もしフォルダが違う場合はパスを書き換えてください (例: './assets/simple_model.tflite')
-const modelAsset = require('./simple_model.tflite');
+// ★重要: Expo GoではTFLiteが動かないためコメントアウトのままにする
+// import { useTensorflowModel } from 'react-native-fast-tflite';
 
-function App(): React.JSX.Element {
-  const [result, setResult] = useState<string | null>(null);
-  const plugin = useTensorflowModel(modelAsset);
-  const model = plugin.model;
+export default function App() {
+  // 型定義: Audio.Recording | null
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [lastUri, setLastUri] = useState<string | null>(null);
+  const [status, setStatus] = useState('待機中');
 
-  const runTest = async () => {
-    if (!model) {
-      setResult('モデルを読み込み中...');
-      return;
+  // 録音スタート
+  async function startRecording() {
+    try {
+      // マイクの使用許可をリクエスト
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('エラー', 'マイクの許可が必要です！');
+        return;
+      }
+
+      // iOS向けの設定（サイレントモードでも録音・再生可能にする）
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      console.log('録音開始...');
+      setStatus('🔴 録音中...');
+
+      // 録音を開始
+      // ★修正: 変数名の衝突を防ぐため、'newRecording' という名前で受け取る
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      // ステートを更新
+      setRecording(newRecording);
+    } catch (err) {
+      console.error('録音失敗:', err);
+      setStatus('エラー発生');
     }
+  }
+
+  // 録音ストップ
+  async function stopRecording() {
+    if (!recording) return;
+
+    console.log('録音停止...');
+    setStatus('処理中...');
 
     try {
-      // 1. 入力データを作成 (数値 10.0 を入力)
-      const inputData = new Float32Array([10.0]);
+      // 録音を停止してメモリから解放
+      await recording.stopAndUnloadAsync();
 
-      // 2. 推論実行
-      // inputData を [ ] で囲んで配列にします
-      const output = await model.run([inputData]);
+      // 保存先のURIを取得
+      const uri = recording.getURI();
 
-      // 3. 結果を表示
-      // ★★★ 修正ポイント: Number() で囲んで「これは数字だよ」と明示します ★★★
-      const answer = Number(output[0][0]);
+      // ステートをリセット
+      setRecording(null);
+      setLastUri(uri);
+      setStatus('✅ 完了');
 
-      setResult(`AIの答え: ${answer.toFixed(1)}`);
-
-    } catch (e: any) {
-      console.error(e);
-      setResult(`推論失敗: ${e.message}`);
+      console.log('保存先:', uri);
+    } catch (err) {
+      console.error('停止エラー:', err);
+      setStatus('停止エラー');
     }
-  };
+  }
+
+  // 録音したファイルをシェア（PCに送る用）
+  async function shareAudio() {
+    if (lastUri && await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(lastUri);
+    } else {
+      Alert.alert('エラー', 'シェア機能が利用できません');
+    }
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ColdKeep AI Test</Text>
+      <Text style={styles.title}>ColdKeep Recorder</Text>
 
-      <Text style={styles.result}>
-        {result ? result : 'ボタンを押してテスト'}
-      </Text>
+      <View style={styles.statusBox}>
+        <Text style={styles.statusText}>{status}</Text>
+      </View>
 
-      <TouchableOpacity style={styles.button} onPress={runTest}>
-        <Text style={styles.buttonText}>テスト実行</Text>
+      <TouchableOpacity
+        style={[styles.button, recording ? styles.stopBtn : styles.startBtn]}
+        onPress={recording ? stopRecording : startRecording}
+      >
+        <Text style={styles.btnText}>
+          {recording ? 'ストップ' : '録音スタート'}
+        </Text>
       </TouchableOpacity>
+
+      {lastUri && (
+        <View style={styles.resultBox}>
+          <Text style={styles.pathText}>録音完了！</Text>
+          <Button title="PCに送る (Share)" onPress={shareAudio} />
+        </View>
+      )}
     </View>
   );
 }
@@ -55,34 +110,48 @@ function App(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#fff',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    padding: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#000000',
+    marginBottom: 40,
   },
-  result: {
-    fontSize: 18,
+  statusBox: {
     marginBottom: 30,
-    color: '#333333',
-    textAlign: 'center',
-    paddingHorizontal: 20,
+  },
+  statusText: {
+    fontSize: 24,
+    color: '#333',
   },
   button: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
+    paddingHorizontal: 40,
+    paddingVertical: 20,
+    borderRadius: 50,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+  startBtn: { backgroundColor: '#2196F3' },
+  stopBtn: { backgroundColor: '#FF5252' },
+  btnText: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: 'bold',
   },
+  resultBox: {
+    marginTop: 30,
+    alignItems: 'center',
+    gap: 10,
+  },
+  pathText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
 });
-
-export default App;
