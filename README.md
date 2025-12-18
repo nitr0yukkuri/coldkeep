@@ -1,3 +1,81 @@
+
+# 🧊 ColdKeep (AI水筒アシスタント)
+
+> **Hardware is Heavy, Software is Eating the World.**
+
+高価なIoTデバイスはもう要らない。  
+スマホのマイクと物理演算だけで、あなたの水筒を「スマートボトル」へ進化させる。
+
+<p align="center">
+  <img src="https://via.placeholder.com/800x400?text=ColdKeep+App+Demo" alt="ColdKeep App Demo" width="100%">
+</p>
+
+---
+
+## 📖 概要 (Overview)
+
+**ColdKeep** は、スマートフォンのマイクを入力センサーとして活用し、  
+ステンレスボトルの内部状態（**氷の有無・残量・温度**）を**非破壊で推定**する  
+**Soft Sensing（ソフトセンシング）アプリケーション**です。
+
+従来の「スマート水筒」が抱えていた  
+**高価・重い・充電が必要** というハードウェアの課題を、  
+
+- 信号処理（DSP）
+- エッジAI（Edge AI）
+- 物理シミュレーション  
+
+の組み合わせにより、**ソフトウェアのみで解決**しました。
+
+---
+
+## 💡 解決する課題 (The Problem)
+
+- **ブラックボックス化**  
+  水筒の中身は見えず、「飲んだら熱すぎた」「いつの間にかぬるい」という体験損失が発生
+
+- **ハードウェアの限界**  
+  既存IoT水筒は専用デバイス必須で、充電・コスト・E-Wasteの問題がある
+
+- **健康管理の欠如**  
+  最適な水分補給の「量」と「温度」を感覚に頼っている
+
+---
+
+## 🚀 技術的アプローチ (Technical Approach)
+
+ColdKeep は  
+**「アクティブ・センシング」 × 「パッシブ・シミュレーション」**  
+のハイブリッドアーキテクチャを採用しています。
+
+---
+
+### 1. 🔊 音響解析による初期状態推定 (Active Sensing)
+
+ユーザーがボトルを振った際（または注水時）の  
+**衝突音・流体音** をスマートフォンのマイクで集音し、内部状態を推定します。
+
+- **Signal Processing**  
+  PCM 生波形を FFT（高速フーリエ変換）でスペクトログラム化
+
+- **Edge AI**  
+  TensorFlow Lite による軽量モデルで  
+  端末内リアルタイム推論（氷量・水量）
+
+- **JSI (JavaScript Interface)**  
+  React Native のブリッジを介さず  
+  **C++ レイヤーで直接信号処理**を行い、低遅延・高パフォーマンスを実現
+
+---
+
+### 2. 🌡️ 物理モデルによるリアルタイム予測 (Passive Simulation)
+
+一度内部状態を特定した後は、  
+**ニュートンの冷却法則**に基づく物理モデルをバックグラウンドで実行します。
+
+```math
+\frac{dT(t)}{dt} = -k (T(t) - T_{\text{env}})
+
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
 # Getting Started
