@@ -1,4 +1,7 @@
 {
   "name": "ColdKeep",
-  "displayName": "ColdKeep"
+  "displayName": "ColdKeep",
+  "plugins": [
+    "expo-asset"
+  ]
 }
