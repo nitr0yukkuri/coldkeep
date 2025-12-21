@@ -1,5 +1,3 @@
-// android/settings.gradle
-
 pluginManagement {
     repositories {
         google()
@@ -17,5 +15,13 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'ColdKeep'
+
+// ▼ 追加: React Native CLIのオートリンク（これが fast-tflite を認識させます）
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+
+// Expoのオートリンク
+apply from: new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle")
+useExpoModules()
+
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')

@@ -1,14 +1,7 @@
-// android/build.gradle
-
 buildscript {
-    ext {
-        buildToolsVersion = "35.0.0"
-        minSdkVersion = 24
-        compileSdkVersion = 35
-        targetSdkVersion = 35
-        ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.9.24"
-    }
+    // buildscript内で使う変数をここで定義
+    ext.kotlinVersion = "1.9.24"
+    
     repositories {
         google()
         mavenCentral()
@@ -16,8 +9,18 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.1.1")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${ext.kotlinVersion}")
     }
+}
+
+// アプリ全体で使う変数を定義（buildscriptの外）
+ext {
+    buildToolsVersion = "35.0.0"
+    minSdkVersion = 24
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    ndkVersion = "26.1.10909125"
+    kotlinVersion = "1.9.24"
 }
 
 allprojects {
