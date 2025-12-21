@@ -11,7 +11,7 @@ const { assetExts, sourceExts } = defaultConfig.resolver;
  */
 const config = {
     resolver: {
-        // ↓ ここで tflite を「画像などの素材」として認識させる
+        // tfliteをアセットとして追加
         assetExts: [...assetExts, 'tflite'],
     },
 };

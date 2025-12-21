@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Button, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Sharing from 'expo-sharing';
-
-// ★重要: Expo GoではTFLiteが動かないためコメントアウトのままにする
-// import { useTensorflowModel } from 'react-native-fast-tflite';
+import { useTensorflowModel } from 'react-native-fast-tflite';
+// @ts-ignore declarations.d.tsが効かない場合の保険
+import modelFile from './simple_model.tflite';
 
 export default function App() {
+  // TFLiteモデルのロード
+  const model = useTensorflowModel(modelFile);
+  const [modelStatus, setModelStatus] = useState('モデル読み込み中...');
+
   // 型定義: Audio.Recording | null
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [lastUri, setLastUri] = useState<string | null>(null);
   const [status, setStatus] = useState('待機中');
+
+  // モデルの状態監視
+  useEffect(() => {
+    if (model.state === 'loaded') {
+      console.log('TFLite Model Loaded Successfully');
+      setModelStatus('✅ AIモデル準備完了');
+    } else if (model.state === 'error') {
+      console.error('TFLite Model Failed to Load');
+      setModelStatus('❌ AIモデルエラー');
+    }
+  }, [model.state]);
 
   // 録音スタート
   async function startRecording() {
@@ -32,7 +47,6 @@ export default function App() {
       setStatus('🔴 録音中...');
 
       // 録音を開始
-      // ★修正: 変数名の衝突を防ぐため、'newRecording' という名前で受け取る
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -65,6 +79,12 @@ export default function App() {
       setStatus('✅ 完了');
 
       console.log('保存先:', uri);
+
+      // ★ここに将来的に推論ロジックを入れることができます
+      if (model.model) {
+        console.log("モデルを使用して推論可能です");
+      }
+
     } catch (err) {
       console.error('停止エラー:', err);
       setStatus('停止エラー');
@@ -86,6 +106,11 @@ export default function App() {
 
       <View style={styles.statusBox}>
         <Text style={styles.statusText}>{status}</Text>
+      </View>
+
+      {/* モデル状態表示 */}
+      <View style={styles.modelStatusBox}>
+        <Text style={styles.modelStatusText}>{modelStatus}</Text>
       </View>
 
       <TouchableOpacity
@@ -118,14 +143,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   statusBox: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   statusText: {
     fontSize: 24,
     color: '#333',
+  },
+  modelStatusBox: {
+    marginBottom: 30,
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  modelStatusText: {
+    fontSize: 14,
+    color: '#555',
   },
   button: {
     paddingHorizontal: 40,
