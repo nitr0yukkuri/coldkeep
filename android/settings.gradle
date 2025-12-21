@@ -1,22 +1,21 @@
+// android/settings.gradle
+
 pluginManagement {
-    // React Nativeのプラグイン場所を指定
-    includeBuild("../node_modules/@react-native/gradle-plugin")
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
 }
-
-plugins {
-    // React Nativeの設定プラグイン
-    id("com.facebook.react.settings")
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
 }
-
-// React Nativeの自動リンク設定
-extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
 
 rootProject.name = 'ColdKeep'
 include ':app'
-includeBuild("../node_modules/@react-native/gradle-plugin")
-
-// ★修正: Windowsで確実に動くよう、直接ファイルを指定してExpo設定を読み込む
-// (これで Plugin not found も フリーズも起きなくなります)
-apply from: new File(settingsDir, '../node_modules/expo/scripts/autolinking.gradle')
-useExpoModules()
+includeBuild('../node_modules/@react-native/gradle-plugin')
