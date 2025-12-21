@@ -1,14 +1,22 @@
 pluginManagement {
+    // React Nativeのプラグイン場所を指定
     includeBuild("../node_modules/@react-native/gradle-plugin")
 }
 
 plugins {
+    // React Nativeの設定プラグイン
     id("com.facebook.react.settings")
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
+// React Nativeの自動リンク設定
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
 
 rootProject.name = 'ColdKeep'
 include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')
+includeBuild("../node_modules/@react-native/gradle-plugin")
+
+// ★修正: Windowsで確実に動くよう、直接ファイルを指定してExpo設定を読み込む
+// (これで Plugin not found も フリーズも起きなくなります)
+apply from: new File(settingsDir, '../node_modules/expo/scripts/autolinking.gradle')
+useExpoModules()
