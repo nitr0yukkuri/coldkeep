@@ -2,11 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-// ▼ 追加: React Native CLIのオートリンク設定を適用
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
-
 react {
-    // React Nativeの設定
     autolinkLibrariesWithApp()
 }
 
@@ -14,20 +10,20 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    ndkVersion "26.1.10909125" // 直接指定
-    buildToolsVersion "35.0.0" // 直接指定
-    compileSdk 35              // 直接指定
+    // ▼ 修正: NDK r27を指定
+    ndkVersion "27.1.12297006"
+    buildToolsVersion "35.0.0"
+    compileSdk 35
 
     namespace "com.coldkeep"
     defaultConfig {
         applicationId "com.coldkeep"
-        minSdkVersion 24       // 直接指定
-        targetSdkVersion 35    // 直接指定
+        minSdkVersion 24
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
     }
 
-    // TFLiteモデルの圧縮防止
     aaptOptions {
         noCompress "tflite"
     }
