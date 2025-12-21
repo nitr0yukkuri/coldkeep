@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Button, Alert } from 'react-n
 import { Audio } from 'expo-av';
 import * as Sharing from 'expo-sharing';
 import { useTensorflowModel } from 'react-native-fast-tflite';
-// @ts-ignore declarations.d.tsが効かない場合の保険
+// @ts-ignore
 import modelFile from './simple_model.tflite';
 
 export default function App() {
@@ -11,7 +11,6 @@ export default function App() {
   const model = useTensorflowModel(modelFile);
   const [modelStatus, setModelStatus] = useState('モデル読み込み中...');
 
-  // 型定義: Audio.Recording | null
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [lastUri, setLastUri] = useState<string | null>(null);
   const [status, setStatus] = useState('待機中');
@@ -27,17 +26,14 @@ export default function App() {
     }
   }, [model.state]);
 
-  // 録音スタート
   async function startRecording() {
     try {
-      // マイクの使用許可をリクエスト
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') {
         Alert.alert('エラー', 'マイクの許可が必要です！');
         return;
       }
 
-      // iOS向けの設定（サイレントモードでも録音・再生可能にする）
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -46,12 +42,10 @@ export default function App() {
       console.log('録音開始...');
       setStatus('🔴 録音中...');
 
-      // 録音を開始
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
 
-      // ステートを更新
       setRecording(newRecording);
     } catch (err) {
       console.error('録音失敗:', err);
@@ -59,7 +53,6 @@ export default function App() {
     }
   }
 
-  // 録音ストップ
   async function stopRecording() {
     if (!recording) return;
 
@@ -67,20 +60,15 @@ export default function App() {
     setStatus('処理中...');
 
     try {
-      // 録音を停止してメモリから解放
       await recording.stopAndUnloadAsync();
-
-      // 保存先のURIを取得
       const uri = recording.getURI();
 
-      // ステートをリセット
       setRecording(null);
       setLastUri(uri);
       setStatus('✅ 完了');
 
       console.log('保存先:', uri);
 
-      // ★ここに将来的に推論ロジックを入れることができます
       if (model.model) {
         console.log("モデルを使用して推論可能です");
       }
@@ -91,7 +79,6 @@ export default function App() {
     }
   }
 
-  // 録音したファイルをシェア（PCに送る用）
   async function shareAudio() {
     if (lastUri && await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(lastUri);
@@ -108,7 +95,6 @@ export default function App() {
         <Text style={styles.statusText}>{status}</Text>
       </View>
 
-      {/* モデル状態表示 */}
       <View style={styles.modelStatusBox}>
         <Text style={styles.modelStatusText}>{modelStatus}</Text>
       </View>

@@ -4,19 +4,18 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.1") // Gradle Pluginを少し新しく
+        classpath("com.android.tools.build:gradle:8.2.1")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
     }
 }
 
-// アプリ全体で使用する設定値
 ext {
     buildToolsVersion = "35.0.0"
     minSdkVersion = 24
     compileSdkVersion = 35
     targetSdkVersion = 35
-    // ▼ 修正: C++20 (std::format) をサポートするNDK r27を指定
+    // ★重要: C++20対応のためにNDK r27を指定
     ndkVersion = "27.1.12297006"
     kotlinVersion = "1.9.24"
 }

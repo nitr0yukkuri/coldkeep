@@ -10,7 +10,7 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    // ▼ 修正: NDK r27を指定
+    // ★重要: NDK r27を指定
     ndkVersion "27.1.12297006"
     buildToolsVersion "35.0.0"
     compileSdk 35
@@ -24,6 +24,7 @@ android {
         versionName "1.0"
     }
 
+    // ★重要: tfliteファイルの圧縮を防ぐ
     aaptOptions {
         noCompress "tflite"
     }
