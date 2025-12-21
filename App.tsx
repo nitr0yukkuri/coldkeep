@@ -17,8 +17,8 @@ export default function App() {
         setStatus("TFJS Ready. Loading model...");
 
         // 2. モデルファイルの読み込み
-        // android/app/src/main/assets にあるファイルを参照
-        const modelAsset = Asset.fromModule(require('./android/app/src/main/assets/simple_model.tflite'));
+        // assetsフォルダに移動したファイルを参照
+        const modelAsset = Asset.fromModule(require('./assets/simple_model.tflite'));
 
         // アセットをダウンロードして使える状態にする
         await modelAsset.downloadAsync();
