@@ -18,12 +18,11 @@ export default function App() {
 
         // 2. モデルファイルの読み込み
         // assetsフォルダに移動したファイルを参照
-        const modelAsset = Asset.fromModule(require('./assets/simple_model.tflite'));
-
+        const model = require('./assets/simple_model.png');
         // アセットをダウンロードして使える状態にする
-        await modelAsset.downloadAsync();
+        await model.downloadAsync();
 
-        setStatus(`Model loaded at: ${modelAsset.localUri}`);
+        setStatus(`Model loaded at: ${model.localUri}`);
         console.log("Model loaded successfully");
 
       } catch (error) {
