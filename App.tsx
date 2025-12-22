@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-react-native';
-import { Asset } from 'expo-asset';
+import { Asset } from 'expo-asset'; // ← これが必要です
 
 export default function App() {
   const [isTfReady, setIsTfReady] = useState(false);
@@ -17,12 +17,14 @@ export default function App() {
         setStatus("TFJS Ready. Loading model...");
 
         // 2. モデルファイルの読み込み
-        // assetsフォルダに移動したファイルを参照
-        const model = require('./assets/simple_model.png');
-        // アセットをダウンロードして使える状態にする
-        await model.downloadAsync();
+        // ★ここが修正ポイント！
+        // requireで読み込んだ画像を、操作可能な「Asset」に変換します
+        const modelAsset = Asset.fromModule(require('./assets/simple_model.png'));
 
-        setStatus(`Model loaded at: ${model.localUri}`);
+        // Assetに変換してからダウンロードを実行
+        await modelAsset.downloadAsync();
+
+        setStatus(`Model loaded at: ${modelAsset.localUri}`);
         console.log("Model loaded successfully");
 
       } catch (error) {
