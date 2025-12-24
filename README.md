@@ -6,9 +6,7 @@
 高価なIoTデバイスはもう要らない。  
 スマホのマイクと物理演算だけで、あなたの水筒を「スマートボトル」へ進化させる。
 
-<p align="center">
-  <img src="https://via.placeholder.com/800x400?text=ColdKeep+App+Demo" alt="ColdKeep App Demo" width="100%">
-</p>
+
 
 ---
 
