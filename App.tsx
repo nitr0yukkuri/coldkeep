@@ -7,17 +7,14 @@ import * as FileSystem from 'expo-file-system';
 const { width } = Dimensions.get('window');
 
 // --- ユーティリティ: Bufferを使わないBase64デコーダー ---
-// これがないと "Buffer is not defined" で落ちます
 const base64CharToValue = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.split('').reduce((acc, char, index) => {
   acc[char] = index;
   return acc;
 }, {} as Record<string, number>);
 
 function base64ToFloat32Array(base64: string): Float32Array {
-  // 末尾の=を削除
   const cleanBase64 = base64.replace(/=+$/, '');
   const len = cleanBase64.length;
-  // およそのバイト数
   const byteLength = Math.floor((len * 3) / 4);
   const bytes = new Uint8Array(byteLength);
 
@@ -33,17 +30,33 @@ function base64ToFloat32Array(base64: string): Float32Array {
     if (i + 3 < len) bytes[p++] = ((c & 3) << 6) | d;
   }
 
-  // WAVヘッダー(44byte)をスキップして、無理やりFloat(-1.0~1.0)として解釈する
-  // ※本来はWAVデコードが必要ですが、最小構成のため「バイト列→正規化」で代用します
-  const float32 = new Float32Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    // 0~255 のバイトデータを -1.0 ~ 1.0 に変換
-    float32[i] = (bytes[i] - 128) / 128.0;
+  // WAVデータの解析: ヘッダー(44byte)をスキップして16bit PCMとして読み込む
+  const headerSize = 44;
+  const dataByteSize = bytes.length - headerSize;
+
+  if (dataByteSize <= 0) return new Float32Array(0);
+
+  // 2バイトで1サンプルなので、サンプル数はバイト数の半分
+  const numSamples = Math.floor(dataByteSize / 2);
+  const float32 = new Float32Array(numSamples);
+
+  for (let i = 0; i < numSamples; i++) {
+    const byteIndex = headerSize + i * 2;
+    // Little Endianで結合
+    const low = bytes[byteIndex];
+    const high = bytes[byteIndex + 1];
+    let int16 = (high << 8) | low;
+
+    // 符号付き16bit整数の処理 (0x8000以上は負の数)
+    if (int16 >= 32768) int16 -= 65536;
+
+    // -1.0 ~ 1.0 に正規化
+    float32[i] = int16 / 32768.0;
   }
   return float32;
 }
-// --------------------------------------------------------
 
+// 円形のメーターを表示するコンポーネント
 const CircleMeter = ({ title, value, unit, color }: { title: string, value: string | number, unit: string, color: string }) => (
   <View style={styles.meterContainer}>
     <View style={[styles.circle, { borderColor: color }]}>
@@ -77,12 +90,26 @@ export default function App() {
 
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
-      // Android/iOS両対応の安全な設定
+      // WAVで高音質録音 (PCMデータを取り出しやすくするため)
       const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
+        {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          android: {
+            ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+            extension: '.wav',
+            outputFormat: Audio.AndroidOutputFormat.DEFAULT,
+            audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
+          },
+          ios: {
+            ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+            extension: '.wav',
+            outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+          }
+        }
       );
+
       setRecording(recording);
-      setStatus("Recording...");
+      setStatus("Listening...");
     } catch (err) {
       console.error(err);
       setStatus("Rec Failed");
@@ -94,15 +121,12 @@ export default function App() {
     setStatus("Processing...");
     await recording.stopAndUnloadAsync();
     const uri = recording.getURI();
-    setLastRecordingUri(uri);
-    setRecording(null);
-    setStatus("Audio Captured");
-  }
 
-  // エラー回避用ラッパー
-  function setLastRecordingUri(uri: string | null) {
+    setRecording(null);
     setLastUri(uri);
-    if (uri) setTimeout(handleScan, 500, uri); // 録音直後に自動解析を試みる
+
+    // 録音完了後、即座に解析を実行
+    if (uri) handleScan(uri);
   }
 
   const handleScan = useCallback(async (uriOverride?: string) => {
@@ -118,14 +142,25 @@ export default function App() {
       const base64 = await FileSystem.readAsStringAsync(targetUri, { encoding: 'base64' });
       const audioData = base64ToFloat32Array(base64);
 
-      // モデルの入力サイズに合わせてデータを整形（クラッシュ防止）
-      // 入力テンソルが複数ある場合や形状が異なる場合に対応
+      if (audioData.length === 0) {
+        setStatus("Audio Error");
+        return;
+      }
+
+      // ★重要修正: 毎回「違う場所」を読み込ませて、結果の固定化を防ぐ
+      // データのランダムな位置から、モデルが必要な長さ分だけ切り出す
       const inputs = plugin.model.inputs.map((input) => {
-        const size = input.shape.reduce((a, b) => a * b, 1);
-        const data = new Float32Array(size);
-        // 音声データをコピー（足りなければ0埋め、多ければ切り捨て）
-        for (let i = 0; i < size; i++) {
-          data[i] = i < audioData.length ? audioData[i] : 0;
+        const inputSize = input.shape.reduce((a, b) => a * b, 1);
+        const data = new Float32Array(inputSize);
+
+        // ランダムな開始位置 (データが短い場合は0から)
+        const maxStart = Math.max(0, audioData.length - inputSize);
+        const startOffset = Math.floor(Math.random() * maxStart);
+
+        for (let i = 0; i < inputSize; i++) {
+          // データが足りなければループさせる
+          const index = (startOffset + i) % audioData.length;
+          data[i] = audioData[index];
         }
         return data;
       });
@@ -133,14 +168,17 @@ export default function App() {
       const outputs = await plugin.model.run(inputs);
       const res = outputs[0];
 
-      // 結果の表示更新
       if (res && res.length > 0) {
-        // 結果が極端な数字にならないよう調整
         const val1 = res[0] as number;
         const val2 = res.length > 1 ? res[1] as number : val1;
 
-        setTemp(parseFloat(Math.abs(val1 * 10 + 20).toFixed(1)));
-        setIceLevel(Math.floor(Math.abs(val2 * 100) % 100));
+        // 数値の変化を大きくするために計算式を調整
+        // 生の値(val1)に対して感度を上げる
+        const newTemp = Math.abs(val1 * 50 + 10) % 40;
+        const newIce = Math.floor(Math.abs(val2 * 200) % 100);
+
+        setTemp(parseFloat(newTemp.toFixed(1)));
+        setIceLevel(newIce);
         setStatus("Complete");
       }
     } catch (e) {
@@ -167,7 +205,7 @@ export default function App() {
           onPress={recording ? stopRecording : startRecording}
         >
           <Text style={styles.buttonText}>
-            {recording ? "STOP" : "SCAN AUDIO"}
+            {recording ? "STOP & SCAN" : "HOLD TO SPEAK"}
           </Text>
         </TouchableOpacity>
       </View>
