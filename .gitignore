@@ -85,3 +85,7 @@ dataset/
 
 # --- Editors ---
 .vscode/
+
+# --- Generated application materials / scratch outputs ---
+output/
+tmp/
