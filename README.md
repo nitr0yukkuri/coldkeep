@@ -1,173 +1,122 @@
+# ColdKeep
 
-# 🧊 ColdKeep (AI水筒アシスタント)
+ColdKeep は、スマートフォンのマイクで取得した水筒の音を解析し、水筒内部の氷量・水量・冷たさを推定することを目指す実験的な AI 水筒アシスタントです。
 
-> **Hardware is Heavy, Software is Eating the World.**
+専用センサーや IoT 水筒を使わず、ユーザーがすでに持っているスマートフォンと水筒だけで、外から見えない水筒内部の状態を推定できるかを検証します。
 
-高価なIoTデバイスはもう要らない。  
-スマホのマイクと物理演算だけで、あなたの水筒を「スマートボトル」へ進化させる。
+## ColdKeep とは
 
+水筒に氷を入れる音、水を注ぐ音、水筒を振ったときの音には、氷の量、水の量、氷の溶け具合、容器内部の空洞の大きさによる違いが現れる可能性があります。
 
+ColdKeep は、その音をスマートフォンのマイクで取得し、音響解析と機械学習を組み合わせて、水筒内部の状態を推定するアプリです。
 
----
+最初から氷の個数や正確な水温を当てることを目標にするのではなく、まずは次のような日常的に役立つ粒度での推定を目指します。
 
-## 📖 概要 (Overview)
+- 氷が多いか、少ないか
+- 水量が多いか、少ないか
+- まだ冷たい可能性が高いか
+- そろそろぬるくなりそうか
 
-**ColdKeep** は、スマートフォンのマイクを入力センサーとして活用し、  
-ステンレスボトルの内部状態（**氷の有無・残量・温度**）を**非破壊で推定**する  
-**Soft Sensing（ソフトセンシング）アプリケーション**です。
+## なぜ作るのか
 
-従来の「スマート水筒」が抱えていた  
-**高価・重い・充電が必要** というハードウェアの課題を、  
+断熱性の高い水筒は便利ですが、中身の状態が外から見えません。
 
-- 信号処理（DSP）
-- エッジAI（Edge AI）
-- 物理シミュレーション  
+氷がまだ残っているのか、水がどれくらい入っているのか、飲み物がまだ冷たいのかは、ふたを開けるか、実際に飲むまで分からないことが多いです。
 
-の組み合わせにより、**ソフトウェアのみで解決**しました。
+専用センサー付きの水筒を作る方法もありますが、専用ハードウェアはコストが高く、充電や管理も必要になります。ColdKeep では、専用ハードウェアではなく、スマートフォンのマイクとソフトウェアでこの課題に取り組みます。
 
----
+このプロジェクトの関心は、単なる水分補給通知ではありません。見えない物理状態を、音とソフトウェアによって知覚可能にすることです。
 
-## 💡 解決する課題 (The Problem)
+## 技術仮説
 
-- **ブラックボックス化**  
-  水筒の中身は見えず、「飲んだら熱すぎた」「いつの間にかぬるい」という体験損失が発生
+ColdKeep の中心にある仮説は、水筒内部の状態が音響特徴に反映されるというものです。
 
-- **ハードウェアの限界**  
-  既存IoT水筒は専用デバイス必須で、充電・コスト・E-Wasteの問題がある
+例えば、氷が多い場合は氷同士や氷と容器内壁の衝突が増え、短く鋭い衝突音が多く発生する可能性があります。水量が少ない場合は容器内部の空洞が大きくなり、水や氷が動ける空間が広がります。逆に水量が多い場合は音がこもったり、衝突の仕方が変化したりすると考えられます。
 
-- **健康管理の欠如**  
-  最適な水分補給の「量」と「温度」を感覚に頼っている
+ただし、音の違いが存在することと、それをスマートフォンだけで安定して推定できることは別です。スマートフォンのマイク性能、水筒の材質、氷の形状、録音位置、周囲の騒音などによって結果は変わります。
 
----
+そのため、このプロジェクトでは「理論上できる」と決めつけず、録音データを集めながら、FFT、STFT、MFCC、Mel スペクトログラムなどを使って実用的な粒度で分類できるかを検証します。
 
-## 🚀 技術的アプローチ (Technical Approach)
+## 現在のプロトタイプでできること
 
-ColdKeep は  
-**「アクティブ・センシング」 × 「パッシブ・シミュレーション」**  
-のハイブリッドアーキテクチャを採用しています。
+現在の実装は、仮説検証のための初期プロトタイプです。
 
----
+- スマートフォンのマイクで音声を録音する
+- 録音した WAV データを読み込む
+- TensorFlow Lite モデルをアプリ内で読み込む
+- 端末上で簡易的な推論を実行する
+- 推論結果をもとに、温度と氷量のメーターを表示する
 
-### 1. 🔊 音響解析による初期状態推定 (Active Sensing)
+現時点の推論結果は、完成された精度評価済みモデルによるものではありません。録音からオンデバイス推論までの流れを確認するためのプロトタイプです。
 
-ユーザーがボトルを振った際（または注水時）の  
-**衝突音・流体音** をスマートフォンのマイクで集音し、内部状態を推定します。
+## 技術構成
 
-- **Signal Processing**  
-  PCM 生波形を FFT（高速フーリエ変換）でスペクトログラム化
+- React Native
+- Expo
+- Android Studio
+- Android native build
+- expo-av
+- expo-file-system
+- TensorFlow Lite
+- react-native-fast-tflite
+- JSI 経由のネイティブ推論
+- TypeScript
 
-- **Edge AI**  
-  TensorFlow Lite による軽量モデルで  
-  端末内リアルタイム推論（氷量・水量）
+ColdKeep は React Native を UI 層として使い、Android Studio によるネイティブ Android ビルド上で動作する構成にしています。
 
-- **JSI (JavaScript Interface)**  
-  React Native のブリッジを介さず  
-  **C++ レイヤーで直接信号処理**を行い、低遅延・高パフォーマンスを実現
+マイク録音や TensorFlow Lite の推論は、Expo Go だけで完結させるのが難しいため、Android プロジェクトを生成し、Android 実機またはエミュレータ上で検証しています。
 
----
+TensorFlow Lite の推論には `react-native-fast-tflite` を利用しています。JavaScript だけで推論処理を完結させるのではなく、JSI 経由でネイティブ側の高速な推論処理を呼び出す構成です。
 
-### 2. 🌡️ 物理モデルによるリアルタイム予測 (Passive Simulation)
+現時点では、自前の C++ 実装をリポジトリ内に持っているわけではありません。まずは JSI 対応ライブラリを利用し、Android 上で録音からオンデバイス推論までの流れを成立させることを優先しています。
 
-一度内部状態を特定した後は、  
-**ニュートンの冷却法則**に基づく物理モデルをバックグラウンドで実行します。
+## 今後の検証計画
 
-```math
-\frac{dT(t)}{dt} = -k (T(t) - T_{\text{env}})
+今後は、実際の水筒音データを集めながら、段階的に検証します。
 
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+1. 一種類の水筒で録音データを集める
+2. 氷なし、氷少なめ、氷多め、水少なめ、水半分、水多めなどの条件を作る
+3. 録音データを FFT や STFT で可視化する
+4. MFCC や Mel スペクトログラムなどの特徴量を抽出する
+5. 氷量や水量を粗く分類するモデルを作る
+6. TensorFlow Lite に変換し、スマートフォン上で推論する
+7. 外気温、経過時間、水筒の断熱性能を組み合わせて冷たさの残存時間を推定する
+8. 複数の水筒や録音環境で汎用性を検証する
 
-# Getting Started
+## 起動方法
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
-
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
+依存関係をインストールします。
 
 ```sh
-# Using npm
+npm install
+```
+
+Metro を起動します。
+
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+Android で起動します。
 
 ```sh
-# Using npm
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+Android Studio で確認する場合は、`android/` ディレクトリを Android Studio で開き、実機またはエミュレータにビルドして動作確認します。
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+このプロトタイプは Android 上での検証を主な対象にしています。マイク録音、TensorFlow Lite モデルの読み込み、JSI 経由のネイティブ推論を確認するため、Expo Go ではなくネイティブ Android ビルドでの実行を前提にしています。
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
+iOS 用のスクリプトも残していますが、現在の検証対象は Android です。
 
 ```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 注意
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+ColdKeep は現時点では実験段階のプロトタイプです。
 
-## Step 3: Modify your app
+現在の実装は、録音からオンデバイス推論までの技術的な流れを確認するためのものです。氷量、水量、水温、冷たさの推定精度はまだ検証中であり、実用的な精度を保証するものではありません。
 
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+今後、実データの収集、特徴量設計、モデル学習、精度評価を進めながら、実用上意味のある粒度での状態推定を目指します。
