@@ -20,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
       override fun getPackages(): List<ReactPackage> {
         val packages = PackageList(this).packages
         packages.add(WavRecorderPackage())
+        packages.add(RustAudioClassifierPackage())
         return packages
       }
 
