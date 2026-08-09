@@ -35,5 +35,8 @@ jobs:
       - name: Test
         run: npm test -- --runInBand
 
+      - name: Prepare bundle output directory
+        run: mkdir -p tmp
+
       - name: Build Android JavaScript bundle
         run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output tmp/index.android.bundle --assets-dest tmp/assets
