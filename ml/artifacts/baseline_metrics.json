@@ -1,0 +1,538 @@
+{
+  "dataset": "ACM-S2",
+  "evaluation": "leave-one-container-out; probabilities averaged per recording",
+  "feature": "1 s gain-normalized log-mel summary, 0.5 s hop",
+  "warning": "ACM-S2 is a 21-recording external validation set, not a training corpus.",
+  "tasks": {
+    "fill_level_water": {
+      "recordings": 6,
+      "correct": 5,
+      "accuracy": 0.8333333333333334,
+      "accuracy_wilson_95": [
+        0.43649717781352987,
+        0.9699466302516935
+      ],
+      "majority_baseline_accuracy": 0.5,
+      "balanced_accuracy": 0.8333333333333333,
+      "macro_f1": 0.8285714285714285,
+      "confusion_matrix": [
+        [
+          2,
+          1
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "classes": [
+        1,
+        2
+      ],
+      "predictions": [
+        {
+          "recording_id": 2,
+          "held_out_container": 16,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.289997,
+            0.710003
+          ]
+        },
+        {
+          "recording_id": 4,
+          "held_out_container": 16,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.531513,
+            0.468487
+          ]
+        },
+        {
+          "recording_id": 15,
+          "held_out_container": 17,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.29969,
+            0.70031
+          ]
+        },
+        {
+          "recording_id": 13,
+          "held_out_container": 17,
+          "actual": 1,
+          "predicted": 2,
+          "probabilities": [
+            0.458313,
+            0.541687
+          ]
+        },
+        {
+          "recording_id": 16,
+          "held_out_container": 18,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.312365,
+            0.687635
+          ]
+        },
+        {
+          "recording_id": 21,
+          "held_out_container": 18,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.706023,
+            0.293977
+          ]
+        }
+      ]
+    },
+    "water_presence": {
+      "recordings": 18,
+      "correct": 18,
+      "accuracy": 1.0,
+      "accuracy_wilson_95": [
+        0.8241207763533425,
+        1.0
+      ],
+      "majority_baseline_accuracy": 0.6666666666666666,
+      "balanced_accuracy": 1.0,
+      "macro_f1": 1.0,
+      "confusion_matrix": [
+        [
+          12,
+          0
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      "classes": [
+        0,
+        1
+      ],
+      "predictions": [
+        {
+          "recording_id": 2,
+          "held_out_container": 16,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.32509,
+            0.67491
+          ]
+        },
+        {
+          "recording_id": 12,
+          "held_out_container": 16,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.91867,
+            0.08133
+          ]
+        },
+        {
+          "recording_id": 3,
+          "held_out_container": 16,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.875843,
+            0.124157
+          ]
+        },
+        {
+          "recording_id": 19,
+          "held_out_container": 16,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.902324,
+            0.097676
+          ]
+        },
+        {
+          "recording_id": 4,
+          "held_out_container": 16,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.392022,
+            0.607978
+          ]
+        },
+        {
+          "recording_id": 18,
+          "held_out_container": 16,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.87959,
+            0.12041
+          ]
+        },
+        {
+          "recording_id": 8,
+          "held_out_container": 17,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.955785,
+            0.044215
+          ]
+        },
+        {
+          "recording_id": 15,
+          "held_out_container": 17,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.228877,
+            0.771123
+          ]
+        },
+        {
+          "recording_id": 14,
+          "held_out_container": 17,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.969812,
+            0.030188
+          ]
+        },
+        {
+          "recording_id": 1,
+          "held_out_container": 17,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.939613,
+            0.060387
+          ]
+        },
+        {
+          "recording_id": 13,
+          "held_out_container": 17,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.451228,
+            0.548772
+          ]
+        },
+        {
+          "recording_id": 9,
+          "held_out_container": 17,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.90616,
+            0.09384
+          ]
+        },
+        {
+          "recording_id": 7,
+          "held_out_container": 18,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.647889,
+            0.352111
+          ]
+        },
+        {
+          "recording_id": 16,
+          "held_out_container": 18,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.051198,
+            0.948802
+          ]
+        },
+        {
+          "recording_id": 21,
+          "held_out_container": 18,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.086804,
+            0.913196
+          ]
+        },
+        {
+          "recording_id": 10,
+          "held_out_container": 18,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.71335,
+            0.28665
+          ]
+        },
+        {
+          "recording_id": 6,
+          "held_out_container": 18,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.864714,
+            0.135286
+          ]
+        },
+        {
+          "recording_id": 5,
+          "held_out_container": 18,
+          "actual": 0,
+          "predicted": 0,
+          "probabilities": [
+            0.692902,
+            0.307098
+          ]
+        }
+      ]
+    },
+    "content_type": {
+      "recordings": 18,
+      "correct": 16,
+      "accuracy": 0.8888888888888888,
+      "accuracy_wilson_95": [
+        0.672002348698212,
+        0.9689804773543876
+      ],
+      "majority_baseline_accuracy": 0.3333333333333333,
+      "balanced_accuracy": 0.8888888888888888,
+      "macro_f1": 0.882051282051282,
+      "confusion_matrix": [
+        [
+          6,
+          0,
+          0
+        ],
+        [
+          1,
+          4,
+          1
+        ],
+        [
+          0,
+          0,
+          6
+        ]
+      ],
+      "classes": [
+        1,
+        2,
+        3
+      ],
+      "predictions": [
+        {
+          "recording_id": 2,
+          "held_out_container": 16,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.087541,
+            0.231509,
+            0.68095
+          ]
+        },
+        {
+          "recording_id": 12,
+          "held_out_container": 16,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.517201,
+            0.382624,
+            0.100175
+          ]
+        },
+        {
+          "recording_id": 3,
+          "held_out_container": 16,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.17355,
+            0.703902,
+            0.122548
+          ]
+        },
+        {
+          "recording_id": 19,
+          "held_out_container": 16,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.163239,
+            0.737584,
+            0.099177
+          ]
+        },
+        {
+          "recording_id": 4,
+          "held_out_container": 16,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.163094,
+            0.226396,
+            0.61051
+          ]
+        },
+        {
+          "recording_id": 18,
+          "held_out_container": 16,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.43822,
+            0.422361,
+            0.139419
+          ]
+        },
+        {
+          "recording_id": 8,
+          "held_out_container": 17,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.345667,
+            0.602521,
+            0.051812
+          ]
+        },
+        {
+          "recording_id": 15,
+          "held_out_container": 17,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.10253,
+            0.11449,
+            0.782981
+          ]
+        },
+        {
+          "recording_id": 14,
+          "held_out_container": 17,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.640364,
+            0.312566,
+            0.04707
+          ]
+        },
+        {
+          "recording_id": 1,
+          "held_out_container": 17,
+          "actual": 2,
+          "predicted": 2,
+          "probabilities": [
+            0.283362,
+            0.654034,
+            0.062605
+          ]
+        },
+        {
+          "recording_id": 13,
+          "held_out_container": 17,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.186374,
+            0.23179,
+            0.581836
+          ]
+        },
+        {
+          "recording_id": 9,
+          "held_out_container": 17,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.713027,
+            0.199228,
+            0.087744
+          ]
+        },
+        {
+          "recording_id": 7,
+          "held_out_container": 18,
+          "actual": 2,
+          "predicted": 3,
+          "probabilities": [
+            0.373038,
+            0.223306,
+            0.403655
+          ]
+        },
+        {
+          "recording_id": 16,
+          "held_out_container": 18,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.034368,
+            0.030952,
+            0.934681
+          ]
+        },
+        {
+          "recording_id": 21,
+          "held_out_container": 18,
+          "actual": 3,
+          "predicted": 3,
+          "probabilities": [
+            0.11719,
+            0.004003,
+            0.878807
+          ]
+        },
+        {
+          "recording_id": 10,
+          "held_out_container": 18,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.687818,
+            0.087199,
+            0.224983
+          ]
+        },
+        {
+          "recording_id": 6,
+          "held_out_container": 18,
+          "actual": 1,
+          "predicted": 1,
+          "probabilities": [
+            0.825133,
+            0.082671,
+            0.092196
+          ]
+        },
+        {
+          "recording_id": 5,
+          "held_out_container": 18,
+          "actual": 2,
+          "predicted": 1,
+          "probabilities": [
+            0.457102,
+            0.244654,
+            0.298243
+          ]
+        }
+      ]
+    }
+  }
+}
