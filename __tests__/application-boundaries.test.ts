@@ -30,6 +30,31 @@ test('recording refuses to access the microphone without permission', async () =
   expect(recorder.start).not.toHaveBeenCalled();
 });
 
+test('recording coalesces concurrent starts and rejects a second active start', async () => {
+  const permission: MicrophonePermission = {
+    ensure: jest.fn(async () => true),
+  };
+  const recording = { uri: 'file:///recording.wav' };
+  const recorder: AudioRecorder = {
+    start: jest.fn(async () => recording),
+    stop: jest.fn(async () => recording),
+    cleanup: jest.fn(async () => undefined),
+  };
+  const useCase = new RecordingUseCase(permission, recorder);
+
+  const firstStart = useCase.start();
+  const secondStart = useCase.start();
+  await expect(Promise.all([firstStart, secondStart])).resolves.toEqual([
+    recording,
+    recording,
+  ]);
+  expect(permission.ensure).toHaveBeenCalledTimes(1);
+  expect(recorder.start).toHaveBeenCalledTimes(1);
+
+  await expect(useCase.start()).rejects.toThrow('already in progress');
+  expect(recorder.start).toHaveBeenCalledTimes(1);
+});
+
 test('scan rejects recordings shorter than one second before classification', async () => {
   const reader: AudioReader = {
     read: jest.fn(async () => shortAudio),
