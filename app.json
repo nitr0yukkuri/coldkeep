@@ -1,10 +1,4 @@
 {
   "name": "ColdKeep",
-  "displayName": "ColdKeep",
-  "plugins": [
-    "expo-asset"
-  ],
-  "android": {
-    "package": "com.anonymous.coldkeep"
-  }
+  "displayName": "ColdKeep"
 }
