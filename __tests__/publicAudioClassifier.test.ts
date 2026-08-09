@@ -14,4 +14,3 @@ test('public audio classifier returns finite probabilities', () => {
     expect(result.fillConfidence).toBeLessThanOrEqual(1);
   }
 });
-

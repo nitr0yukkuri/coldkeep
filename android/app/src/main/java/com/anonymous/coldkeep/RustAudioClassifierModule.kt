@@ -88,4 +88,3 @@ class RustAudioClassifierModule(
 
   private external fun nativeClassifyWav(path: String): String
 }
-

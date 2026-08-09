@@ -1,6 +1,6 @@
 # ColdKeep U-22提出用 評価レポート
 
-更新日: 2026-08-09  
+更新日: 2026-08-09
 評価対象: `ml/artifacts/baseline_metrics.json`
 
 ## 1. 評価の目的

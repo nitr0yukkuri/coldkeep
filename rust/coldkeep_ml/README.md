@@ -30,4 +30,3 @@ After `ml/artifacts/ice_presence_baseline.json` exists, the next Rust build
 embeds it automatically and returns `iceStatus: "trained"` with a binary
 `icePresence` value.  The training script still labels the artifact as a
 baseline; container-held-out evaluation is required before product claims.
-

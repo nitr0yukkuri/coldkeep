@@ -22,4 +22,3 @@ foreach ($architecture in $Architectures) {
 }
 
 Write-Output "Rust libraries written to $destination"
-

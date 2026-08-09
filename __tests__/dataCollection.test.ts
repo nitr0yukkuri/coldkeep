@@ -33,7 +33,6 @@ test('validates and normalizes collection labels', () => {
     action: 'shake',
   });
 });
-
 test('rejects physically inconsistent labels', () => {
   expect(() =>
     validateCollectionDraft({ ...validDraft, waterMl: '600' }),
@@ -68,4 +67,3 @@ test('escapes CSV metadata', () => {
   expect(row).toContain('"phone, primary"');
   expect(row).toContain('2.346');
 });
-

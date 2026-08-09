@@ -13,4 +13,3 @@ class RustAudioClassifierPackage : ReactPackage {
     reactContext: ReactApplicationContext,
   ): List<ViewManager<*, *>> = emptyList()
 }
-

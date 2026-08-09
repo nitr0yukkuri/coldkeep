@@ -14,4 +14,3 @@ fn main() {
     let contents = fs::read_to_string(&source).unwrap_or_else(|_| "null".to_string());
     fs::write(destination, contents).expect("write optional ice model");
 }
-

@@ -140,4 +140,3 @@ def extract_features(
         ]
     )
     return features.astype(np.float32)
-
