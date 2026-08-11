@@ -12,6 +12,15 @@ react {
 def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: false).toBoolean()
 def jscFlavor = 'org.webkit:android-jsc:+'
 
+// Release builds must be signed with a private key supplied by the build
+// environment. Never fall back to the shared Android debug keystore.
+def releaseStoreFile = System.getenv('COLDKEEP_RELEASE_STORE_FILE') ?: findProperty('COLDKEEP_RELEASE_STORE_FILE')
+def releaseStorePassword = System.getenv('COLDKEEP_RELEASE_STORE_PASSWORD') ?: findProperty('COLDKEEP_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = System.getenv('COLDKEEP_RELEASE_KEY_ALIAS') ?: findProperty('COLDKEEP_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('COLDKEEP_RELEASE_KEY_PASSWORD') ?: findProperty('COLDKEEP_RELEASE_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+    .every { value -> value != null && !value.toString().trim().isEmpty() }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -33,13 +42,28 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.debug
+            if (!hasReleaseSigning) {
+                throw new GradleException(
+                    'Release signing is not configured. Set COLDKEEP_RELEASE_STORE_FILE, ' +
+                    'COLDKEEP_RELEASE_STORE_PASSWORD, COLDKEEP_RELEASE_KEY_ALIAS, and ' +
+                    'COLDKEEP_RELEASE_KEY_PASSWORD.'
+                )
+            }
+            signingConfig signingConfigs.release
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
