@@ -4,13 +4,19 @@ import {
 } from '../../collection/domain/collection';
 import { ScanResult } from '../../scan/domain/scanResult';
 
-export type RecordingRef = {
-  uri: string;
-};
-
 export type PcmAudio = {
   samples: Float32Array;
   sampleRate: number;
+};
+
+export type RecordingRef = {
+  uri: string;
+  /**
+   * Expo Go can capture PCM in memory because it cannot load our custom
+   * native WAV recorder. Native adapters leave this unset and continue to
+   * use the file URI path.
+   */
+  audio?: PcmAudio;
 };
 
 export type AudioInput = {

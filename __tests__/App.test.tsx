@@ -29,7 +29,7 @@ jest.mock('../src/app/compositionRoot', () => ({
   }),
 }));
 
-import App from '../App';
+import App from '../src/app/NativeApp';
 
 test('renders correctly', async () => {
   await ReactTestRenderer.act(() => {

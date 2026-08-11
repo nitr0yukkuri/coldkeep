@@ -1,6 +1,7 @@
 /* eslint-disable no-bitwise */
 
 import modelArtifact from './ml/artifacts/public_audio_baseline.json';
+import { resamplePcm } from './src/platform/audio/resamplePcm';
 
 type LinearModel = {
   classes: number[];
@@ -37,25 +38,6 @@ const artifact = modelArtifact as ModelArtifact;
 const FFT_SIZE = 512;
 const FRAME_SIZE = 400;
 const FRAME_HOP = 160;
-
-function resample(samples: Float32Array, sourceRate: number): Float32Array {
-  if (sourceRate === artifact.sampleRate) {
-    return samples;
-  }
-  const length = Math.max(
-    1,
-    Math.round((samples.length * artifact.sampleRate) / sourceRate),
-  );
-  const output = new Float32Array(length);
-  for (let index = 0; index < length; index += 1) {
-    const source = (index * sourceRate) / artifact.sampleRate;
-    const left = Math.min(Math.floor(source), samples.length - 1);
-    const right = Math.min(left + 1, samples.length - 1);
-    const fraction = source - left;
-    output[index] = samples[left] * (1 - fraction) + samples[right] * fraction;
-  }
-  return output;
-}
 
 function fftPower(frame: Float32Array): Float64Array {
   const real = new Float64Array(FFT_SIZE);
@@ -249,7 +231,7 @@ export function classifyPublicAudio(
   input: Float32Array,
   sourceRate: number,
 ): PublicAudioPrediction {
-  const samples = resample(input, sourceRate);
+  const samples = resamplePcm(input, sourceRate, artifact.sampleRate);
   const features = recordingWindows(samples).map(extractWindowFeatures);
   const waterModel = artifact.models.water_presence;
   const waterProbabilities = averagedPrediction(features, waterModel);
