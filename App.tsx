@@ -35,19 +35,14 @@ const MetricCard = ({
   title,
   value,
   unit,
-  icon,
   color,
 }: {
   title: string;
   value: string | number;
   unit: string;
-  icon: string;
   color: string;
 }) => (
-  <View style={styles.metricCard}>
-    <View style={[styles.metricIcon, { backgroundColor: `${color}22` }]}>
-      <Text style={styles.metricIconText}>{icon}</Text>
-    </View>
+  <View style={[styles.metricCard, { borderLeftColor: color }]}>
     <Text style={styles.metricTitle}>{title}</Text>
     <Text
       style={[
@@ -59,32 +54,6 @@ const MetricCard = ({
       {value}
     </Text>
     <Text style={styles.metricUnit}>{unit}</Text>
-  </View>
-);
-
-const ScanInfoCard = ({
-  title,
-  description,
-  tone,
-}: {
-  title: string;
-  description: string;
-  tone: 'blue' | 'green' | 'neutral';
-}) => (
-  <View
-    style={[
-      styles.scanInfoCard,
-      tone === 'blue'
-        ? styles.scanInfoCardBlue
-        : tone === 'green'
-          ? styles.scanInfoCardGreen
-          : styles.scanInfoCardNeutral,
-    ]}
-  >
-    <View style={styles.scanInfoText}>
-      <Text style={styles.scanInfoTitle}>{title}</Text>
-      <Text style={styles.scanInfoDescription}>{description}</Text>
-    </View>
   </View>
 );
 
@@ -117,10 +86,9 @@ const LabeledInput = ({
 export default function App() {
   const app = useMemo(() => createAppDependencies(), []);
   const [mode, setMode] = useState<'scan' | 'collect'>('scan');
-  const [status, setStatus] = useState('Public Model Ready');
+  const [status, setStatus] = useState('準備できました');
   const [content, setContent] = useState('UNKNOWN');
   const [fillLevel, setFillLevel] = useState('—');
-  const [confidence, setConfidence] = useState('—');
   const [icePresence, setIcePresence] = useState('UNKNOWN');
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -131,12 +99,14 @@ export default function App() {
     content === 'WATER' ? '水あり' : content === 'NON-WATER' ? '水なし' : '未判定';
   const iceDisplay =
     icePresence === 'PRESENT' ? 'あり' : icePresence === 'ABSENT' ? 'なし' : '未判定';
+  const hasResult = content !== 'UNKNOWN';
+  const hasIceResult = icePresence !== 'UNKNOWN';
 
   useEffect(() => {
     if (mode === 'collect') {
-      setStatus('Collection Ready');
+      setStatus('データ収集の準備ができました');
     } else {
-      setStatus('Public Model Ready');
+      setStatus('準備できました');
     }
   }, [mode]);
 
@@ -150,11 +120,10 @@ export default function App() {
   const handleScan = useCallback(
     async (uri: string) => {
       try {
-        setStatus('Analyzing...');
+        setStatus('確認中…');
         const result = await app.scan.execute({ uri });
         setContent(result.containsWater ? 'WATER' : 'NON-WATER');
         setFillLevel(result.fillLevel === null ? 'N/A' : `${result.fillLevel}%`);
-        setConfidence(`${Math.round(result.waterConfidence * 100)}% confidence`);
         setIcePresence(
           result.icePresence === null
             ? 'UNKNOWN'
@@ -162,17 +131,13 @@ export default function App() {
               ? 'PRESENT'
               : 'ABSENT',
         );
-        setStatus(
-          `${result.engine === 'rust' ? 'Rust' : 'TypeScript'} estimate complete` +
-            (result.iceStatus === 'untrained' ? ' (ice model needs labels)' : ''),
-        );
+        setStatus('確認が完了しました');
       } catch (error) {
         console.error(error);
         setContent('UNKNOWN');
         setFillLevel('—');
-        setConfidence('—');
         setIcePresence('UNKNOWN');
-        setStatus(error instanceof Error ? error.message : 'Inference Error');
+        setStatus(error instanceof Error ? error.message : '確認に失敗しました');
       }
     },
     [app],
@@ -190,13 +155,11 @@ export default function App() {
       setPendingLabels(labels);
       setIsRecording(true);
       setIsProcessing(false);
-      setStatus(
-        mode === 'collect' ? 'Recording labeled sample...' : 'Listening...',
-      );
+      setStatus('録音中…');
     } catch (error) {
       console.error(error);
       setIsRecording(false);
-      setStatus(error instanceof Error ? error.message : 'Recording Failed');
+      setStatus(error instanceof Error ? error.message : '録音を開始できませんでした');
     }
   }
 
@@ -204,17 +167,18 @@ export default function App() {
     recording: RecordingRef,
     labels: CollectionLabels,
   ) {
-    setStatus('Validating WAV...');
+    setStatus('録音を保存中…');
     const record = await app.collect.execute(recording, labels);
     setSavedRecordings(count => count + 1);
-    setStatus(`Saved ${record.recordingId}`);
+    setStatus(`保存しました（${record.recordingId}）`);
   }
 
   async function shareManifest() {
     try {
       await app.exportDataset.execute();
+      setStatus('CSVを書き出しました');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Export Failed');
+      setStatus(error instanceof Error ? error.message : 'CSVを書き出せませんでした');
     }
   }
 
@@ -225,7 +189,7 @@ export default function App() {
     setIsProcessing(true);
     let recording: RecordingRef | null = null;
     try {
-      setStatus('Processing...');
+      setStatus(mode === 'collect' ? '録音を保存中…' : '確認中…');
       recording = await app.recording.stop();
 
       setIsRecording(false);
@@ -242,7 +206,7 @@ export default function App() {
       console.error(error);
       setIsRecording(false);
       setPendingLabels(null);
-      setStatus(error instanceof Error ? error.message : 'Recording Failed');
+      setStatus(error instanceof Error ? error.message : '録音を処理できませんでした');
     } finally {
       if (recording) {
         await app.recording.cleanup(recording).catch(() => undefined);
@@ -258,31 +222,15 @@ export default function App() {
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>ColdKeep</Text>
-        {mode === 'scan' ? (
-          <Text style={styles.headerSubtitle}>AI水筒アシスタント</Text>
-        ) : null}
-        <Text style={styles.statusText}>{status}</Text>
-      </View>
-
-      <View style={styles.modeTabs}>
-        {(['scan', 'collect'] as const).map(item => (
-          <TouchableOpacity
-            key={item}
-            disabled={isRecording || isProcessing}
-            style={[styles.modeTab, mode === item && styles.activeModeTab]}
-            onPress={() => setMode(item)}
-          >
-            <Text style={styles.modeTabText}>
-              {item === 'scan' ? 'SCAN' : 'COLLECT DATA'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <Text style={styles.headerSubtitle}>
+          {mode === 'scan' ? '水筒チェック' : 'データ収集'}
+        </Text>
       </View>
 
       {mode === 'scan' ? (
         <View style={styles.scanScreen}>
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>現在の水の状態</Text>
+            <Text style={styles.heroLabel}>現在の状態</Text>
             <Text
               style={[
                 styles.heroValue,
@@ -293,43 +241,44 @@ export default function App() {
             </Text>
             <Text style={styles.heroDescription}>
               {content === 'UNKNOWN'
-                ? '音声解析を始めてください'
+                ? '水筒を軽く振ってチェックします'
                 : content === 'WATER'
-                  ? '水が入っている可能性があります'
+                  ? '水が入っています'
                   : '水が検出されませんでした'}
-            </Text>
-            <Text style={styles.heroConfidence}>
-              {content === 'UNKNOWN' ? '未解析' : confidence}
             </Text>
           </View>
 
-          <View style={styles.metricRow}>
-            <MetricCard
-              title="充填率"
-              value={fillLevel}
-              unit="50 / 90%"
-              icon="◒"
-              color="#0b8fbd"
-            />
-            <MetricCard
-              title="氷の有無"
-              value={iceDisplay}
-              unit="PRESENT / ABSENT"
-              icon="❄"
-              color="#159b8b"
-            />
-          </View>
+          {hasResult && (content === 'WATER' || hasIceResult) ? (
+            <View style={styles.metricRow}>
+              {content === 'WATER' ? (
+                <MetricCard
+                  title="充填率"
+                  value={fillLevel}
+                  unit="50% / 90%の目安"
+                  color="#087ea4"
+                />
+              ) : null}
+              {hasIceResult ? (
+                <MetricCard
+                  title="氷の有無"
+                  value={iceDisplay}
+                  unit="音からの目安"
+                  color="#168276"
+                />
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.analysisCard}>
             <Text style={styles.analysisDescription}>
-              水筒を軽く叩いた音をAIで解析
+              水筒の音を聞いて状態を確認します
             </Text>
             <Text style={styles.analysisHint}>
               {isProcessing
-                ? '解析中です。結果が表示されるまでお待ちください'
+                ? '確認中です。少しお待ちください'
                 : isRecording
-                ? '録音中です。終わったら停止してください'
-                : '1秒以上録音すると水の有無と充填率を判定します'}
+                ? '振り終わったら停止してください'
+                : '水筒を軽く振って1秒以上録音してください'}
             </Text>
             <TouchableOpacity
               disabled={isProcessing}
@@ -342,107 +291,101 @@ export default function App() {
             >
               <Text style={styles.analysisButtonText}>
                 {isProcessing
-                  ? '解析中...'
+                  ? '確認中…'
                   : isRecording
-                    ? '録音を停止して解析'
-                    : '音を解析する'}
+                    ? '停止して確認'
+                    : 'チェックする'}
               </Text>
             </TouchableOpacity>
+            {status !== '準備できました' && status !== '確認が完了しました' ? (
+              <Text style={styles.analysisStatus}>{status}</Text>
+            ) : null}
           </View>
 
-          <View style={styles.scanSection}>
-            <Text style={styles.scanSectionTitle}>次にできること</Text>
-            {content === 'UNKNOWN' ? (
-              <ScanInfoCard
-                title="まず音を解析してください"
-                description="水の有無と、学習済みクラス（50% / 90%）の充填率を音声から確認できます"
-                tone="blue"
-              />
-            ) : (
-              <ScanInfoCard
-                title="解析結果を確認してください"
-                description="容器やマイクの条件によって結果が変わる場合があります"
-                tone="blue"
-              />
-            )}
-            <ScanInfoCard
-              title="氷の判定"
-              description={
-                icePresence === 'UNKNOWN'
-                  ? '氷モデルはラベルデータを収集中です'
-                  : `氷は${iceDisplay}`
-              }
-              tone={icePresence === 'UNKNOWN' ? 'neutral' : 'green'}
-            />
-          </View>
-
-          <View style={styles.modelCard}>
-            <Text style={styles.modelCardTitle}>推論情報</Text>
-            <Text style={styles.modelCardText}>{status}</Text>
-            <Text style={styles.modelCardText}>
-              氷判定は二値のみ。温度・氷量の推定は行いません。
-            </Text>
-          </View>
+          <Text style={styles.resultNote}>
+            結果は録音する距離や振り方によって変わることがあります
+          </Text>
+          <TouchableOpacity
+            disabled={isRecording || isProcessing}
+            style={styles.developerLink}
+            onPress={() => setMode('collect')}
+          >
+            <Text style={styles.developerLinkText}>データ収集（開発用）</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.collectionPanel}>
-          <Text style={styles.sectionTitle}>GROUND-TRUTH LABELS</Text>
+          <View style={styles.collectionHeaderRow}>
+            <View style={styles.collectionHeaderText}>
+              <Text style={styles.sectionTitle}>データ収集</Text>
+              <Text style={styles.sectionHint}>
+                学習用の録音と実測値を保存します
+              </Text>
+            </View>
+            <TouchableOpacity
+              disabled={isRecording || isProcessing}
+              style={styles.backLink}
+              onPress={() => setMode('scan')}
+            >
+              <Text style={styles.backLinkText}>チェック画面へ</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.inputGrid}>
             <LabeledInput
-              label="Session ID"
+              label="セッション"
               value={collectionDraft.sessionId}
               onChangeText={value => updateCollectionField('sessionId', value)}
               editable={!isRecording}
             />
             <LabeledInput
-              label="Container ID"
+              label="水筒"
               value={collectionDraft.containerId}
               onChangeText={value => updateCollectionField('containerId', value)}
               editable={!isRecording}
             />
             <LabeledInput
-              label="Device ID"
+              label="端末"
               value={collectionDraft.deviceId}
               onChangeText={value => updateCollectionField('deviceId', value)}
               editable={!isRecording}
             />
             <LabeledInput
-              label="Capacity (mL)"
+              label="容量 (mL)"
               value={collectionDraft.capacityMl}
               onChangeText={value => updateCollectionField('capacityMl', value)}
               numeric
               editable={!isRecording}
             />
             <LabeledInput
-              label="Water (mL)"
+              label="水量 (mL)"
               value={collectionDraft.waterMl}
               onChangeText={value => updateCollectionField('waterMl', value)}
               numeric
               editable={!isRecording}
             />
             <LabeledInput
-              label="Ice count"
+              label="氷の個数"
               value={collectionDraft.iceCount}
               onChangeText={value => updateCollectionField('iceCount', value)}
               numeric
               editable={!isRecording}
             />
             <LabeledInput
-              label="Ice mass (g)"
+              label="氷の重さ (g)"
               value={collectionDraft.iceMassG}
               onChangeText={value => updateCollectionField('iceMassG', value)}
               numeric
               editable={!isRecording}
             />
             <LabeledInput
-              label="Measured temp (°C)"
+              label="水温 (°C)"
               value={collectionDraft.temperatureC}
               onChangeText={value => updateCollectionField('temperatureC', value)}
               numeric
               editable={!isRecording}
             />
             <LabeledInput
-              label="Mic distance (cm)"
+              label="マイク距離 (cm)"
               value={collectionDraft.microphoneDistanceCm}
               onChangeText={value =>
                 updateCollectionField('microphoneDistanceCm', value)
@@ -451,7 +394,7 @@ export default function App() {
               editable={!isRecording}
             />
           </View>
-          <Text style={styles.inputLabel}>Action</Text>
+          <Text style={styles.inputLabel}>動作</Text>
           <View style={styles.actionRow}>
             {COLLECTION_ACTIONS.map(action => (
               <TouchableOpacity
@@ -463,28 +406,31 @@ export default function App() {
                 ]}
                 onPress={() => updateCollectionField('action', action)}
               >
-                <Text style={styles.actionText}>{action.toUpperCase()}</Text>
+                <Text style={styles.actionText}>
+                  {action === 'pour' ? '傾ける' : action === 'shake' ? '振る' : '静置'}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.savedCount}>Saved this run: {savedRecordings}</Text>
+          <Text style={styles.savedCount}>今回保存: {savedRecordings}件</Text>
         </View>
       )}
 
       {mode === 'collect' ? (
         <View style={styles.controls}>
+          <Text style={styles.collectionStatus}>{status}</Text>
           <TouchableOpacity
             disabled={isProcessing}
             style={[styles.button, isRecording && styles.activeRec]}
             onPress={isRecording ? stopRecording : startRecording}
           >
             <Text style={styles.buttonText}>
-              {isRecording ? 'STOP & SAVE' : 'START RECORDING'}
+              {isRecording ? '停止して保存' : '録音して保存'}
             </Text>
           </TouchableOpacity>
           {!isRecording ? (
             <TouchableOpacity style={styles.exportButton} onPress={shareManifest}>
-              <Text style={styles.exportText}>EXPORT LABEL CSV</Text>
+              <Text style={styles.exportText}>CSVを書き出す</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -496,129 +442,104 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#f4f7f8',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 50,
+    paddingTop: 36,
+    paddingBottom: 40,
   },
-  header: { marginBottom: 16, alignItems: 'center' },
-  headerTitle: { fontSize: 32, fontWeight: '800', color: '#fff' },
-  headerSubtitle: { color: '#b8c0d4', marginTop: 4, fontSize: 14 },
-  statusText: { color: '#8993aa', marginTop: 8, paddingHorizontal: 20, textAlign: 'center' },
-  scanScreen: { width: '92%', alignItems: 'center' },
+  header: { marginBottom: 24, alignItems: 'center' },
+  headerTitle: { fontSize: 30, fontWeight: '800', color: '#17323b' },
+  headerSubtitle: { color: '#62747a', marginTop: 4, fontSize: 15 },
+  scanScreen: { width: '90%', alignItems: 'center' },
   heroCard: {
     width: '100%',
     alignItems: 'center',
-    paddingVertical: 28,
+    paddingVertical: 24,
     paddingHorizontal: 16,
-    borderRadius: 24,
-    backgroundColor: '#e1f1f5',
+    borderRadius: 16,
+    backgroundColor: '#e8f4f6',
     borderWidth: 1,
-    borderColor: '#a9dbe7',
+    borderColor: '#c4e2e6',
   },
-  heroLabel: { color: '#4c6872', fontSize: 14, fontWeight: '600' },
-  heroValue: { color: '#0788b8', fontSize: 44, fontWeight: '800', marginTop: 12 },
+  heroLabel: { color: '#5a737a', fontSize: 14, fontWeight: '600' },
+  heroValue: { color: '#087ea4', fontSize: 42, fontWeight: '800', marginTop: 10 },
   heroValueCompact: { fontSize: 28 },
-  heroDescription: { color: '#36535e', fontSize: 15, marginTop: 4, textAlign: 'center' },
-  heroConfidence: { color: '#148c78', fontSize: 14, fontWeight: '700', marginTop: 14 },
-  metricRow: { flexDirection: 'row', width: '100%', gap: 12, marginTop: 14 },
+  heroDescription: { color: '#45636a', fontSize: 15, marginTop: 4, textAlign: 'center' },
+  metricRow: { flexDirection: 'row', width: '100%', gap: 10, marginTop: 12 },
   metricCard: {
     flex: 1,
-    minHeight: 150,
-    padding: 16,
-    borderRadius: 18,
+    minHeight: 112,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e0e6eb',
-    elevation: 2,
-    shadowColor: '#0b2330',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    borderColor: '#dce7e9',
+    borderLeftWidth: 3,
   },
-  metricIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  metricIconText: { fontSize: 20 },
-  metricTitle: { color: '#1e2931', fontSize: 14, fontWeight: '600', marginTop: 12 },
-  metricValue: { color: '#0788b8', fontSize: 28, fontWeight: '800', marginTop: 12 },
+  metricTitle: { color: '#36515a', fontSize: 13, fontWeight: '600' },
+  metricValue: { color: '#087ea4', fontSize: 25, fontWeight: '800', marginTop: 10 },
   metricValueCompact: { fontSize: 17 },
-  metricUnit: { color: '#71808a', fontSize: 11, marginTop: 6 },
+  metricUnit: { color: '#73878c', fontSize: 11, marginTop: 5 },
   analysisCard: {
     width: '100%',
     alignItems: 'center',
-    padding: 18,
-    marginTop: 14,
-    borderRadius: 18,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e6eb',
-  },
-  analysisDescription: { color: '#40515a', fontSize: 15, fontWeight: '600' },
-  analysisHint: { color: '#81909a', fontSize: 12, marginTop: 5, textAlign: 'center' },
-  analysisButton: {
-    width: '100%',
-    minHeight: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-    borderRadius: 14,
-    backgroundColor: '#078fbd',
-  },
-  analysisButtonActive: { backgroundColor: '#d94b59' },
-  analysisButtonDisabled: { backgroundColor: '#7d8b94' },
-  analysisButtonText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  scanSection: { width: '100%', marginTop: 28 },
-  scanSectionTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 12 },
-  scanInfoCard: {
-    flexDirection: 'row',
-    minHeight: 86,
-    alignItems: 'center',
     padding: 16,
-    marginBottom: 10,
+    marginTop: 12,
     borderRadius: 16,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e0e6eb',
+    borderColor: '#dce7e9',
   },
-  scanInfoCardBlue: { borderLeftWidth: 4, borderLeftColor: '#078fbd' },
-  scanInfoCardGreen: { borderLeftWidth: 4, borderLeftColor: '#159b8b' },
-  scanInfoCardNeutral: { borderLeftWidth: 4, borderLeftColor: '#9aa7af' },
-  scanInfoText: { flex: 1 },
-  scanInfoTitle: { color: '#1e2931', fontSize: 16, fontWeight: '700' },
-  scanInfoDescription: { color: '#71808a', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  modelCard: { width: '100%', padding: 16, marginTop: 6, borderRadius: 16, backgroundColor: '#253445' },
-  modelCardTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  modelCardText: { color: '#c3d0da', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  controls: { alignItems: 'center' },
-  button: {
-    backgroundColor: '#4facfe',
-    paddingVertical: 20,
-    paddingHorizontal: 60,
-    borderRadius: 40,
-    elevation: 5,
-  },
-  activeRec: { backgroundColor: '#ff4b4b' },
-  buttonText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  modeTabs: {
-    flexDirection: 'row',
-    width: '90%',
-    backgroundColor: '#101024',
+  analysisDescription: { color: '#36515a', fontSize: 15, fontWeight: '600' },
+  analysisHint: { color: '#73878c', fontSize: 13, marginTop: 5, textAlign: 'center' },
+  analysisButton: {
+    width: '100%',
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 13,
     borderRadius: 12,
-    padding: 4,
+    backgroundColor: '#087ea4',
   },
-  modeTab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 9 },
-  activeModeTab: { backgroundColor: '#334a70' },
-  modeTabText: { color: '#fff', fontWeight: '700' },
-  collectionPanel: { width: '90%', marginVertical: 22 },
-  sectionTitle: { color: '#fff', fontWeight: '800', marginBottom: 14 },
+  analysisButtonActive: { backgroundColor: '#c94f57' },
+  analysisButtonDisabled: { backgroundColor: '#9aa9ad' },
+  analysisButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  analysisStatus: { color: '#b04b50', fontSize: 12, marginTop: 9, textAlign: 'center' },
+  resultNote: { color: '#73878c', fontSize: 12, marginTop: 14, textAlign: 'center' },
+  developerLink: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 10 },
+  developerLinkText: { color: '#6d8489', fontSize: 12 },
+  collectionStatus: { color: '#62747a', fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  collectionPanel: { width: '90%', marginBottom: 18 },
+  collectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  collectionHeaderText: { flex: 1, paddingRight: 12 },
+  sectionTitle: { color: '#17323b', fontSize: 20, fontWeight: '800' },
+  sectionHint: { color: '#62747a', fontSize: 13, lineHeight: 18, marginTop: 5 },
+  backLink: { paddingVertical: 4 },
+  backLinkText: { color: '#087ea4', fontSize: 12, fontWeight: '700' },
+  controls: { alignItems: 'center', width: '90%' },
+  button: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#087ea4',
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  activeRec: { backgroundColor: '#c94f57' },
+  buttonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   inputGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   inputGroup: { width: '50%', paddingHorizontal: 5, marginBottom: 12 },
-  inputLabel: { color: '#b8c0d4', fontSize: 12, marginBottom: 5 },
+  inputLabel: { color: '#62747a', fontSize: 12, marginBottom: 5 },
   input: {
-    color: '#fff',
-    backgroundColor: '#101024',
-    borderColor: '#3d4661',
+    color: '#17323b',
+    backgroundColor: '#fff',
+    borderColor: '#d4e1e3',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 9,
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
@@ -629,12 +550,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     marginRight: 6,
-    borderRadius: 8,
-    backgroundColor: '#101024',
+    borderRadius: 9,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4e1e3',
   },
-  activeAction: { backgroundColor: '#216d8a' },
-  actionText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  savedCount: { color: '#8f9bb3', textAlign: 'right' },
-  exportButton: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 24 },
-  exportText: { color: '#7cc9ff', fontWeight: '700' },
+  activeAction: { backgroundColor: '#dceff1', borderColor: '#087ea4' },
+  actionText: { color: '#36515a', fontSize: 12, fontWeight: '700' },
+  savedCount: { color: '#73878c', textAlign: 'right' },
+  exportButton: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 24 },
+  exportText: { color: '#087ea4', fontWeight: '700' },
 });
