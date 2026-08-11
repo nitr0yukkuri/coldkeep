@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -9,14 +9,15 @@ import {
   View,
 } from 'react-native';
 
-import { createAppDependencies } from './src/app/compositionRoot';
+import type { AppDependencies } from './src/app/types';
 import {
   COLLECTION_ACTIONS,
   CollectionDraft,
   CollectionLabels,
+  MODEL_RECORDING_ACTION,
   validateCollectionDraft,
 } from './src/features/collection/domain/collection';
-import { RecordingRef } from './src/features/shared/application/ports';
+import type { RecordingRef } from './src/features/shared/application/ports';
 
 const initialCollectionDraft: CollectionDraft = {
   sessionId: 'session-01',
@@ -28,7 +29,7 @@ const initialCollectionDraft: CollectionDraft = {
   iceMassG: '0',
   temperatureC: '20',
   microphoneDistanceCm: '10',
-  action: 'shake',
+  action: MODEL_RECORDING_ACTION,
 };
 
 const MetricCard = ({
@@ -83,8 +84,7 @@ const LabeledInput = ({
   </View>
 );
 
-export default function App() {
-  const app = useMemo(() => createAppDependencies(), []);
+export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [mode, setMode] = useState<'scan' | 'collect'>('scan');
   const [status, setStatus] = useState('準備できました');
   const [content, setContent] = useState('UNKNOWN');
@@ -241,7 +241,7 @@ export default function App() {
             </Text>
             <Text style={styles.heroDescription}>
               {content === 'UNKNOWN'
-                ? '水筒を軽く振ってチェックします'
+                ? '水筒に水を注ぐ音でチェックします'
                 : content === 'WATER'
                   ? '水が入っています'
                   : '水が検出されませんでした'}
@@ -277,8 +277,8 @@ export default function App() {
               {isProcessing
                 ? '確認中です。少しお待ちください'
                 : isRecording
-                ? '振り終わったら停止してください'
-                : '水筒を軽く振って1秒以上録音してください'}
+                ? '注ぎ終わったら停止してください'
+                : '水筒に水を注ぎながら1秒以上録音してください'}
             </Text>
             <TouchableOpacity
               disabled={isProcessing}
@@ -303,7 +303,7 @@ export default function App() {
           </View>
 
           <Text style={styles.resultNote}>
-            結果は録音する距離や振り方によって変わることがあります
+            結果は注ぐ速度、録音距離、容器によって変わることがあります
           </Text>
           <TouchableOpacity
             disabled={isRecording || isProcessing}

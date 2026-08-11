@@ -12,6 +12,7 @@ import { RustClassifierAdapter } from '../platform/ml/rustClassifier';
 import { TypeScriptClassifierAdapter } from '../platform/ml/typescriptClassifier';
 import { RnfsDatasetRepository } from '../platform/storage/rnfsDatasetRepository';
 import { ReactNativeShareGateway } from '../platform/sharing/reactNativeShareGateway';
+import { COLLECTION_ACTIONS } from '../features/collection/domain/collection';
 
 export function createAppDependencies() {
   const recorder =
@@ -28,7 +29,7 @@ export function createAppDependencies() {
   const repository = new RnfsDatasetRepository();
 
   return {
-    collectionActions: ['pour', 'shake', 'still'] as const,
+    collectionActions: COLLECTION_ACTIONS,
     recording,
     scan: new ScanBottleUseCase(reader, [
       new RustClassifierAdapter(),

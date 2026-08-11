@@ -1,5 +1,12 @@
 export const COLLECTION_ACTIONS = ['pour', 'shake', 'still'] as const;
 
+/**
+ * The public scan model was trained and evaluated on pouring recordings.
+ * Shake/still remain collection labels for future experiments, but they are
+ * not valid inputs for the current scan model.
+ */
+export const MODEL_RECORDING_ACTION = 'pour' as const;
+
 export type CollectionAction = (typeof COLLECTION_ACTIONS)[number];
 
 export type CollectionDraft = {

@@ -49,6 +49,11 @@ clearing app data or uninstalling the app.
 Never randomly split windows from one WAV across training and evaluation. Hold
 out complete sessions, containers, and phones to measure real generalization.
 
+The current `SCAN` baseline accepts only `pour`: ACM-S2 water recordings use a
+pouring action. `shake` and `still` are retained here as experimental collection
+labels, but they are out of distribution for the current scan model and must not
+be presented as evaluated scan inputs.
+
 ## Ice binary model
 
 The app records both `ice_count` and `ice_mass_g` as ground truth. The model
