@@ -1,4 +1,15 @@
 {
   "name": "ColdKeep",
-  "displayName": "ColdKeep"
+  "displayName": "ColdKeep",
+  "expo": {
+    "name": "ColdKeep",
+    "slug": "coldkeep",
+    "version": "0.0.1",
+    "ios": {
+      "bundleIdentifier": "com.nitroyukkuri.coldkeep"
+    },
+    "android": {
+      "package": "com.anonymous.coldkeep"
+    }
+  }
 }
