@@ -1,5 +1,4 @@
-// metro.config.js
-const { getDefaultConfig } = require('expo/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
@@ -7,4 +6,4 @@ const config = getDefaultConfig(__dirname);
 config.resolver.assetExts.push('tflite');
 config.resolver.assetExts.push('bin');
 
-module.exports = config;
+module.exports = mergeConfig(config, {});

@@ -1,5 +1,4 @@
-import { registerRootComponent } from 'expo';
+import { AppRegistry } from 'react-native';
 import App from './App';
 
-// これを使うと、自動的に「main」として登録されます
-registerRootComponent(App);
+AppRegistry.registerComponent('ColdKeep', () => App);
