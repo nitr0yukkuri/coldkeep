@@ -86,9 +86,11 @@ final class ColdKeepAudioRecorder: NSObject {
     rejecter reject: @escaping RCTPromiseRejectBlock
   ) {
     lock.lock()
+    // iOS may stop the recorder during a phone call or another audio
+    // interruption. Keep the URL so stop() can finalize that partial file
+    // and let the JavaScript state machine recover on the next recording.
     guard let activeRecorder = recorder,
-          let url = currentURL,
-          activeRecorder.isRecording else {
+          let url = currentURL else {
       lock.unlock()
       reject("NOT_RECORDING", "No recording is in progress", nil)
       return
