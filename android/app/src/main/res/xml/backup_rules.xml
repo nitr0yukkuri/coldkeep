@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="file" path="coldkeep-dataset" />
+    <exclude domain="root" path="cache" />
+    <exclude domain="root" path="no_backup" />
+</full-backup-content>
