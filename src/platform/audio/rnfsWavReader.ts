@@ -12,6 +12,9 @@ function localPath(uri: string): string {
 
 export class RnfsWavReader implements AudioReader {
   async read(recording: RecordingRef) {
+    if (recording.audio) {
+      return recording.audio;
+    }
     const base64 = await RNFS.readFile(localPath(recording.uri), 'base64');
     return parsePcm16Wav(base64);
   }
