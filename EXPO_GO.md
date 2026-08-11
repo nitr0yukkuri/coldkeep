@@ -43,3 +43,14 @@ npx expo export --platform android
 
 上記のexportはJavaScriptバンドルの検証です。マイクの実録音と権限ダイアログは、Expo Goを
 実機で開いて確認します。WindowsではiOSネイティブビルドは行いません。
+
+## 依存監査
+
+2026-08-11に `npm audit --omit=dev --audit-level=high` を実行したところ、18件（high 11、
+moderate 7）が報告されました。内訳はExpo CLI/Metroのビルド時依存 `image-size@1.2.1` と、
+Expo config pluginのビルド時依存 `uuid@7.0.3` です。これらはExpo Goへ配信するColdKeepの
+JavaScriptバンドルには含まれず、端末上の録音・推論コードからは到達しません。
+
+現時点の修正提案は `npm audit fix --force` だけで、Expo SDKを57から53へ下げる破壊的変更を
+含むため適用していません。Expo SDKの互換更新で修正版が提供された時点で、exportと実機確認を
+やり直してから更新します。依存取得時は必ず `expo-go/package-lock.json` を使ってください。
