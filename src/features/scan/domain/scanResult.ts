@@ -17,6 +17,7 @@ export type ScanResult = {
  * low-confidence scans can be shown as `未判定` and never feed hydration math.
  */
 export const MIN_SCAN_CONFIDENCE = 0.65;
+export const MIN_ICE_CONFIDENCE = 0.65;
 
 export function unknownScanResult(
   engine: InferenceEngine = 'typescript',
@@ -53,14 +54,20 @@ export function normalizeScanResult(result: ScanResult): ScanResult {
   const fillConfidence = result.containsWater
     ? clampConfidence(result.fillConfidence)
     : null;
-  const iceConfidence =
+  const candidateIceConfidence =
     result.icePresence === null ? null : clampConfidence(result.iceConfidence);
+  const iceIsReliable =
+    result.iceStatus === 'trained' &&
+    result.icePresence !== null &&
+    candidateIceConfidence !== null &&
+    candidateIceConfidence >= MIN_ICE_CONFIDENCE;
 
   return {
     ...result,
     waterConfidence,
     fillLevel,
     fillConfidence,
-    iceConfidence,
+    icePresence: iceIsReliable ? result.icePresence : null,
+    iceConfidence: iceIsReliable ? candidateIceConfidence : null,
   };
 }

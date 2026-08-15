@@ -139,9 +139,48 @@ test('scan result normalization enforces the public result contract', () => {
     waterConfidence: 1,
     fillLevel: null,
     fillConfidence: null,
-    icePresence: true,
-    iceConfidence: 1,
+    icePresence: null,
+    iceConfidence: null,
     iceStatus: 'untrained',
     engine: 'typescript',
   });
+});
+
+test('scan result normalization hides untrained or low-confidence ice claims', () => {
+  expect(
+    normalizeScanResult({
+      containsWater: true,
+      waterConfidence: 0.9,
+      fillLevel: 50,
+      fillConfidence: 0.9,
+      icePresence: true,
+      iceConfidence: 0.9,
+      iceStatus: 'untrained',
+      engine: 'typescript',
+    }).icePresence,
+  ).toBeNull();
+  expect(
+    normalizeScanResult({
+      containsWater: true,
+      waterConfidence: 0.9,
+      fillLevel: 50,
+      fillConfidence: 0.9,
+      icePresence: true,
+      iceConfidence: 0.64,
+      iceStatus: 'trained',
+      engine: 'typescript',
+    }).icePresence,
+  ).toBeNull();
+  expect(
+    normalizeScanResult({
+      containsWater: true,
+      waterConfidence: 0.9,
+      fillLevel: 50,
+      fillConfidence: 0.9,
+      icePresence: false,
+      iceConfidence: 0.65,
+      iceStatus: 'trained',
+      engine: 'typescript',
+    }).icePresence,
+  ).toBe(false);
 });

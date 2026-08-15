@@ -107,6 +107,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [inferenceEngine, setInferenceEngine] =
     useState<InferenceEngine | null>(null);
   const [icePresence, setIcePresence] = useState('UNKNOWN');
+  const [iceStatus, setIceStatus] = useState<'untrained' | 'trained'>(
+    'untrained',
+  );
+  const [iceConfidence, setIceConfidence] = useState<number | null>(null);
   const [hasScanResult, setHasScanResult] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -230,6 +234,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               ? 'PRESENT'
               : 'ABSENT',
         );
+        setIceStatus(result.iceStatus);
+        setIceConfidence(result.iceConfidence);
         if (
           waterIsReliable &&
           fillIsReliable &&
@@ -263,6 +269,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setFillConfidence(null);
         setInferenceEngine(null);
         setIcePresence('UNKNOWN');
+        setIceStatus('untrained');
+        setIceConfidence(null);
         setStatus(
           error instanceof Error ? error.message : '確認に失敗しました',
         );
@@ -457,7 +465,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 title="氷の有無"
                 value={iceDisplay}
                 unit={
-                  icePresence === 'UNKNOWN' ? '学習前は未判定' : '音からの目安'
+                  icePresence === 'UNKNOWN'
+                    ? iceStatus === 'trained'
+                      ? `信頼度不足（${formatProbability(iceConfidence)}）`
+                      : '学習前は未判定'
+                    : `音からの目安（${formatProbability(iceConfidence)}）`
                 }
                 color="#168276"
               />
