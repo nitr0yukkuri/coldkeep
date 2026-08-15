@@ -53,6 +53,11 @@ try {
       $qualityWorkflow -notmatch 'COLDKEEP_PREVIEW_STORE_FILE') {
     throw 'CI workflow is missing the standalone Preview APK path.'
   }
+  $previewBuilder = Join-Path $root 'scripts/build-preview.ps1'
+  if (-not (Test-Path -LiteralPath $previewBuilder) -or
+      (Get-Content -LiteralPath $previewBuilder -Raw) -notmatch 'assemblePreview') {
+    throw 'Reproducible Preview build script is missing.'
+  }
   Write-Host '== Android Preview configuration (static) passed' -ForegroundColor Green
 
   $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
@@ -119,6 +124,7 @@ try {
       'ios/ColdKeep/Info.plist',
       'rust/coldkeep_ml/Cargo.toml',
       '.github/workflows/quality.yml',
+      'scripts/build-preview.ps1',
       'package-lock.json'
     )
     $missing = $required | Where-Object { $entries -notcontains $_ }

@@ -30,12 +30,11 @@ npm start
 APKをビルドする場合:
 
 ```powershell
-cd android
-./gradlew.bat :app:assemblePreview
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview.ps1
 ```
 
-`assemblePreview`には、CIごとに生成する一時署名鍵（`COLDKEEP_PREVIEW_*`環境変数）が必要です。
-本番Release鍵をソースや提出ZIPへ含めないためです。提出用の単体APKはソースZIPとは別に生成する
+スクリプトは実行時だけ一時署名鍵を生成し、本番Release鍵をソースや提出ZIPへ含めません。
+提出用の単体APKはソースZIPとは別に生成する
 `output/ColdKeep-u22-current-preview.apk`またはCIのPreview artifactです。端末へインストール後、
 SCANでマイク権限を許可し、同じ水筒へ水を注ぐ音を1秒以上録音してください。
 
@@ -57,6 +56,7 @@ SCANでマイク権限を許可し、同じ水筒へ水を注ぐ音を1秒以上
 - `U22_EVALUATION_REPORT.md`: 評価結果と限界
 - `DATA_COLLECTION.md`: ラベル付きデータ収集手順
 - `U22_VIDEO_SCRIPT.md`: 3分以内説明動画の台本
+- `scripts/build-preview.ps1`: 一時鍵を自動生成する再現可能なPreviewビルド
 
 実行対象とソースの対応を変えた場合は、この一覧とビルド手順を同じ版で更新してください。`dataset/` の個人録音や、APIキー、個人情報はZIPに含めません。
 

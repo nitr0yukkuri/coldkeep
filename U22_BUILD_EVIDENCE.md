@@ -5,15 +5,16 @@
 ## Current standalone Preview APK
 
 - ビルド日時: 2026-08-15
-- コマンド: `cd android; ./gradlew.bat :app:assemblePreview --no-daemon --console=plain`
+- コマンド: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview.ps1`
 - 署名: ローカルの一時Preview keystore（提出用の本番秘密鍵は使用しない）
 - APK: `android/app/build/outputs/apk/preview/app-preview.apk`
 - 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
 - サイズ: 48,235,978 bytes
-- SHA-256: `1E84CF0D76B5773A7DB625D95397195847C23A7A3508B0A715342D84CBD03E70`
+- SHA-256: `B7BC6396369A27FCEEE1EC5774D3BEFE20B5D5362C49B1F2E492F22DC423A251`
 - JS bundle: APK内の`assets/index.android.bundle`（896,368 bytes）を確認
 - 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
+- 再現性: `scripts/build-preview.ps1`が実行時だけ一時署名鍵を作成し、終了時に削除する。本番鍵・パスワードはリポジトリへ保存しない
 
 ## Release APK（旧コードの提出候補・参考）
 

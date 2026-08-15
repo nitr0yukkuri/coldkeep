@@ -97,12 +97,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-submission.ps1 -SkipAn
 Androidネイティブ確認:
 
 ```powershell
-cd android
-./gradlew.bat :app:assemblePreview
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview.ps1
 ```
 
-`assemblePreview`にはCIまたはローカルで作る一時署名鍵（`COLDKEEP_PREVIEW_*`）が必要です。
-端末確認にはUSBデバッグを有効にしたAndroid端末を接続し、JS bundle入りPreview APKをインストールします。
+スクリプトは本番鍵を使わず、実行時だけ一時署名鍵を作り、JS bundle入りPreview APKを
+`output/ColdKeep-u22-current-preview.apk`へコピーします。直接Gradleを呼ぶ場合は
+`COLDKEEP_PREVIEW_*`環境変数を指定してください。
+端末確認にはUSBデバッグを有効にしたAndroid端末を接続し、生成されたPreview APKをインストールします。
 マイク権限、録音、解析、無音時の再録音、再試行を同じ手順で確認してください。
 
 ### Expo Goでの確認

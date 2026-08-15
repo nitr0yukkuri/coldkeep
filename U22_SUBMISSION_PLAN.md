@@ -49,6 +49,7 @@ ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音�
 - Expo依存を外した標準React Native構成で、現行コミットのJS bundle入りPreview APKを生成済み（2026-08-15）。ローカルPreviewはTypeScript経路、CI PreviewはRustライブラリ同梱を検証する。API35エミュレータではクリーンインストール、マイク許可、録音、低信号の再録音エラー、プロセス維持まで確認済み。実水筒を使った実機3回の推論結果は未確認である。
 - `output/ColdKeep-u22-release.apk`、`output/ColdKeep-u22-debug.apk`、`output/ColdKeep-U22-source.zip`を生成済み。ZIPは`node_modules`、録音データ、ビルドキャッシュを除外している。
 - `.github/workflows/quality.yml` にAndroid SDK 34/NDK 26.1のRustライブラリ付きPreview APK生成・Actions artifact保存ジョブを追加した。PRまたは`main` push後のartifactで、JS bundleを含む現行Android/Rust単体APKを確認できる。
+- `scripts/build-preview.ps1`で、一時署名鍵を手入力せずにPreview APKを再生成できる。鍵は実行時だけ作成・削除し、提出ZIPには含めない。
 - この環境には `rustc` / `cargo` がないため、Rustネイティブライブラリは未ビルド。APKはRustライブラリがない場合もTypeScript経路へフォールバックする。
 
 ## 未完了ゲートと完了証拠
