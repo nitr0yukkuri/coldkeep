@@ -9,7 +9,7 @@
 - ProtoPedia限定共有URL: `〈提出前に入力〉`
 - 3分以内説明動画URL: `〈提出前に入力〉`
 - 実行環境: Android端末、Node.js 18以上、Android Studio/SDK（ソースビルド時）
-- 提出APK: `output/ColdKeep-u22-release.apk`
+- 提出APK: `output/ColdKeep-u22-current-preview.apk`（または同じheadのCI Preview artifact）
 - ソースZIP: `output/ColdKeep-U22-source.zip`
 
 ## 説明文
