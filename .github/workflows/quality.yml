@@ -71,6 +71,14 @@ jobs:
         shell: pwsh
         run: .\rust\build_android.ps1 -Architectures arm64-v8a,x86_64
 
+      - name: Verify Rust libraries exist
+        shell: pwsh
+        run: |
+          $libraries = @(Get-ChildItem -LiteralPath android/app/src/main/jniLibs -Filter libcoldkeep_ml.so -Recurse)
+          if ($libraries.Count -lt 2) {
+            throw 'Expected arm64-v8a and x86_64 Rust libraries were not generated.'
+          }
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
