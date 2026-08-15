@@ -57,6 +57,7 @@ SCANでマイク権限を許可し、同じ水筒へ水を注ぐ音を1秒以上
 - `DATA_COLLECTION.md`: ラベル付きデータ収集手順
 - `U22_VIDEO_SCRIPT.md`: 3分以内説明動画の台本
 - `scripts/build-preview.ps1`: 一時鍵を自動生成する再現可能なPreviewビルド
+- `scripts/smoke-android.ps1`: 接続端末のインストール・起動・証拠保存
 
 実行対象とソースの対応を変えた場合は、この一覧とビルド手順を同じ版で更新してください。`dataset/` の個人録音や、APIキー、個人情報はZIPに含めません。
 

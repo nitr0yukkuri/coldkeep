@@ -97,4 +97,10 @@ JS bundle入りPreview APKへ同梱して、14日間のActions artifactとして
 5. 同じ条件で3回実行し、2回以上結果が表示されることを記録する。
 6. `COLLECT DATA` でラベル付きWAVを1件保存し、共有テキストが生成されることを確認する。
 
+インストール・起動の環境証拠は次で保存できる。`-ResetApp`は対象パッケージの既存データを消すため、必要な場合だけ指定する。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-android.ps1
+```
+
 この端末確認と現行コードでのAPK再生成が終わるまでは、U-22提出要件の「実機動作」を完了扱いにしない。

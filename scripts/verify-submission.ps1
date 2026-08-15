@@ -58,6 +58,9 @@ try {
       (Get-Content -LiteralPath $previewBuilder -Raw) -notmatch 'assemblePreview') {
     throw 'Reproducible Preview build script is missing.'
   }
+  if (-not (Test-Path -LiteralPath (Join-Path $root 'scripts/smoke-android.ps1'))) {
+    throw 'Android smoke script is missing.'
+  }
   Write-Host '== Android Preview configuration (static) passed' -ForegroundColor Green
 
   $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
@@ -125,6 +128,7 @@ try {
       'rust/coldkeep_ml/Cargo.toml',
       '.github/workflows/quality.yml',
       'scripts/build-preview.ps1',
+      'scripts/smoke-android.ps1',
       'package-lock.json'
     )
     $missing = $required | Where-Object { $entries -notcontains $_ }

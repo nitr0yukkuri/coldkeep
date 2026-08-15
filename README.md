@@ -106,6 +106,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview.ps1
 端末確認にはUSBデバッグを有効にしたAndroid端末を接続し、生成されたPreview APKをインストールします。
 マイク権限、録音、解析、無音時の再録音、再試行を同じ手順で確認してください。
 
+接続端末へのインストール・起動・スクリーンショット・直近ログの保存は次で行えます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-android.ps1 -ResetApp
+```
+
 ### Expo Goでの確認
 
 iPhoneを含む実機の録音確認は、独立した `expo-go/` コンパニオンを使います。MacやEASの
