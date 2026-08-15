@@ -47,7 +47,7 @@ export class PcmCaptureAccumulator {
     const values =
       chunk.encoding === 'int16'
         ? this.decodeInt16(chunk.data)
-        : new Float32Array(chunk.data);
+        : this.decodeFloat32(chunk.data);
     const frameCount = Math.floor(values.length / chunk.channels);
     const mono = new Float32Array(frameCount);
     for (let frame = 0; frame < frameCount; frame += 1) {
@@ -99,11 +99,21 @@ export class PcmCaptureAccumulator {
   }
 
   private decodeInt16(data: ArrayBuffer): Float32Array {
+    if (data.byteLength % 2 !== 0) {
+      throw new Error('PCM16 capture contains an incomplete sample');
+    }
     const values = new Int16Array(data);
     const output = new Float32Array(values.length);
     for (let index = 0; index < values.length; index += 1) {
       output[index] = values[index] / 32768;
     }
     return output;
+  }
+
+  private decodeFloat32(data: ArrayBuffer): Float32Array {
+    if (data.byteLength % 4 !== 0) {
+      throw new Error('Float32 capture contains an incomplete sample');
+    }
+    return new Float32Array(data);
   }
 }

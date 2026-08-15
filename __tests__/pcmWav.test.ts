@@ -62,3 +62,18 @@ test('aborting a PCM capture releases the accumulator for retry', () => {
   expect(() => accumulator.start()).not.toThrow();
   accumulator.abort();
 });
+
+test('rejects incomplete PCM sample buffers', () => {
+  const accumulator = new PcmCaptureAccumulator();
+  accumulator.start();
+
+  expect(() =>
+    accumulator.append({
+      data: new Uint8Array([0]).buffer,
+      channels: 1,
+      sampleRate: 16_000,
+      encoding: 'int16',
+    }),
+  ).toThrow('incomplete sample');
+  accumulator.abort();
+});
