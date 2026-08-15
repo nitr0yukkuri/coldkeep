@@ -54,3 +54,19 @@ pasta in one muesli box), so it intentionally cannot produce a trustworthy
 three-class shake model. This is an explicit data-collection gate, not a
 failed claim of shake support. Until that gate is met, the app's scan action
 remains `pour` and shake recordings are collected only for the next dataset.
+
+## Public shake-data candidate
+
+The official [CORSMAL data catalogue](https://corsmal.github.io/data.html) lists
+the larger CORSMAL Containers Manipulation (CCM) dataset: 1,140 multimodal
+recordings from 15 containers, three filling levels, and three filling types.
+The project describes shaking as an interaction with filled food boxes, so this
+is useful for a research pre-training comparison but is not automatically a
+water-bottle dataset. The official [ACC implementation](https://github.com/CORSMAL/ACC)
+also keeps action-specific shaking and pouring models separate.
+
+We do not silently download or include CCM in this repository: it is large,
+its microphone geometry differs from a phone, and the CCM test split must not
+be used for training. If it is added later, only the annotated training split
+will be converted into the manifest format above, with container/session
+holdouts and a separate phone-recorded validation set.
