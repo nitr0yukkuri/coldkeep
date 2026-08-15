@@ -85,6 +85,7 @@ class WavRecorderModule(
         .also { it.start() }
       promise.resolve(Uri.fromFile(file).toString())
     } catch (error: Exception) {
+      outputFile?.delete()
       releaseRecorder()
       promise.reject("RECORDING_START_FAILED", error.message, error)
     }
@@ -105,6 +106,7 @@ class WavRecorderModule(
       writeWavHeader(file)
       promise.resolve(Uri.fromFile(file).toString())
     } catch (error: Exception) {
+      file.delete()
       releaseRecorder()
       promise.reject("RECORDING_STOP_FAILED", error.message, error)
     }
@@ -151,6 +153,7 @@ class WavRecorderModule(
     audioRecord?.release()
     audioRecord = null
     recordingThread = null
+    outputFile = null
   }
 
   override fun invalidate() {
