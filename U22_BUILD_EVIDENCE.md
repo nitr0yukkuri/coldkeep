@@ -9,8 +9,8 @@
 - 署名: ローカルの一時Preview keystore（提出用の本番秘密鍵は使用しない）
 - APK: `android/app/build/outputs/apk/preview/app-preview.apk`
 - 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
-- サイズ: 48,235,298 bytes
-- SHA-256: `9599BAEF585F6BF69FA4CBB77E48967079C81DACAE32967230C34AE327F623D0`
+- サイズ: 48,235,978 bytes
+- SHA-256: `1E84CF0D76B5773A7DB625D95397195847C23A7A3508B0A715342D84CBD03E70`
 - JS bundle: APK内の`assets/index.android.bundle`（896,368 bytes）を確認
 - 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
@@ -62,7 +62,7 @@ npm test -- --runInBand
 
 - TypeScript: 成功
 - ESLint: 成功
-- Jest: 10 suites / 43 tests 成功（現ワークツリー）
+- Jest: 10 suites / 45 tests 成功（現ワークツリー）
 - Python ML: 10 tests 成功（現ワークツリー）
 - Rust: `cargo` 未導入のためローカル検証はスキップ。CIのRustジョブで`cargo test`を実行する。
 - React Native Android bundle生成: 成功
@@ -77,6 +77,15 @@ npm test -- --runInBand
 ごとにAndroid SDK 34とNDK 26.1でRust推論ライブラリを生成し、CIごとの一時鍵で
 JS bundle入りPreview APKへ同梱して、14日間のActions artifactとして保存する。
 本番Release鍵はCIへ持ち込まず、Previewは審査用の再現可能な単体APKとして扱う。
+
+## エミュレータ smoke evidence
+
+- 環境: `coldkeep_api35`、API 35、`emulator-5554`
+- 現行Preview APKを旧署名アプリ削除後にクリーンインストールし、Metroなしで`MainActivity`を起動
+- 初回の`RECORD_AUDIO`許可ダイアログを確認
+- 2秒録音後に停止し、エミュレータの低信号入力を`有効な音声信号がありません。水筒へ水を注ぐ音を録音してください`として拒否
+- アプリプロセスは維持され、誤った水あり/90%表示やクラッシュは発生しなかった
+- これはエミュレータの入力品質ゲート証拠であり、実水筒の分類精度・実機3回成功の代替ではない
 
 ## 端末で残る確認
 
