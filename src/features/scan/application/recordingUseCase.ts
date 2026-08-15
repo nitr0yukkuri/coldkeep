@@ -62,8 +62,13 @@ export class RecordingUseCase {
   }
 
   private async stopInternal(): Promise<RecordingRef> {
-    const recording = await this.recorder.stop();
-    this.activeRecording = null;
-    return recording;
+    try {
+      return await this.recorder.stop();
+    } finally {
+      // Native recorders finalize and release their session even when stop()
+      // rejects. Clearing the application state here lets the user retry
+      // instead of getting stuck behind a stale "already recording" guard.
+      this.activeRecording = null;
+    }
   }
 }

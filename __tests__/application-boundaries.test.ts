@@ -55,6 +55,28 @@ test('recording coalesces concurrent starts and rejects a second active start', 
   expect(recorder.start).toHaveBeenCalledTimes(1);
 });
 
+test('recording clears active state when native stop fails so retry is possible', async () => {
+  const permission: MicrophonePermission = {
+    ensure: jest.fn(async () => true),
+  };
+  const recording = { uri: 'file:///recording.wav' };
+  const recorder: AudioRecorder = {
+    start: jest.fn(async () => recording),
+    stop: jest
+      .fn()
+      .mockRejectedValueOnce(new Error('native stop failed'))
+      .mockResolvedValueOnce(recording),
+    cleanup: jest.fn(async () => undefined),
+  };
+  const useCase = new RecordingUseCase(permission, recorder);
+
+  await useCase.start();
+  await expect(useCase.stop()).rejects.toThrow('native stop failed');
+  await expect(useCase.start()).resolves.toEqual(recording);
+  await expect(useCase.stop()).resolves.toEqual(recording);
+  expect(recorder.start).toHaveBeenCalledTimes(2);
+});
+
 test('scan rejects recordings shorter than one second before classification', async () => {
   const reader: AudioReader = {
     read: jest.fn(async () => shortAudio),
