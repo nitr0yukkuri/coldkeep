@@ -55,6 +55,11 @@ three-class shake model. This is an explicit data-collection gate, not a
 failed claim of shake support. Until that gate is met, the app's scan action
 remains `pour` and shake recordings are collected only for the next dataset.
 
+The same rule applies to `train_ice_presence.py`: it requires at least two
+recordings of each binary class across at least two containers and reports a
+container-held-out evaluation. It writes no ice artifact when those groups are
+missing, so training-set accuracy cannot accidentally become a product claim.
+
 ## Public shake-data candidate
 
 The official [CORSMAL data catalogue](https://corsmal.github.io/data.html) lists

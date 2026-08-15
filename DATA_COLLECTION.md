@@ -104,7 +104,9 @@ python ml/train_ice_presence.py `
   --audio-root <path>\coldkeep-dataset
 ```
 
-The command refuses to train when either class is missing. It writes
+The command refuses to train when either class is missing, when a class has
+fewer than two recordings, or when a class appears in fewer than two
+containers. It performs container-held-out evaluation before writing
 `ml/artifacts/ice_presence_baseline.json`; rebuilding the Rust library then
 embeds that artifact automatically. Treat the first model as a baseline and
-evaluate on a held-out container and phone before relying on it.
+evaluate on a held-out phone and session before relying on it.
