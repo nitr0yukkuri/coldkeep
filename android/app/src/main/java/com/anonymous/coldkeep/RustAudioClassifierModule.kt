@@ -49,7 +49,9 @@ class RustAudioClassifierModule(
       result.putString("engine", json.optString("engine", "rust"))
       result.putInt("modelVersion", json.optInt("modelVersion", 1))
       promise.resolve(result)
-    } catch (error: Throwable) {
+    } catch (error: LinkageError) {
+      promise.reject("RUST_INFERENCE_FAILED", error.message, error)
+    } catch (error: Exception) {
       promise.reject("RUST_INFERENCE_FAILED", error.message, error)
     }
   }
