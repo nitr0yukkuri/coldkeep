@@ -83,7 +83,7 @@ Rustは速度と端末内再現性を改善するための経路です。Rustラ
 ## ローカル検証
 
 ```powershell
-npm install
+npm ci
 npx tsc --noEmit
 npx eslint App.tsx
 npm test -- --runInBand

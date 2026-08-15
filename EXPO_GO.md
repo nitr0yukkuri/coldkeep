@@ -8,7 +8,7 @@
 
 ```powershell
 cd expo-go
-npm install
+npm ci
 npx expo start
 ```
 

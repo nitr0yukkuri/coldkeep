@@ -23,7 +23,7 @@ ColdKeep — スマートフォンの音で水筒内部の水状態を推定す�
 ## 起動
 
 ```powershell
-npm install
+npm ci
 npm start
 ```
 
