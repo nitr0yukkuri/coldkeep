@@ -45,9 +45,10 @@ shaking, and empty containers are outside the current training distribution.
 `shake` action. It accepts a labelled CSV exported from the app's collection
 screen and only trains when empty/half/full recordings exist in at least two
 sessions per class. The 10--30% and 70--90% transition bands are rejected
-instead of being guessed. Evaluation holds out complete sessions, containers,
-and devices are recorded in the report, and no artifact is written when the
-dataset is too small.
+instead of being guessed. Evaluation holds out complete sessions; the report
+records container/device coverage. Container- and phone-held-out
+generalization is a follow-up gate, not a result claimed by this pilot. No
+artifact is written when the dataset is too small.
 
 The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
 pasta in one muesli box), so it intentionally cannot produce a trustworthy

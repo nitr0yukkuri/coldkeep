@@ -83,9 +83,11 @@ python ml/train_shake_level.py `
 ```
 
 The command performs session-held-out evaluation and refuses to write a model
-when a class or session is missing. Until this gate passes on phone-recorded
-water-bottle data, the production scan must continue to request a `pour`
-recording; a `shake` recording is not silently treated as a pour.
+when a class or session is missing. It reports container and device coverage,
+but does not claim container- or phone-held-out generalization yet. Until this
+gate passes on phone-recorded water-bottle data, the production scan must
+continue to request a `pour` recording; a `shake` recording is not silently
+treated as a pour.
 
 ## Ice binary model
 
