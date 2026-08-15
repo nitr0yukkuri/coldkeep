@@ -59,7 +59,17 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android build tools
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Rust inference libraries
+        shell: pwsh
+        run: .\rust\build_android.ps1 -Architectures arm64-v8a,x86_64
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
