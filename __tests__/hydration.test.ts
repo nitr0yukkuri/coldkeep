@@ -108,7 +108,8 @@ test('an observation from a previous local day is not treated as intake', () => 
   const result = recordObservation(
     state,
     { remainingMl: 250, fillLevel: 50, confidence: 0.8 },
-    new Date('2026-08-15T08:00:00+09:00'),
+    // Keep the instants on different calendar days in both UTC and JST CI hosts.
+    new Date('2026-08-15T20:00:00+09:00'),
   );
 
   expect(result.estimatedConsumedMl).toBeNull();
