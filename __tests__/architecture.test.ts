@@ -14,7 +14,9 @@ import { ScanResult } from '../src/features/scan/domain/scanResult';
 import { CollectionLabels } from '../dataCollection';
 
 const audio = {
-  samples: new Float32Array(16_000),
+  samples: Float32Array.from({ length: 16_000 }, (_, index) =>
+    0.05 * Math.sin((2 * Math.PI * 700 * index) / 16_000),
+  ),
   sampleRate: 16_000,
 };
 

@@ -3,6 +3,7 @@ import {
   AudioReader,
   RecordingRef,
 } from '../../shared/application/ports';
+import { hasUsableScanSignal } from '../domain/audioQuality';
 import { normalizeScanResult, ScanResult } from '../domain/scanResult';
 
 export class ScanBottleUseCase {
@@ -23,6 +24,11 @@ export class ScanBottleUseCase {
     const durationSeconds = audio.samples.length / audio.sampleRate;
     if (durationSeconds < 1) {
       throw new Error('Recording must be at least one second');
+    }
+    if (!hasUsableScanSignal(audio.samples)) {
+      throw new Error(
+        '有効な音声信号がありません。水筒へ水を注ぐ音を録音してください',
+      );
     }
 
     let lastError: unknown = null;

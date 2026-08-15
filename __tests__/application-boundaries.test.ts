@@ -107,6 +107,22 @@ test('scan rejects empty or invalid PCM before classification', async () => {
   expect(classifier.classify).not.toHaveBeenCalled();
 });
 
+test('scan rejects a silent recording before classification', async () => {
+  const reader: AudioReader = {
+    read: jest.fn(async () => ({
+      samples: new Float32Array(16_000),
+      sampleRate: 16_000,
+    })),
+  };
+  const classifier: AudioClassifier = { classify: jest.fn() };
+  const useCase = new ScanBottleUseCase(reader, [classifier]);
+
+  await expect(useCase.execute({ uri: 'file:///silent.wav' })).rejects.toThrow(
+    '有効な音声信号がありません。水筒へ水を注ぐ音を録音してください',
+  );
+  expect(classifier.classify).not.toHaveBeenCalled();
+});
+
 test('collection rejects short recordings before persisting labels', async () => {
   const reader: AudioReader = {
     read: jest.fn(async () => shortAudio),
@@ -164,6 +180,41 @@ test('collection rejects invalid PCM before persisting labels', async () => {
       },
     ),
   ).rejects.toThrow('Recording contains invalid PCM audio');
+  expect(repository.save).not.toHaveBeenCalled();
+});
+
+test('collection rejects a silent recording before persisting labels', async () => {
+  const reader: AudioReader = {
+    read: jest.fn(async () => ({
+      samples: new Float32Array(16_000),
+      sampleRate: 16_000,
+    })),
+  };
+  const repository: DatasetRepository = {
+    save: jest.fn(),
+    readManifest: jest.fn(),
+  };
+  const useCase = new CollectSampleUseCase(reader, repository);
+
+  await expect(
+    useCase.execute(
+      { uri: 'file:///silent.wav' },
+      {
+        sessionId: 'session-01',
+        containerId: 'bottle-01',
+        deviceId: 'test-device',
+        capacityMl: 500,
+        waterMl: 250,
+        iceCount: 0,
+        iceMassG: 0,
+        temperatureC: 20,
+        microphoneDistanceCm: 10,
+        action: 'shake',
+      },
+    ),
+  ).rejects.toThrow(
+    '有効な音声信号がありません。ラベルに対応する音を録音してください',
+  );
   expect(repository.save).not.toHaveBeenCalled();
 });
 
