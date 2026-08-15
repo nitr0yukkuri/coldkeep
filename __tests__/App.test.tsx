@@ -136,6 +136,36 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
   expect(textValues).toContain('氷の有無');
   expect(textValues).toContain('未判定');
 
+  const testApp = app as unknown as {
+    scan: { execute: jest.Mock };
+    hydration: { recordObservation: jest.Mock };
+  };
+  testApp.scan.execute.mockResolvedValueOnce({
+    containsWater: true,
+    waterConfidence: 0.4,
+    fillLevel: 50,
+    fillConfidence: 0.9,
+    icePresence: null,
+    iceConfidence: null,
+    iceStatus: 'untrained',
+    engine: 'typescript',
+  });
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('チェックする')?.props.onPress();
+  });
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('停止して確認')?.props.onPress();
+  });
+
+  const lowConfidenceText = renderer.root
+    .findAllByType(Text)
+    .map(text => textContent(text.props.children));
+  expect(lowConfidenceText).toContain('未判定');
+  expect(lowConfidenceText).toContain(
+    '信頼度が低いため判定できませんでした。条件をそろえて再試行してください',
+  );
+  expect(testApp.hydration.recordObservation).toHaveBeenCalledTimes(1);
+
   await ReactTestRenderer.act(async () => {
     renderer.unmount();
   });

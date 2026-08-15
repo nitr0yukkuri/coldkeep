@@ -20,7 +20,10 @@ import {
   validateCollectionDraft,
 } from './src/features/collection/domain/collection';
 import type { RecordingRef } from './src/features/shared/application/ports';
-import type { InferenceEngine } from './src/features/scan/domain/scanResult';
+import {
+  MIN_SCAN_CONFIDENCE,
+  InferenceEngine,
+} from './src/features/scan/domain/scanResult';
 import {
   DEFAULT_HYDRATION_PROFILE,
   HydrationState,
@@ -104,6 +107,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [inferenceEngine, setInferenceEngine] =
     useState<InferenceEngine | null>(null);
   const [icePresence, setIcePresence] = useState('UNKNOWN');
+  const [hasScanResult, setHasScanResult] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [collectionDraft, setCollectionDraft] = useState(
@@ -138,7 +142,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       : icePresence === 'ABSENT'
         ? 'なし'
         : '未判定';
-  const hasResult = content !== 'UNKNOWN';
+  const hasResult = hasScanResult;
   const modelActionLabel = COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION];
   const modelActionInstruction =
     COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION];
@@ -195,9 +199,26 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setStatus('確認中…');
         setEstimatedIntakeMl(null);
         const result = await app.scan.execute(recording);
-        setContent(result.containsWater ? 'WATER' : 'NON-WATER');
+        const waterIsReliable =
+          Number.isFinite(result.waterConfidence) &&
+          result.waterConfidence >= MIN_SCAN_CONFIDENCE;
+        const fillIsReliable =
+          !result.containsWater ||
+          (result.fillConfidence !== null &&
+            Number.isFinite(result.fillConfidence) &&
+            result.fillConfidence >= MIN_SCAN_CONFIDENCE);
+        setHasScanResult(true);
+        setContent(
+          !waterIsReliable
+            ? 'UNKNOWN'
+            : result.containsWater
+              ? 'WATER'
+              : 'NON-WATER',
+        );
         setFillLevel(
-          result.fillLevel === null ? 'N/A' : `${result.fillLevel}%`,
+          result.fillLevel === null || !fillIsReliable
+            ? 'N/A'
+            : `${result.fillLevel}%`,
         );
         setWaterConfidence(result.waterConfidence);
         setFillConfidence(result.fillConfidence);
@@ -209,7 +230,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               ? 'PRESENT'
               : 'ABSENT',
         );
-        if (result.containsWater && result.fillLevel !== null) {
+        if (
+          waterIsReliable &&
+          fillIsReliable &&
+          result.containsWater &&
+          result.fillLevel !== null
+        ) {
           const confidences = [
             result.waterConfidence,
             result.fillConfidence,
@@ -231,6 +257,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       } catch (error) {
         console.error(error);
         setContent('UNKNOWN');
+        setHasScanResult(false);
         setFillLevel('—');
         setWaterConfidence(null);
         setFillConfidence(null);
@@ -404,17 +431,19 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               {waterDisplay}
             </Text>
             <Text style={styles.heroDescription}>
-              {content === 'UNKNOWN'
+              {!hasScanResult
                 ? `${modelActionInstruction}を1秒以上録音します`
-                : content === 'WATER'
-                  ? '水が入っています'
-                  : '水が検出されませんでした'}
+                : content === 'UNKNOWN'
+                  ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
+                  : content === 'WATER'
+                    ? '水が入っています'
+                    : '水が検出されませんでした'}
             </Text>
           </View>
 
           {hasResult ? (
             <View style={styles.metricRow}>
-              {content === 'WATER' ? (
+              {content === 'WATER' && fillLevel !== 'N/A' ? (
                 <MetricCard
                   title="充填率"
                   value={fillLevel}
