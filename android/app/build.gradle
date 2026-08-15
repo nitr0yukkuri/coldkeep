@@ -56,14 +56,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            if (!hasReleaseSigning) {
-                throw new GradleException(
-                    'Release signing is not configured. Set COLDKEEP_RELEASE_STORE_FILE, ' +
-                    'COLDKEEP_RELEASE_STORE_PASSWORD, COLDKEEP_RELEASE_KEY_ALIAS, and ' +
-                    'COLDKEEP_RELEASE_KEY_PASSWORD.'
-                )
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
             }
-            signingConfig signingConfigs.release
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -77,6 +72,21 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+// Keep debug builds usable for reviewers while refusing an unsigned release.
+// This check runs only when a release task is actually requested; throwing in
+// the buildTypes configuration would also make :app:assembleDebug fail.
+gradle.taskGraph.whenReady { graph ->
+    if (!hasReleaseSigning && graph.allTasks.any { task ->
+        task.name.toLowerCase(Locale.ROOT).contains('release')
+    }) {
+        throw new GradleException(
+            'Release signing is not configured. Set COLDKEEP_RELEASE_STORE_FILE, ' +
+            'COLDKEEP_RELEASE_STORE_PASSWORD, COLDKEEP_RELEASE_KEY_ALIAS, and ' +
+            'COLDKEEP_RELEASE_KEY_PASSWORD.'
+        )
     }
 }
 

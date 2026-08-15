@@ -59,10 +59,10 @@ export class ExpoPcmRecorderAdapter implements AudioRecorder {
     }
     this.active = false;
     this.stream.stop();
-    // AudioStream.stop() is synchronous, but yielding once lets the final
-    // onBuffer callback run before the accumulator is finalized on devices
-    // that dispatch the callback through the JS queue.
-    await Promise.resolve();
+    // AudioStream.stop() is synchronous, but the final onBuffer event can be
+    // queued on the JS event loop. A macrotask yield lets that event arrive
+    // before the accumulator is finalized, avoiding truncated recordings.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
     const audio = this.accumulator.finish();
     return {
       uri: `memory://expo-recording-${this.recordingId}`,

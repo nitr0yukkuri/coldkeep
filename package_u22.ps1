@@ -9,7 +9,7 @@ $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("coldkeep-u22-" + [guid]::
 
 $excludeNames = @(
   '.git', '.expo', '.bundle', 'node_modules', 'dataset', 'output', 'tmp',
-  'build', '.gradle', '.cxx', 'Pods', 'DerivedData', 'coverage', '__pycache__'
+  'build', 'dist', '.gradle', '.cxx', 'Pods', 'DerivedData', 'coverage', '__pycache__'
 )
 
 try {
@@ -17,7 +17,7 @@ try {
   Get-ChildItem -LiteralPath $root -File -Force |
     Where-Object { $_.Extension -notin @('.apk', '.zip') } |
     ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stage $_.Name) -Force }
-  foreach ($directoryName in @('android', 'ml', 'rust', 'src', '__tests__')) {
+  foreach ($directoryName in @('android', 'expo-go', 'ios', 'ml', 'rust', 'src', '__tests__')) {
     $sourceDirectory = Join-Path $root $directoryName
     if (Test-Path -LiteralPath $sourceDirectory) {
       $destinationDirectory = Join-Path $stage $directoryName
@@ -31,7 +31,7 @@ try {
         $destinationDirectory,
         '/E', '/NFL', '/NDL', '/NJH', '/NJS',
         '/XD'
-      ) + $excludedDirectories + @('/XF', '*.apk', '*.zip')
+      ) + $excludedDirectories + @('/XF', '*.apk', '*.zip', 'local.properties')
       & robocopy @robocopyArgs | Out-Null
       if ($LASTEXITCODE -gt 7) {
         throw "Failed to stage $directoryName (robocopy exit $LASTEXITCODE)"

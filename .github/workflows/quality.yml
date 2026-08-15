@@ -40,3 +40,62 @@ jobs:
 
       - name: Build Android JavaScript bundle
         run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output tmp/index.android.bundle --assets-dest tmp/assets
+
+  python-ml:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ML dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Test feature extraction and shake pilot safeguards
+        run: python -m unittest discover -s ml -p 'test_*.py'
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test inference core
+        run: cargo test --manifest-path rust/coldkeep_ml/Cargo.toml
+
+  expo-go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: expo-go
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: expo-go/package-lock.json
+
+      - name: Install Expo Go companion dependencies
+        run: npm ci
+
+      - name: Type check Expo Go companion
+        run: npm run typecheck
+
+      - name: Export iOS and Android bundles
+        run: |
+          npx expo export --platform ios
+          npx expo export --platform android

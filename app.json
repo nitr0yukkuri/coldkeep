@@ -10,6 +10,11 @@
     },
     "android": {
       "package": "com.anonymous.coldkeep"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b5eee358-358b-42d8-84d6-2e0daf1fe844"
+      }
     }
   }
 }
