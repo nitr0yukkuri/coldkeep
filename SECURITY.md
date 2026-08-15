@@ -30,6 +30,15 @@ tooling. These packages are not imported by the release JavaScript entry point,
 but the audit should be rerun and reviewed when the React Native toolchain is
 updated.
 
+検証日 2026-08-15 の `npm audit --omit=dev --audit-level=high` は、root
+toolchainで critical 5 / high 22、`expo-go/`で high 25（Expoのビルド・開発依存を含む）を報告した。
+これは「脆弱性ゼロ」の主張ではない。現行フレームワークを強制アップグレードすると録音・ネイティブブリッジを壊すため、提出版では次の境界を固定している。
+
+- Preview/Release APKの静的Manifestに `INTERNET`、ストレージ、オーバーレイ権限を含めない
+- APKへNode/Metro開発サーバーやnpm依存物を同梱しない
+- Expo Go companionは開発確認専用で、サーバーとして公開しない
+- フレームワーク更新時に同じauditを再実行し、high/criticalがruntimeへ到達する場合は公開前に解消する
+
 The audit is treated as a toolchain risk rather than a claim that the APK is
 vulnerability-free: the current React Native/Metro line has unresolved
 transitive advisories and a forced fix would change the framework major
