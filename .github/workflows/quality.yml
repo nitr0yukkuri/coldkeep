@@ -61,6 +61,10 @@ jobs:
       - name: Install Android build tools
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
 
+      - name: Configure Android NDK path
+        shell: bash
+        run: echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> "$GITHUB_ENV"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
