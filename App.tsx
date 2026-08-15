@@ -467,7 +467,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 unit={
                   icePresence === 'UNKNOWN'
                     ? iceStatus === 'trained'
-                      ? `信頼度不足（${formatProbability(iceConfidence)}）`
+                      ? iceConfidence === null
+                        ? '信頼度不足（再試行）'
+                        : `信頼度不足（${formatProbability(iceConfidence)}）`
                       : '学習前は未判定'
                     : `音からの目安（${formatProbability(iceConfidence)}）`
                 }
