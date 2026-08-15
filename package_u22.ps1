@@ -24,7 +24,7 @@ try {
       -not ($excludeFiles | Where-Object { $fileName -like $_ })
     } |
     ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stage $_.Name) -Force }
-  foreach ($directoryName in @('.github', 'android', 'expo-go', 'ios', 'ml', 'rust', 'src', '__tests__')) {
+  foreach ($directoryName in @('.github', 'android', 'expo-go', 'ios', 'ml', 'rust', 'src', 'scripts', '__tests__')) {
     $sourceDirectory = Join-Path $root $directoryName
     if (Test-Path -LiteralPath $sourceDirectory) {
       $destinationDirectory = Join-Path $stage $directoryName
