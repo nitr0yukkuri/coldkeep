@@ -62,13 +62,18 @@ missing, so training-set accuracy cannot accidentally become a product claim.
 
 ## Public shake-data candidate
 
-The official [CORSMAL data catalogue](https://corsmal.github.io/data.html) lists
-the larger CORSMAL Containers Manipulation (CCM) dataset: 1,140 multimodal
-recordings from 15 containers, three filling levels, and three filling types.
-The project describes shaking as an interaction with filled food boxes, so this
-is useful for a research pre-training comparison but is not automatically a
-water-bottle dataset. The official [ACC implementation](https://github.com/CORSMAL/ACC)
-also keeps action-specific shaking and pouring models separate.
+The official [CORSMAL data catalogue](https://corsmal.github.io/data.html) and
+[CCM documentation](https://corsmal.github.io/containers_manip.html) list the
+larger CORSMAL Containers Manipulation (CCM) dataset: 1,140 recordings from 15
+containers, three filling levels, and three filling types. The training split
+has nine containers and its audio archive is about 2.8 GB; recordings use a
+44.1 kHz, eight-microphone circular array. The dataset is licensed
+CC BY-NC 4.0, so it also needs a separate non-commercial-use review before
+redistribution. Shaking is performed with filled food boxes, not insulated
+water bottles, so CCM is useful for a research pre-training comparison but is
+not automatically a ColdKeep phone model. The official
+[ACC implementation](https://github.com/CORSMAL/ACC) also keeps action-specific
+shaking and pouring models separate.
 
 We do not silently download or include CCM in this repository: it is large,
 its microphone geometry differs from a phone, and the CCM test split must not
