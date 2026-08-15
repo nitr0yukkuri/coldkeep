@@ -21,6 +21,16 @@ def releaseKeyPassword = System.getenv('COLDKEEP_RELEASE_KEY_PASSWORD') ?: findP
 def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
     .every { value -> value != null && !value.toString().trim().isEmpty() }
 
+// Preview artifacts are standalone review builds, not production releases.
+// CI creates an ephemeral keystore for each run; no private signing material
+// is committed or reused between builds.
+def previewStoreFile = System.getenv('COLDKEEP_PREVIEW_STORE_FILE') ?: findProperty('COLDKEEP_PREVIEW_STORE_FILE')
+def previewStorePassword = System.getenv('COLDKEEP_PREVIEW_STORE_PASSWORD') ?: findProperty('COLDKEEP_PREVIEW_STORE_PASSWORD')
+def previewKeyAlias = System.getenv('COLDKEEP_PREVIEW_KEY_ALIAS') ?: findProperty('COLDKEEP_PREVIEW_KEY_ALIAS')
+def previewKeyPassword = System.getenv('COLDKEEP_PREVIEW_KEY_PASSWORD') ?: findProperty('COLDKEEP_PREVIEW_KEY_PASSWORD')
+def hasPreviewSigning = [previewStoreFile, previewStorePassword, previewKeyAlias, previewKeyPassword]
+    .every { value -> value != null && !value.toString().trim().isEmpty() }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -50,6 +60,14 @@ android {
                 keyPassword releaseKeyPassword
             }
         }
+        preview {
+            if (hasPreviewSigning) {
+                storeFile file(previewStoreFile)
+                storePassword previewStorePassword
+                keyAlias previewKeyAlias
+                keyPassword previewKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
@@ -64,6 +82,16 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
         }
+        preview {
+            initWith release
+            matchingFallbacks = ['release']
+            if (hasPreviewSigning) {
+                signingConfig signingConfigs.preview
+            }
+            minifyEnabled false
+            shrinkResources false
+            crunchPngs false
+        }
     }
     packagingOptions {
         jniLibs {
@@ -75,17 +103,34 @@ android {
     }
 }
 
-// Keep debug builds usable for reviewers while refusing an unsigned release.
-// This check runs only when a release task is actually requested; throwing in
-// the buildTypes configuration would also make :app:assembleDebug fail.
+// Keep debug builds usable for reviewers while refusing unsigned Release or
+// Preview artifacts. Throwing in buildTypes configuration would also make
+// :app:assembleDebug fail, so the requested task names are checked here.
 gradle.taskGraph.whenReady { graph ->
-    if (!hasReleaseSigning && graph.allTasks.any { task ->
-        task.name.toLowerCase(Locale.ROOT).contains('release')
-    }) {
+    // `initWith release` adds release-named resource tasks to the preview
+    // graph. Inspect only the user's requested task names so preview builds
+    // do not accidentally require production credentials.
+    def requestedTaskNames = gradle.startParameter.taskNames.collect {
+        it.toLowerCase(Locale.ROOT)
+    }
+    def releaseRequested = requestedTaskNames.any { name ->
+        name.contains('release') && !name.contains('preview')
+    }
+    def previewRequested = requestedTaskNames.any { name ->
+        name.contains('preview')
+    }
+    if (!hasReleaseSigning && releaseRequested) {
         throw new GradleException(
             'Release signing is not configured. Set COLDKEEP_RELEASE_STORE_FILE, ' +
             'COLDKEEP_RELEASE_STORE_PASSWORD, COLDKEEP_RELEASE_KEY_ALIAS, and ' +
             'COLDKEEP_RELEASE_KEY_PASSWORD.'
+        )
+    }
+    if (!hasPreviewSigning && previewRequested) {
+        throw new GradleException(
+            'Preview signing is not configured. Set COLDKEEP_PREVIEW_STORE_FILE, ' +
+            'COLDKEEP_PREVIEW_STORE_PASSWORD, COLDKEEP_PREVIEW_KEY_ALIAS, and ' +
+            'COLDKEEP_PREVIEW_KEY_PASSWORD.'
         )
     }
 }
