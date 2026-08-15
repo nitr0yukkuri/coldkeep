@@ -7,6 +7,18 @@ export const COLLECTION_ACTIONS = ['pour', 'shake', 'still'] as const;
  */
 export const MODEL_RECORDING_ACTION = 'pour' as const;
 
+export const COLLECTION_ACTION_LABELS: Record<CollectionAction, string> = {
+  pour: '注ぐ',
+  shake: '振る',
+  still: '静置',
+};
+
+export const COLLECTION_ACTION_INSTRUCTIONS: Record<CollectionAction, string> = {
+  pour: '水筒へ水を注ぐ音',
+  shake: '水筒を振る音',
+  still: '水筒を静置した音',
+};
+
 export type CollectionAction = (typeof COLLECTION_ACTIONS)[number];
 
 export type CollectionDraft = {
