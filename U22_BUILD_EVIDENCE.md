@@ -51,7 +51,7 @@ npm test -- --runInBand
 
 - TypeScript: 成功
 - ESLint: 成功
-- Jest: 10 suites / 38 tests 成功（現ワークツリー）
+- Jest: 10 suites / 39 tests 成功（現ワークツリー）
 - Python ML: 10 tests 成功（現ワークツリー）
 - Rust: `cargo` 未導入のためローカル検証はスキップ。CIのRustジョブで`cargo test`を実行する。
 - React Native Android bundle生成: 成功
