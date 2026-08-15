@@ -41,7 +41,7 @@ jobs:
       - name: Build Android JavaScript bundle
         run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output tmp/index.android.bundle --assets-dest tmp/assets
 
-  android-debug:
+  android-preview:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -92,23 +92,44 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
-      - name: Assemble current debug APK
-        working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon --console=plain
+      - name: Create ephemeral preview signing key
+        shell: bash
+        run: |
+          preview_store_file="$RUNNER_TEMP/coldkeep-preview.jks"
+          preview_password="$(openssl rand -hex 32)"
+          keytool -genkeypair -v \
+            -keystore "$preview_store_file" \
+            -storepass "$preview_password" \
+            -keypass "$preview_password" \
+            -alias coldkeep-preview \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname "CN=ColdKeep CI Preview,OU=ColdKeep,O=ColdKeep,C=JP"
+          {
+            echo "COLDKEEP_PREVIEW_STORE_FILE=$preview_store_file"
+            echo "COLDKEEP_PREVIEW_STORE_PASSWORD=$preview_password"
+            echo "COLDKEEP_PREVIEW_KEY_ALIAS=coldkeep-preview"
+            echo "COLDKEEP_PREVIEW_KEY_PASSWORD=$preview_password"
+          } >> "$GITHUB_ENV"
 
-      - name: Record debug APK checksum
+      - name: Assemble standalone preview APK
+        working-directory: android
+        run: ./gradlew :app:assemblePreview --no-daemon --console=plain
+
+      - name: Record preview APK checksum
         shell: pwsh
         run: |
-          Get-FileHash -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Algorithm SHA256 |
-            Format-List | Out-File -Encoding utf8 android/app/build/outputs/apk/debug/app-debug.apk.sha256.txt
+          Get-FileHash -LiteralPath android/app/build/outputs/apk/preview/app-preview.apk -Algorithm SHA256 |
+            Format-List | Out-File -Encoding utf8 android/app/build/outputs/apk/preview/app-preview.apk.sha256.txt
 
-      - name: Upload current debug APK
+      - name: Upload standalone preview APK
         uses: actions/upload-artifact@v4
         with:
-          name: coldkeep-debug-apk-${{ github.sha }}
+          name: coldkeep-preview-apk-${{ github.sha }}
           path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/debug/app-debug.apk.sha256.txt
+            android/app/build/outputs/apk/preview/app-preview.apk
+            android/app/build/outputs/apk/preview/app-preview.apk.sha256.txt
           if-no-files-found: error
           retention-days: 14
 
