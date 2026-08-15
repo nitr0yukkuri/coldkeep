@@ -516,8 +516,8 @@ mod tests {
     fn parses_pcm16_wav_and_returns_finite_prediction() {
         let samples = (0..16_000)
             .map(|index| {
-                ((index as f64 * 2.0 * std::f64::consts::PI * 700.0 / 16_000.0).sin()
-                    * 2_000.0) as i16
+                ((index as f64 * 2.0 * std::f64::consts::PI * 700.0 / 16_000.0).sin() * 2_000.0)
+                    as i16
             })
             .collect::<Vec<_>>();
         let result = classify_wav_bytes(&wav(&samples, 16_000)).expect("prediction");
