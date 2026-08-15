@@ -160,6 +160,15 @@ export function addAcousticIntake(
   recordedAt = new Date(),
 ): HydrationState {
   if (
+    confidence === null ||
+    !Number.isFinite(confidence) ||
+    confidence < MIN_ACOUSTIC_CONFIDENCE
+  ) {
+    throw new Error(
+      `Estimated intake requires model confidence of at least ${MIN_ACOUSTIC_CONFIDENCE}`,
+    );
+  }
+  if (
     !Number.isFinite(amountMl) ||
     amountMl < 10 ||
     amountMl > state.profile.capacityMl
@@ -171,8 +180,7 @@ export function addAcousticIntake(
     recordedAt: recordedAt.toISOString(),
     amountMl: Math.round(amountMl),
     source: 'acoustic',
-    confidence:
-      confidence === null ? null : Math.min(1, Math.max(0, confidence)),
+    confidence: Math.min(1, Math.max(0, confidence)),
   };
   return { ...state, intakes: [...state.intakes, intake] };
 }

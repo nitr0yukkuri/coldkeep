@@ -23,9 +23,18 @@ export class HydrationUseCase {
 
   async updateProfile(profile: HydrationProfile): Promise<HydrationState> {
     const current = await this.currentState();
+    const nextProfile = validateHydrationProfile(profile);
     const next: HydrationState = {
       ...current,
-      profile: validateHydrationProfile(profile),
+      profile: nextProfile,
+      // Remaining millilitres are derived from the configured bottle
+      // capacity. Keeping observations after a capacity change would make a
+      // later difference look like drinking or refilling, so start a fresh
+      // comparison series while preserving the manual intake history.
+      observations:
+        nextProfile.capacityMl === current.profile.capacityMl
+          ? current.observations
+          : [],
     };
     return this.persist(next);
   }

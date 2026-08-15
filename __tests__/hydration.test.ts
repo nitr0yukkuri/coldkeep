@@ -1,4 +1,5 @@
 import {
+  addAcousticIntake,
   addManualIntake,
   createDefaultHydrationState,
   recordObservation,
@@ -86,6 +87,17 @@ test('missing confidence never becomes a consumed-volume estimate', () => {
   expect(result.estimatedConsumedMl).toBeNull();
 });
 
+test('low-confidence acoustic intake cannot be accepted directly', () => {
+  const state = createDefaultHydrationState();
+
+  expect(() => addAcousticIntake(state, 200, 0.64)).toThrow(
+    'Estimated intake requires model confidence',
+  );
+  expect(() => addAcousticIntake(state, 200, null)).toThrow(
+    'Estimated intake requires model confidence',
+  );
+});
+
 test('an observation from a previous local day is not treated as intake', () => {
   let state = createDefaultHydrationState();
   state = recordObservation(
@@ -150,4 +162,28 @@ test('hydration use case persists profile and manual intake through a port', asy
   expect(state.profile).toEqual({ capacityMl: 750, dailyGoalMl: 2_000 });
   expect(state.intakes[0].amountMl).toBe(300);
   expect(repository.save).toHaveBeenCalledTimes(2);
+});
+
+test('changing bottle capacity starts a fresh acoustic comparison series', async () => {
+  let stored: HydrationState | null = null;
+  const repository: HydrationRepository = {
+    load: jest.fn(async () => stored),
+    save: jest.fn(async state => {
+      stored = state;
+    }),
+  };
+  const useCase = new HydrationUseCase(repository);
+
+  await useCase.recordObservation({
+    remainingMl: 450,
+    fillLevel: 90,
+    confidence: 0.9,
+  });
+  const state = await useCase.updateProfile({
+    capacityMl: 750,
+    dailyGoalMl: 2_000,
+  });
+
+  expect(state.profile.capacityMl).toBe(750);
+  expect(state.observations).toHaveLength(0);
 });
