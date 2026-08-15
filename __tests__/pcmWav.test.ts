@@ -52,3 +52,13 @@ test('accumulates int16 stereo chunks as canonical mono PCM', () => {
   expect(audio.samples[0]).toBeCloseTo(-1 / 65536, 5);
   expect(audio.samples[1]).toBe(0);
 });
+
+test('aborting a PCM capture releases the accumulator for retry', () => {
+  const accumulator = new PcmCaptureAccumulator();
+  accumulator.start();
+  accumulator.abort();
+
+  expect(() => accumulator.finish()).toThrow('not in progress');
+  expect(() => accumulator.start()).not.toThrow();
+  accumulator.abort();
+});
