@@ -394,7 +394,8 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         let probabilities = averaged_prediction(&features, &ice_model);
         let present_index = ice_model.classes.iter().position(|class| *class == 1)?;
         let present_probability = probabilities.get(present_index).copied()?;
-        let (presence, confidence) = binary_prediction_from_present_probability(present_probability);
+        let (presence, confidence) =
+            binary_prediction_from_present_probability(present_probability);
         Some((presence, confidence))
     });
     let water_model = model
