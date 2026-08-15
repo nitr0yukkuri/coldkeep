@@ -54,6 +54,39 @@ pouring action. `shake` and `still` are retained here as experimental collection
 labels, but they are out of distribution for the current scan model and must not
 be presented as evaluated scan inputs.
 
+## Shake fill-level pilot
+
+The `shake` action is a separate experiment from the current `pour` scan. If
+you want to test fill-level inference from shaking, collect the following
+three broad classes:
+
+- `empty`: 0% of the measured capacity
+- `half`: 30--70% (use 50% for the first pilot)
+- `full`: 90--100% (use 90% for the first pilot)
+
+Collect at least two recordings per class in at least two independent session
+IDs. Change the session when the day, room, phone, microphone position, or
+operator changes. Do not label 10--30% or 70--90% as a class; the trainer
+rejects those transition bands instead of inventing a precise level. The first
+usable pilot therefore needs at least six shake recordings, although a useful
+phone/container study should collect many more repetitions and hold out a
+whole container and phone for validation.
+
+After copying the complete `coldkeep-dataset` directory, run the dedicated
+pilot trainer:
+
+```powershell
+python ml/train_shake_level.py `
+  --manifest <path>\coldkeep-dataset\manifest.csv `
+  --audio-root <path>\coldkeep-dataset `
+  --output ml/artifacts/shake_fill_level_pilot.json
+```
+
+The command performs session-held-out evaluation and refuses to write a model
+when a class or session is missing. Until this gate passes on phone-recorded
+water-bottle data, the production scan must continue to request a `pour`
+recording; a `shake` recording is not silently treated as a pour.
+
 ## Ice binary model
 
 The app records both `ice_count` and `ice_mass_g` as ground truth. The model
