@@ -371,6 +371,16 @@ fn averaged_prediction(features: &[Vec<f64>], model: &LinearModel) -> Vec<f64> {
     average
 }
 
+fn binary_prediction_from_present_probability(present_probability: f64) -> (bool, f64) {
+    let presence = present_probability >= 0.5;
+    let confidence = if presence {
+        present_probability
+    } else {
+        1.0 - present_probability
+    };
+    (presence, confidence)
+}
+
 pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
     let model = artifact()?;
     let (samples, source_rate) = parse_wav(bytes)?;
@@ -383,8 +393,9 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
     let ice_prediction = optional_ice_model().and_then(|ice_model| {
         let probabilities = averaged_prediction(&features, &ice_model);
         let present_index = ice_model.classes.iter().position(|class| *class == 1)?;
-        let confidence = probabilities.get(present_index).copied()?;
-        Some((confidence >= 0.5, confidence))
+        let present_probability = probabilities.get(present_index).copied()?;
+        let (presence, confidence) = binary_prediction_from_present_probability(present_probability);
+        Some((presence, confidence))
     });
     let water_model = model
         .models
@@ -506,5 +517,11 @@ mod tests {
     #[test]
     fn rejects_empty_pcm_wav() {
         assert!(parse_wav(&wav(&[], 16_000)).is_err());
+    }
+
+    #[test]
+    fn binary_confidence_is_for_the_predicted_class() {
+        assert_eq!(binary_prediction_from_present_probability(0.9), (true, 0.9));
+        assert_eq!(binary_prediction_from_present_probability(0.2), (false, 0.8));
     }
 }
