@@ -59,6 +59,13 @@ npm test -- --runInBand
 - Debug APK生成: 旧コードで成功。現行コードはSDK修復後に再生成が必要
 - Release APK生成: 旧コードで成功。現行コードは署名設定とSDK修復後に再生成が必要
 
+## CI Androidビルド
+
+`.github/workflows/quality.yml` の `android-debug` ジョブは、PR/`main` push
+ごとにAndroid SDK 34で現行コミットのDebug APKを生成し、14日間のActions
+artifactとして保存する。これは未署名Releaseの代替ではなく、WindowsのSDK
+権限問題があっても現行コードのAndroidコンパイルを確認するための証跡である。
+
 ## 端末で残る確認
 
 1. APKをAndroid端末へインストールする。
