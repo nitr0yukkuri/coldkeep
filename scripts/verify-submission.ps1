@@ -106,6 +106,7 @@ try {
       'expo-go/package-lock.json',
       'ios/ColdKeep/Info.plist',
       'rust/coldkeep_ml/Cargo.toml',
+      '.github/workflows/quality.yml',
       'package-lock.json'
     )
     $missing = $required | Where-Object { $entries -notcontains $_ }
