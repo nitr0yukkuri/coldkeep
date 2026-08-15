@@ -26,7 +26,9 @@ test('recording refuses to access the microphone without permission', async () =
   };
   const useCase = new RecordingUseCase(permission, recorder);
 
-  await expect(useCase.start()).rejects.toThrow('Microphone Permission Required');
+  await expect(useCase.start()).rejects.toThrow(
+    'Microphone Permission Required',
+  );
   expect(recorder.start).not.toHaveBeenCalled();
 });
 
@@ -92,6 +94,19 @@ test('scan rejects recordings shorter than one second before classification', as
   expect(classifier.classify).not.toHaveBeenCalled();
 });
 
+test('scan rejects empty or invalid PCM before classification', async () => {
+  const reader: AudioReader = {
+    read: jest.fn(async () => ({ samples: new Float32Array(), sampleRate: 0 })),
+  };
+  const classifier: AudioClassifier = { classify: jest.fn() };
+  const useCase = new ScanBottleUseCase(reader, [classifier]);
+
+  await expect(useCase.execute({ uri: 'file:///empty.wav' })).rejects.toThrow(
+    'Recording contains invalid PCM audio',
+  );
+  expect(classifier.classify).not.toHaveBeenCalled();
+});
+
 test('collection rejects short recordings before persisting labels', async () => {
   const reader: AudioReader = {
     read: jest.fn(async () => shortAudio),
@@ -119,6 +134,36 @@ test('collection rejects short recordings before persisting labels', async () =>
       },
     ),
   ).rejects.toThrow('Recording must be at least one second');
+  expect(repository.save).not.toHaveBeenCalled();
+});
+
+test('collection rejects invalid PCM before persisting labels', async () => {
+  const reader: AudioReader = {
+    read: jest.fn(async () => ({ samples: new Float32Array(), sampleRate: 0 })),
+  };
+  const repository: DatasetRepository = {
+    save: jest.fn(),
+    readManifest: jest.fn(),
+  };
+  const useCase = new CollectSampleUseCase(reader, repository);
+
+  await expect(
+    useCase.execute(
+      { uri: 'file:///empty.wav' },
+      {
+        sessionId: 'session-01',
+        containerId: 'bottle-01',
+        deviceId: 'test-device',
+        capacityMl: 500,
+        waterMl: 250,
+        iceCount: 0,
+        iceMassG: 0,
+        temperatureC: 20,
+        microphoneDistanceCm: 10,
+        action: 'shake',
+      },
+    ),
+  ).rejects.toThrow('Recording contains invalid PCM audio');
   expect(repository.save).not.toHaveBeenCalled();
 });
 

@@ -13,6 +13,13 @@ export class ScanBottleUseCase {
 
   async execute(recording: RecordingRef): Promise<ScanResult> {
     const audio = await this.reader.read(recording);
+    if (
+      audio.samples.length === 0 ||
+      !Number.isFinite(audio.sampleRate) ||
+      audio.sampleRate <= 0
+    ) {
+      throw new Error('Recording contains invalid PCM audio');
+    }
     const durationSeconds = audio.samples.length / audio.sampleRate;
     if (durationSeconds < 1) {
       throw new Error('Recording must be at least one second');
