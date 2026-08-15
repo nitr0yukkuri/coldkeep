@@ -62,9 +62,10 @@ npm test -- --runInBand
 ## CI Androidビルド
 
 `.github/workflows/quality.yml` の `android-debug` ジョブは、PR/`main` push
-ごとにAndroid SDK 34で現行コミットのDebug APKを生成し、14日間のActions
-artifactとして保存する。これは未署名Releaseの代替ではなく、WindowsのSDK
-権限問題があっても現行コードのAndroidコンパイルを確認するための証跡である。
+ごとにAndroid SDK 34とNDK 26.1でRust推論ライブラリを生成し、現行コミットの
+Debug APKへ同梱して、14日間のActions artifactとして保存する。これは未署名
+Releaseの代替ではなく、WindowsのSDK権限問題があっても現行コードとRust経路の
+Androidコンパイルを確認するための証跡である。
 
 ## 端末で残る確認
 
