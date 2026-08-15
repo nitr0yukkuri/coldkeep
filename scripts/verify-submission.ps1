@@ -43,6 +43,18 @@ try {
   }
   Invoke-Checked 'Python ML tests' { & $pythonPath -m unittest discover -s ml -p 'test_*.py' }
 
+  $androidGradle = Get-Content (Join-Path $root 'android/app/build.gradle') -Raw
+  if ($androidGradle -notmatch '(?s)buildTypes\s*\{.*?preview\s*\{' -or
+      $androidGradle -notmatch 'COLDKEEP_PREVIEW_STORE_FILE') {
+    throw 'Android Gradle configuration is missing the standalone Preview signing variant.'
+  }
+  $qualityWorkflow = Get-Content (Join-Path $root '.github/workflows/quality.yml') -Raw
+  if ($qualityWorkflow -notmatch 'assemblePreview' -or
+      $qualityWorkflow -notmatch 'COLDKEEP_PREVIEW_STORE_FILE') {
+    throw 'CI workflow is missing the standalone Preview APK path.'
+  }
+  Write-Host '== Android Preview configuration (static) passed' -ForegroundColor Green
+
   $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
   if ($cargoCommand) {
     Push-Location (Join-Path $root 'rust/coldkeep_ml')
