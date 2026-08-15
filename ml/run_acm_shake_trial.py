@@ -19,6 +19,8 @@ DEFAULT_AUDIO_ROOT = ROOT / "dataset" / "external" / "acm-s2" / "acm_s2_audio"
 
 def run(audio_root: Path) -> dict:
     """Validate the two labelled ACM-S2 shake recordings."""
+    # `Capture.water_ml` is the existing trainer's generic fill-volume field;
+    # ACM-S2's second row is 50% pasta, not water.  Only the ratio is used here.
     rows = [
         Capture(
             recording_id="000017",
