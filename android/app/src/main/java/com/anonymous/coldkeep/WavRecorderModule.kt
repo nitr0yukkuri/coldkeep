@@ -157,10 +157,12 @@ class WavRecorderModule(
   }
 
   override fun invalidate() {
+    val file = outputFile
     if (recording.getAndSet(false)) {
       runCatching { audioRecord?.stop() }
       recordingThread?.join(500)
     }
+    file?.delete()
     releaseRecorder()
     super.invalidate()
   }
