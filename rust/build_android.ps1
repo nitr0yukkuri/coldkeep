@@ -15,9 +15,14 @@ if (-not (Get-Command cargo-ndk -ErrorAction SilentlyContinue)) {
 }
 
 foreach ($architecture in $Architectures) {
-  cargo ndk -t $architecture -o $destination build --manifest-path (Join-Path $crate 'Cargo.toml') --release
-  if ($LASTEXITCODE -ne 0) {
-    throw "Rust Android build failed for $architecture"
+  Push-Location $crate
+  try {
+    cargo ndk -t $architecture -o $destination build --release
+    if ($LASTEXITCODE -ne 0) {
+      throw "Rust Android build failed for $architecture"
+    }
+  } finally {
+    Pop-Location
   }
 }
 

@@ -9,6 +9,9 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb shell monkey -p com.anonymous.coldkeep 1
 ```
 
+このAPKハッシュは旧ビルドの値です。現行コードを提出する場合は、Android SDKを修復して
+Release APKを再生成し、ハッシュとZIPを更新してから端末で次を確認する。
+
 端末で次を確認する。
 
 1. 初回マイク権限を許可する。
@@ -23,7 +26,7 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 ```text
 端末:
 Android OS:
-アプリ版: 0.0.1 / Release APK SHA-256=916B51B3C6DF75886D3DC86618073A3AF51C0A0C3FC1509EAD0F2DEB96617AD7
+アプリ版: 0.0.1 / Release APK SHA-256=<現行コードで再生成後に記録>
 SCAN試行1:
 SCAN試行2:
 SCAN試行3:

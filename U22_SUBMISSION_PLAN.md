@@ -1,9 +1,9 @@
 # U-22 2026 提出計画: ColdKeep
 
-更新日: 2026-08-09
+更新日: 2026-08-15
 判断: **応募推奨（条件付き）**
 
-ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音を解析し、水の有無と充填状態を表示する、検証可能な技術プロトタイプ」として提出する。製品の完成度や汎用的な精度を主張するのではなく、実装・検証方法・制約を説明できる作品に絞る。叩く・振る動作は現行モデルの評価対象に含めない。
+ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音を解析し、水の有無と充填状態を表示する、検証可能な技術プロトタイプ」として提出する。製品の完成度や汎用的な精度を主張するのではなく、実装・検証方法・制約を説明できる作品に絞る。叩く・振る動作は別モデル用の収集対象で、現行モデルの評価対象に含めない。
 
 ## 公式ゲート
 
@@ -45,9 +45,11 @@ ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音�
   - 水あり時の充填レベル: 6件中5件（83.3%）。
   - 内容物分類: 18件中16件（88.9%）。
 - 上記は21録音の小規模な外部検証であり、製品精度や未知の水筒への一般化性能を意味しない。
-- `npx tsc --noEmit`、`npm run lint`、`npm test -- --runInBand` は直近変更後に成功している（5 suites / 13 tests）。
-- Expo依存を外した標準React Native構成で、Debug APKとJS bundleを含むRelease APKの生成に成功した（2026-08-09）。APKの端末インストール・録音・推論結果表示はまだ未確認である。
+- `npx tsc --noEmit`、`npm run lint`、`npm test -- --runInBand` は現ワークツリーで成功している（11 suites / 49 tests）。Python MLテスト10件とExpo iOS/Android exportも成功している。
+- Expo依存を外した標準React Native構成で、現行コミットのJS bundle入りPreview APKを生成済み（2026-08-15）。ローカルPreviewはTypeScript経路、CI PreviewはRustライブラリ同梱を検証する。API35エミュレータではクリーンインストール、マイク許可、録音、低信号の再録音エラー、プロセス維持まで確認済み。実水筒を使った実機3回の推論結果は未確認である。
 - `output/ColdKeep-u22-release.apk`、`output/ColdKeep-u22-debug.apk`、`output/ColdKeep-U22-source.zip`を生成済み。ZIPは`node_modules`、録音データ、ビルドキャッシュを除外している。
+- `.github/workflows/quality.yml` にAndroid SDK 34/NDK 26.1のRustライブラリ付きPreview APK生成・Actions artifact保存ジョブを追加した。PRまたは`main` push後のartifactで、JS bundleを含む現行Android/Rust単体APKを確認できる。
+- `scripts/build-preview.ps1`で、一時署名鍵を手入力せずにPreview APKを再生成できる。鍵は実行時だけ作成・削除し、提出ZIPには含めない。
 - この環境には `rustc` / `cargo` がないため、Rustネイティブライブラリは未ビルド。APKはRustライブラリがない場合もTypeScript経路へフォールバックする。
 
 ## 未完了ゲートと完了証拠
@@ -78,6 +80,7 @@ ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音�
 - [ ] Android実機で同じ手順を3回実行し、少なくとも2回結果が表示される
 - [ ] 水の有無・充填・氷の有無の表示が仕様どおりで、氷は未学習時に`未判定`
 - [ ] `npx tsc --noEmit`、`npm test -- --runInBand`、対象ファイルのlintが成功
+- [ ] `python -m unittest discover -s ml -p "test_*.py"`、Expo iOS/Android exportが成功
 - [ ] ProtoPedia限定共有、3分以内動画、ソースZIP、README、評価資料が相互に同じ版
 - [ ] サンプルデータ/モデル/OSSライセンスと既知の制約を同梱
 - [ ] APIキー、個人情報、未許諾データを提出物から除外

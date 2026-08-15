@@ -127,6 +127,9 @@ fn parse_wav(bytes: &[u8]) -> Result<(Vec<f64>, u32), String> {
 
     let bytes_per_frame = channels * 2;
     let frame_count = data.len() / bytes_per_frame;
+    if frame_count == 0 {
+        return Err("PCM WAV contains no audio samples".to_string());
+    }
     let mut mono = Vec::with_capacity(frame_count);
     for frame in 0..frame_count {
         let mut sum = 0.0;
@@ -166,9 +169,8 @@ fn fft_power(frame: &[f64]) -> Vec<f64> {
     let mut imaginary = vec![0.0; FFT_SIZE];
     for index in 0..FRAME_SIZE {
         let sample = frame.get(index).copied().unwrap_or(0.0);
-        let window = 0.5 - 0.5 * (2.0 * std::f64::consts::PI * index as f64
-            / (FRAME_SIZE - 1) as f64)
-            .cos();
+        let window =
+            0.5 - 0.5 * (2.0 * std::f64::consts::PI * index as f64 / (FRAME_SIZE - 1) as f64).cos();
         real[index] = sample * window;
     }
 
@@ -196,15 +198,13 @@ fn fft_power(frame: &[f64]) -> Vec<f64> {
                 let even = start + offset;
                 let odd = even + length / 2;
                 let odd_real = real[odd] * twiddle_real - imaginary[odd] * twiddle_imaginary;
-                let odd_imaginary = real[odd] * twiddle_imaginary
-                    + imaginary[odd] * twiddle_real;
+                let odd_imaginary = real[odd] * twiddle_imaginary + imaginary[odd] * twiddle_real;
                 real[odd] = real[even] - odd_real;
                 imaginary[odd] = imaginary[even] - odd_imaginary;
                 real[even] += odd_real;
                 imaginary[even] += odd_imaginary;
                 let next_real = twiddle_real * step_real - twiddle_imaginary * step_imaginary;
-                twiddle_imaginary =
-                    twiddle_real * step_imaginary + twiddle_imaginary * step_real;
+                twiddle_imaginary = twiddle_real * step_imaginary + twiddle_imaginary * step_real;
                 twiddle_real = next_real;
             }
         }
@@ -229,8 +229,7 @@ fn mel_filters(sample_rate: u32, mel_bins: usize) -> Vec<Vec<f64>> {
     let edges: Vec<f64> = (0..mel_bins + 2)
         .map(|index| {
             mel_to_hz(
-                minimum_mel
-                    + (maximum_mel - minimum_mel) * index as f64 / (mel_bins + 1) as f64,
+                minimum_mel + (maximum_mel - minimum_mel) * index as f64 / (mel_bins + 1) as f64,
             )
         })
         .collect();
@@ -286,7 +285,10 @@ fn extract_features(input: &[f64], model: &ModelArtifact) -> Vec<f64> {
             *sample * *sample
         })
         .sum::<f64>();
-    let gain = 0.05 / (squared / samples.len().max(1) as f64 + 1e-12).sqrt().max(1e-5);
+    let gain = 0.05
+        / (squared / samples.len().max(1) as f64 + 1e-12)
+            .sqrt()
+            .max(1e-5);
     for sample in &mut samples {
         *sample = (*sample * gain).clamp(-1.0, 1.0);
     }
@@ -345,7 +347,12 @@ fn predict(features: &[f64], model: &LinearModel) -> Vec<f64> {
     for output in 0..model.bias.len() {
         let mut value = model.bias[output];
         for (feature, row) in model.weights.iter().enumerate() {
-            let scale = model.feature_scale.get(feature).copied().unwrap_or(1.0).max(1e-5);
+            let scale = model
+                .feature_scale
+                .get(feature)
+                .copied()
+                .unwrap_or(1.0)
+                .max(1e-5);
             let mean = model.feature_mean.get(feature).copied().unwrap_or(0.0);
             value += ((features.get(feature).copied().unwrap_or(0.0) - mean) / scale)
                 * row.get(output).copied().unwrap_or(0.0);
@@ -355,7 +362,10 @@ fn predict(features: &[f64], model: &LinearModel) -> Vec<f64> {
     let maximum = logits.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let exponentials: Vec<f64> = logits.iter().map(|value| (value - maximum).exp()).collect();
     let total = exponentials.iter().sum::<f64>().max(1e-12);
-    exponentials.into_iter().map(|value| value / total).collect()
+    exponentials
+        .into_iter()
+        .map(|value| value / total)
+        .collect()
 }
 
 fn averaged_prediction(features: &[Vec<f64>], model: &LinearModel) -> Vec<f64> {
@@ -366,6 +376,16 @@ fn averaged_prediction(features: &[Vec<f64>], model: &LinearModel) -> Vec<f64> {
         }
     }
     average
+}
+
+fn binary_prediction_from_present_probability(present_probability: f64) -> (bool, f64) {
+    let presence = present_probability >= 0.5;
+    let confidence = if presence {
+        present_probability
+    } else {
+        1.0 - present_probability
+    };
+    (presence, confidence)
 }
 
 pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
@@ -380,8 +400,10 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
     let ice_prediction = optional_ice_model().and_then(|ice_model| {
         let probabilities = averaged_prediction(&features, &ice_model);
         let present_index = ice_model.classes.iter().position(|class| *class == 1)?;
-        let confidence = probabilities.get(present_index).copied()?;
-        Some((confidence >= 0.5, confidence))
+        let present_probability = probabilities.get(present_index).copied()?;
+        let (presence, confidence) =
+            binary_prediction_from_present_probability(present_probability);
+        Some((presence, confidence))
     });
     let water_model = model
         .models
@@ -403,7 +425,11 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             fill_confidence: None,
             ice_presence: ice_prediction.map(|value| value.0),
             ice_confidence: ice_prediction.map(|value| value.1),
-            ice_status: if ice_prediction.is_some() { "trained" } else { "untrained" },
+            ice_status: if ice_prediction.is_some() {
+                "trained"
+            } else {
+                "untrained"
+            },
             engine: "rust",
             model_version: 1,
         });
@@ -427,7 +453,11 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         fill_confidence: fill_probabilities.get(best_index).copied(),
         ice_presence: ice_prediction.map(|value| value.0),
         ice_confidence: ice_prediction.map(|value| value.1),
-        ice_status: if ice_prediction.is_some() { "trained" } else { "untrained" },
+        ice_status: if ice_prediction.is_some() {
+            "trained"
+        } else {
+            "untrained"
+        },
         engine: "rust",
         model_version: 1,
     })
@@ -450,9 +480,8 @@ pub extern "system" fn Java_com_anonymous_coldkeep_RustAudioClassifierModule_nat
         .get_string(&path)
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let result = classify_wav_path(&path).unwrap_or_else(|error| {
-        serde_json::json!({"error": error}).to_string()
-    });
+    let result = classify_wav_path(&path)
+        .unwrap_or_else(|error| serde_json::json!({"error": error}).to_string());
     env.new_string(result)
         .map(|value| value.into_raw())
         .unwrap_or(std::ptr::null_mut())
@@ -486,8 +515,10 @@ mod tests {
     #[test]
     fn parses_pcm16_wav_and_returns_finite_prediction() {
         let samples = (0..16_000)
-            .map(|index| ((index as f64 * 2.0 * std::f64::consts::PI * 700.0 / 16_000.0).sin()
-                * 2_000.0) as i16)
+            .map(|index| {
+                ((index as f64 * 2.0 * std::f64::consts::PI * 700.0 / 16_000.0).sin() * 2_000.0)
+                    as i16
+            })
             .collect::<Vec<_>>();
         let result = classify_wav_bytes(&wav(&samples, 16_000)).expect("prediction");
         assert!(result.water_confidence.is_finite());
@@ -498,5 +529,19 @@ mod tests {
     #[test]
     fn rejects_non_wav_input() {
         assert!(parse_wav(b"not wav").is_err());
+    }
+
+    #[test]
+    fn rejects_empty_pcm_wav() {
+        assert!(parse_wav(&wav(&[], 16_000)).is_err());
+    }
+
+    #[test]
+    fn binary_confidence_is_for_the_predicted_class() {
+        assert_eq!(binary_prediction_from_present_probability(0.9), (true, 0.9));
+        assert_eq!(
+            binary_prediction_from_present_probability(0.2),
+            (false, 0.8)
+        );
     }
 }

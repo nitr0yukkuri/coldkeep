@@ -175,6 +175,10 @@ def task_label(recording: Recording, task: str) -> int:
 
 
 def metrics(true: list[int], predicted: list[int], classes: list[int]) -> dict:
+    if not true:
+        raise ValueError("evaluation produced no recordings")
+    if len(true) != len(predicted):
+        raise ValueError("evaluation labels and predictions have different lengths")
     confusion = np.zeros((len(classes), len(classes)), dtype=np.int64)
     indices = {label: index for index, label in enumerate(classes)}
     for actual, estimate in zip(true, predicted):

@@ -13,6 +13,8 @@ import { TypeScriptClassifierAdapter } from '../platform/ml/typescriptClassifier
 import { RnfsDatasetRepository } from '../platform/storage/rnfsDatasetRepository';
 import { ReactNativeShareGateway } from '../platform/sharing/reactNativeShareGateway';
 import { COLLECTION_ACTIONS } from '../features/collection/domain/collection';
+import { HydrationUseCase } from '../features/hydration/application/hydrationUseCase';
+import { RnfsHydrationRepository } from '../platform/storage/rnfsHydrationRepository';
 
 export function createAppDependencies() {
   const recorder =
@@ -40,5 +42,6 @@ export function createAppDependencies() {
       repository,
       new ReactNativeShareGateway(),
     ),
+    hydration: new HydrationUseCase(new RnfsHydrationRepository()),
   };
 }

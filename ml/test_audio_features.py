@@ -11,6 +11,7 @@ from audio_features import (
     resample,
     segment_audio,
 )
+from train_baseline import metrics
 
 
 class AudioFeatureTests(unittest.TestCase):
@@ -47,6 +48,12 @@ class AudioFeatureTests(unittest.TestCase):
         self.assertEqual(quiet_features.shape, (128,))
         self.assertTrue(np.isfinite(quiet_features).all())
         np.testing.assert_allclose(quiet_features, loud_features, atol=1e-4)
+
+    def test_metrics_reject_empty_or_misaligned_evaluation(self):
+        with self.assertRaisesRegex(ValueError, "no recordings"):
+            metrics([], [], [0, 1])
+        with self.assertRaisesRegex(ValueError, "different lengths"):
+            metrics([0], [], [0, 1])
 
 
 if __name__ == "__main__":

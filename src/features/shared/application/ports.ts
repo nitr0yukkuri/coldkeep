@@ -3,6 +3,7 @@ import {
   CollectionRecord,
 } from '../../collection/domain/collection';
 import { ScanResult } from '../../scan/domain/scanResult';
+import { HydrationState } from '../../hydration/domain/hydration';
 
 export type PcmAudio = {
   samples: Float32Array;
@@ -53,4 +54,9 @@ export interface DatasetRepository {
 
 export interface ShareGateway {
   shareText(title: string, text: string): Promise<void>;
+}
+
+export interface HydrationRepository {
+  load(): Promise<HydrationState | null>;
+  save(state: HydrationState): Promise<void>;
 }

@@ -8,7 +8,7 @@
 
 ```powershell
 cd expo-go
-npm install
+npm ci
 npx expo start
 ```
 
@@ -21,16 +21,21 @@ Androidで確認できます。接続できない場合は `npx expo start --tun
 - モノラル化・リサンプリングを行い、ネイティブ経路と同じ16 kHz `PcmAudio`に正規化する
 - 既存の `ScanBottleUseCase` と `publicAudioClassifier.ts`（TypeScript経路）へ渡す
 - `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存する
+- 個人向け画面では水筒容量・1日目標・手動飲水量・音響残量観測をDocument directoryへ保存する
 
 Expo GoにはこのリポジトリのRust/TFLiteカスタムネイティブモジュールは含まれないため、
 Expo経路の推論エンジン表示はTypeScriptになります。氷モデルは現時点で未学習なので、
 氷の有無は引き続き `未判定` です。
 
+水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。音響差分を
+飲水量へ追加する場合も、画面の確認ボタンを押したときだけ保存します。
+
 ## 入力動作の注意
 
-現行の公開モデルが学習・評価したのはACM-S2の **pour（注ぐ）** 録音です。Expo Goでも
-画面の指示どおり水筒へ水を注ぐ音を録音してください。`shake` と `still` はデータ収集用の
-比較ラベルで、現行スキャンモデルの評価入力ではありません。
+現行の公開モデルが学習・評価したのはACM-S2の **pour（注ぐ）** 録音です。研究用ベースラインを
+再現する場合は水筒へ水を注ぐ音を録音してください。個人向け画面の残量差分も、現行モデルの
+入力動作に合わせて注ぐ音のチェック結果を比較する設計です。`shake` は別モデルを作るための
+データ収集用ラベルで、現行モデルの入力には使いません。`still` は比較用ラベルです。
 
 ## 検証
 
