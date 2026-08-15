@@ -222,7 +222,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: expo-go/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            expo-go/package-lock.json
+
+      - name: Install root dependencies for shared source type check
+        working-directory: .
+        run: npm ci
 
       - name: Install Expo Go companion dependencies
         run: npm ci
