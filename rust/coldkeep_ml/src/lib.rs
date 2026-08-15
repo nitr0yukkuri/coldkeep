@@ -127,6 +127,9 @@ fn parse_wav(bytes: &[u8]) -> Result<(Vec<f64>, u32), String> {
 
     let bytes_per_frame = channels * 2;
     let frame_count = data.len() / bytes_per_frame;
+    if frame_count == 0 {
+        return Err("PCM WAV contains no audio samples".to_string());
+    }
     let mut mono = Vec::with_capacity(frame_count);
     for frame in 0..frame_count {
         let mut sum = 0.0;
@@ -498,5 +501,10 @@ mod tests {
     #[test]
     fn rejects_non_wav_input() {
         assert!(parse_wav(b"not wav").is_err());
+    }
+
+    #[test]
+    fn rejects_empty_pcm_wav() {
+        assert!(parse_wav(&wav(&[], 16_000)).is_err());
     }
 }
