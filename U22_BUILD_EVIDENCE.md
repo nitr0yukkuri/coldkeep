@@ -16,6 +16,13 @@
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
 - 再現性: `scripts/build-preview.ps1`が実行時だけ一時署名鍵を作成し、終了時に削除する。本番鍵・パスワードはリポジトリへ保存しない
 
+### CIで生成した提出候補
+
+- Quality run: [31876258365](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31876258365)
+- head: `79bb273c44514f16e3781052d4bada58da1373fa`
+- Preview APK artifact: 2026-08-29まで取得可能（Actionsログインが必要）
+- Source ZIP artifact: 同じrunに保存。APKとソースを別runから混在させない
+
 ## Release APK（旧コードの提出候補・参考）
 
 - ビルド日時: 2026-08-09

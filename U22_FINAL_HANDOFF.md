@@ -1,16 +1,28 @@
 # U-22最終引き渡し
 
+## 現行提出版
+
+提出対象は旧Release APKではなく、現行コードから生成したPreview APKです。
+Release署名鍵はリポジトリへ保存していないため、提出時はCI artifactまたは手元で再生成したPreviewを使います。
+
+- ローカルAPK: `output/ColdKeep-u22-current-preview.apk`
+- ローカルAPK SHA-256（2026-08-15生成）: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
+- CI Preview artifact: [Quality run 15](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31876258365)（artifactは2026-08-29まで）
+- CI source artifactも同じrunに保存している。APKとソースのheadは`79bb273c44514f16e3781052d4bada58da1373fa`。
+
+CI artifactはActionsへのログインが必要で、期限後は同じコミットからビルド手順で再生成する。
+
 ## 端末が接続できるようになったら
 
 ```powershell
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb devices
-& $adb install -r output\ColdKeep-u22-release.apk
+& $adb install -r output\ColdKeep-u22-current-preview.apk
 & $adb shell monkey -p com.anonymous.coldkeep 1
 ```
 
-このAPKハッシュは旧ビルドの値です。現行コードを提出する場合は、Android SDKを修復して
-Release APKを再生成し、ハッシュとZIPを更新してから端末で次を確認する。
+Previewは一時署名のため、異なる署名の旧アプリが入っている場合は先にアンインストールする。
+提出版を再生成した場合は、このファイルと`U22_BUILD_EVIDENCE.md`のハッシュを同じ版に更新する。
 
 端末で次を確認する。
 
@@ -47,7 +59,7 @@ COLLECT DATA保存:
 
 ## 提出物
 
-- `output/ColdKeep-u22-release.apk`（提出・単体起動用）
+- `output/ColdKeep-u22-current-preview.apk`（提出・単体起動用）
 - `output/ColdKeep-u22-debug.apk`（Metro接続デバッグ用）
 - `output/ColdKeep-U22-source.zip`
 - `U22_EVALUATION_REPORT.md`
