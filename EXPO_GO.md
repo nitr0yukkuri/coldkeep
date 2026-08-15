@@ -15,6 +15,15 @@ npx expo start
 表示されたQRコードをExpo Goで読み込みます。Windowsからでも、同じLAN上のiPhoneまたは
 Androidで確認できます。接続できない場合は `npx expo start --tunnel` を使います。
 
+### 「Project is incompatible with this version of Expo Go」と表示された場合
+
+これは録音処理のエラーではなく、端末側のExpo GoがこのコンパニオンアプリのSDKより古い
+という意味です。現在の`expo-go/package.json`はExpo SDK 57を固定しているため、iPhoneの
+App StoreまたはAndroidのPlay StoreでExpo Goを最新版へ更新してから、QRコードを再度読み
+込んでください。WindowsからiOSのネイティブビルドを行う必要はありません。古いExpo Goに
+合わせてSDKを無理に下げると、`expo-audio`のPCM録音経路と依存関係の検証結果が変わるため、
+提出版では行いません。
+
 ## 録音経路
 
 - `expo-audio` の `useAudioStream` で16-bit PCMをメモリに受け取る
@@ -51,10 +60,12 @@ npx expo export --platform android
 
 ## 依存監査
 
-2026-08-11に `npm audit --omit=dev --audit-level=high` を実行したところ、18件（high 11、
-moderate 7）が報告されました。内訳はExpo CLI/Metroのビルド時依存 `image-size@1.2.1` と、
-Expo config pluginのビルド時依存 `uuid@7.0.3` です。これらはExpo Goへ配信するColdKeepの
-JavaScriptバンドルには含まれず、端末上の録音・推論コードからは到達しません。
+2026-08-15に `npm audit --omit=dev --audit-level=high` を実行したところ、32件（high 25、
+moderate 7）が報告されました。主な経路はExpo/React Native/MetroのCLI・ビルドグラフと、
+その中の`image-size`および`uuid`です。これは開発時の依存グラフに含まれる既知の問題を
+隠さず記録したもので、Expo Goへ配信するColdKeepのJavaScriptバンドルにサーバーやAPIキー
+は含めていません。ただし「脆弱性ゼロ」とは主張せず、ロックファイルを固定し、ビルド時の
+入力を信頼できるソースに限定します。
 
 現時点の修正提案は `npm audit fix --force` だけで、Expo SDKを57から53へ下げる破壊的変更を
 含むため適用していません。Expo SDKの互換更新で修正版が提供された時点で、exportと実機確認を
