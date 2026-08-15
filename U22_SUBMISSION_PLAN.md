@@ -45,7 +45,7 @@ ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音�
   - 水あり時の充填レベル: 6件中5件（83.3%）。
   - 内容物分類: 18件中16件（88.9%）。
 - 上記は21録音の小規模な外部検証であり、製品精度や未知の水筒への一般化性能を意味しない。
-- `npx tsc --noEmit`、`npm run lint`、`npm test -- --runInBand` は現ワークツリーで成功している（10 suites / 45 tests）。Python MLテスト10件とExpo iOS/Android exportも成功している。
+- `npx tsc --noEmit`、`npm run lint`、`npm test -- --runInBand` は現ワークツリーで成功している（11 suites / 49 tests）。Python MLテスト10件とExpo iOS/Android exportも成功している。
 - Expo依存を外した標準React Native構成で、現行コミットのJS bundle入りPreview APKを生成済み（2026-08-15）。ローカルPreviewはTypeScript経路、CI PreviewはRustライブラリ同梱を検証する。API35エミュレータではクリーンインストール、マイク許可、録音、低信号の再録音エラー、プロセス維持まで確認済み。実水筒を使った実機3回の推論結果は未確認である。
 - `output/ColdKeep-u22-release.apk`、`output/ColdKeep-u22-debug.apk`、`output/ColdKeep-U22-source.zip`を生成済み。ZIPは`node_modules`、録音データ、ビルドキャッシュを除外している。
 - `.github/workflows/quality.yml` にAndroid SDK 34/NDK 26.1のRustライブラリ付きPreview APK生成・Actions artifact保存ジョブを追加した。PRまたは`main` push後のartifactで、JS bundleを含む現行Android/Rust単体APKを確認できる。
