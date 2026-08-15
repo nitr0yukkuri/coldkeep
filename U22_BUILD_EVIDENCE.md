@@ -11,7 +11,7 @@
 - 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
 - サイズ: 48,236,626 bytes
 - SHA-256: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
-- JS bundle: APK内の`assets/index.android.bundle`（896,368 bytes）を確認
+- JS bundle: APK内の`assets/index.android.bundle`（898,168 bytes）を確認
 - 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
 - 再現性: `scripts/build-preview.ps1`が実行時だけ一時署名鍵を作成し、終了時に削除する。本番鍵・パスワードはリポジトリへ保存しない
