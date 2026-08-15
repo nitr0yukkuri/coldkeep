@@ -53,6 +53,7 @@ npm test -- --runInBand
 - ESLint: 成功
 - Jest: 10 suites / 38 tests 成功（現ワークツリー）
 - Python ML: 10 tests 成功（現ワークツリー）
+- Rust: `cargo` 未導入のためローカル検証はスキップ。CIのRustジョブで`cargo test`を実行する。
 - React Native Android bundle生成: 成功
 - Gradle設定: Release署名チェックをDebug評価から分離済み。現環境ではAndroid SDK `android-34`のアクセス拒否でコンパイル未完了
 - Debug APK生成: 旧コードで成功。現行コードはSDK修復後に再生成が必要
