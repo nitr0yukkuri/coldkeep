@@ -9,7 +9,7 @@ $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("coldkeep-u22-" + [guid]::
 
 $excludeNames = @(
   '.git', '.expo', '.bundle', 'node_modules', 'dataset', 'output', 'tmp',
-  'build', 'dist', '.gradle', '.cxx', 'Pods', 'DerivedData', 'coverage', '__pycache__'
+  'build', 'dist', '.gradle', '.cxx', 'jniLibs', 'Pods', 'DerivedData', 'coverage', '__pycache__'
 )
 $excludeFiles = @(
   '*.apk', '*.zip', '.env', '.env.*', '*.keystore', '*.jks', '*.p12', '*.pem',
