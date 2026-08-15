@@ -29,14 +29,31 @@ try {
   if ($pythonCommand) {
     $pythonPath = $pythonCommand.Source
   } else {
-    $bundled = 'C:\Users\2250126\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
-    if (Test-Path -LiteralPath $bundled) {
-      $pythonPath = $bundled
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+      $pythonPath = $pyLauncher.Source
     } else {
-      throw 'Python 3 is required for ML verification.'
+      $bundled = 'C:\Users\2250126\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+      if (Test-Path -LiteralPath $bundled) {
+        $pythonPath = $bundled
+      } else {
+        throw 'Python 3 is required for ML verification.'
+      }
     }
   }
   Invoke-Checked 'Python ML tests' { & $pythonPath -m unittest discover -s ml -p 'test_*.py' }
+
+  $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
+  if ($cargoCommand) {
+    Push-Location (Join-Path $root 'rust/coldkeep_ml')
+    try {
+      Invoke-Checked 'Rust tests' { & $cargoCommand.Source test --manifest-path (Join-Path (Get-Location).Path 'Cargo.toml') }
+    } finally {
+      Pop-Location
+    }
+  } else {
+    Write-Host '== Rust tests (skipped: cargo is not installed)' -ForegroundColor Yellow
+  }
 
   Push-Location (Join-Path $root 'expo-go')
   try {
