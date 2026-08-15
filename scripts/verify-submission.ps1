@@ -68,7 +68,8 @@ try {
     $entries = @(tar -tf $zip)
     $forbidden = $entries | Where-Object {
       $_ -match '(^|/)(node_modules|dataset|output|tmp|\.git|\.expo|\.bundle|__pycache__|build|dist)(/|$)' -or
-      $_ -match '(^|/)local\.properties$'
+      $_ -match '(^|/)(local\.properties|\.env(\..*)?|google-services\.json)$' -or
+      $_ -match '\.(apk|zip|keystore|jks|p12|pem)$'
     }
     if ($forbidden) {
       $forbidden | ForEach-Object { Write-Error "Forbidden ZIP entry: $_" }
