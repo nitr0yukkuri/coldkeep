@@ -18,8 +18,8 @@
 
 ### CIで生成した提出候補
 
-- Quality run: [31880433541](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31880433541)
-- head: `17f16f795ac894972558acfe132db62b5d1abc3d`
+- Quality run: [31881389325](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31881389325)
+- head: `dcbcad0d94cccb80768948193d1918f28498e570`
 - Preview APK artifact: 2026-08-29まで取得可能（Actionsログインが必要）
 - Source ZIP artifact: 同じrunに保存。APKとソースを別runから混在させない
 

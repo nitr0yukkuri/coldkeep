@@ -7,8 +7,8 @@ Release署名鍵はリポジトリへ保存していないため、提出時はC
 
 - ローカルAPK: `output/ColdKeep-u22-current-preview.apk`
 - ローカルAPK SHA-256（2026-08-15生成）: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
-- CI Preview artifact: [Quality run 17](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31880433541)（artifactは2026-08-29まで）
-- CI source artifactも同じrunに保存している。APKとソースのheadは`17f16f795ac894972558acfe132db62b5d1abc3d`。
+- CI Preview artifact: [Quality run 20](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31881389325)（artifactは2026-08-29まで）
+- CI source artifactも同じrunに保存している。APKとソースのheadは`dcbcad0d94cccb80768948193d1918f28498e570`。
 
 CI artifactはActionsへのログインが必要で、期限後は同じコミットからビルド手順で再生成する。
 
