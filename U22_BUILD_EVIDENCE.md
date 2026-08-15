@@ -9,8 +9,8 @@
 - 署名: ローカルの一時Preview keystore（提出用の本番秘密鍵は使用しない）
 - APK: `android/app/build/outputs/apk/preview/app-preview.apk`
 - 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
-- サイズ: 48,235,978 bytes
-- SHA-256: `B7BC6396369A27FCEEE1EC5774D3BEFE20B5D5362C49B1F2E492F22DC423A251`
+- サイズ: 48,236,626 bytes
+- SHA-256: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
 - JS bundle: APK内の`assets/index.android.bundle`（896,368 bytes）を確認
 - 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
@@ -84,7 +84,9 @@ JS bundle入りPreview APKへ同梱して、14日間のActions artifactとして
 - 環境: `coldkeep_api35`、API 35、`emulator-5554`
 - 現行Preview APKを旧署名アプリ削除後にクリーンインストールし、Metroなしで`MainActivity`を起動
 - 初回の`RECORD_AUDIO`許可ダイアログを確認
+- 録音中画面で経過時間（`1.9秒`）と停止ボタンを確認（`tmp/android-smoke/recording-progress.png`）
 - 2秒録音後に停止し、エミュレータの低信号入力を`有効な音声信号がありません。水筒へ水を注ぐ音を録音してください`として拒否
+- 拒否後も`未判定`へ戻り、再試行ボタンが表示された（`tmp/android-smoke/latest-after-stop.png`）
 - アプリプロセスは維持され、誤った水あり/90%表示やクラッシュは発生しなかった
 - これはエミュレータの入力品質ゲート証拠であり、実水筒の分類精度・実機3回成功の代替ではない
 
