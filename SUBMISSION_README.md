@@ -31,11 +31,13 @@ APKをビルドする場合:
 
 ```powershell
 cd android
-./gradlew.bat :app:assembleRelease
+./gradlew.bat :app:assemblePreview
 ```
 
-提出用の単体APKは、ソースZIPとは別に生成する`output/ColdKeep-u22-release.apk`です。端末へインストール後、
-SCANでマイク権限を許可し、同じ水筒を1秒以上録音してください。
+`assemblePreview`には、CIごとに生成する一時署名鍵（`COLDKEEP_PREVIEW_*`環境変数）が必要です。
+本番Release鍵をソースや提出ZIPへ含めないためです。提出用の単体APKはソースZIPとは別に生成する
+`output/ColdKeep-u22-current-preview.apk`またはCIのPreview artifactです。端末へインストール後、
+SCANでマイク権限を許可し、同じ水筒へ水を注ぐ音を1秒以上録音してください。
 
 ## ZIP内のファイル
 

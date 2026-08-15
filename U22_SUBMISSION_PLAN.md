@@ -46,9 +46,9 @@ ColdKeep は「スマートフォンのマイクで水筒に水を注いだ音�
   - 内容物分類: 18件中16件（88.9%）。
 - 上記は21録音の小規模な外部検証であり、製品精度や未知の水筒への一般化性能を意味しない。
 - `npx tsc --noEmit`、`npm run lint`、`npm test -- --runInBand` は現ワークツリーで成功している（10 suites / 43 tests）。Python MLテスト10件とExpo iOS/Android exportも成功している。
-- Expo依存を外した標準React Native構成で、Debug APKとJS bundleを含むRelease APKの生成実績はある（2026-08-09の旧コード）。UI変更後の再ビルドは、Windows Android SDKのアクセス拒否を解消してから行う。APKの端末インストール・録音・推論結果表示はまだ未確認である。
+- Expo依存を外した標準React Native構成で、現行コミットのJS bundle入りPreview APKを生成済み（2026-08-15）。ローカルPreviewはTypeScript経路、CI PreviewはRustライブラリ同梱を検証する。APKの端末インストール・録音・推論結果表示はまだ未確認である。
 - `output/ColdKeep-u22-release.apk`、`output/ColdKeep-u22-debug.apk`、`output/ColdKeep-U22-source.zip`を生成済み。ZIPは`node_modules`、録音データ、ビルドキャッシュを除外している。
-- `.github/workflows/quality.yml` にAndroid SDK 34/NDK 26.1のRustライブラリ付きDebug APK生成・Actions artifact保存ジョブを追加した。PRまたは`main` push後のartifactで現行コミットのAndroid/Rustコンパイルを確認できる。
+- `.github/workflows/quality.yml` にAndroid SDK 34/NDK 26.1のRustライブラリ付きPreview APK生成・Actions artifact保存ジョブを追加した。PRまたは`main` push後のartifactで、JS bundleを含む現行Android/Rust単体APKを確認できる。
 - この環境には `rustc` / `cargo` がないため、Rustネイティブライブラリは未ビルド。APKはRustライブラリがない場合もTypeScript経路へフォールバックする。
 
 ## 未完了ゲートと完了証拠

@@ -1,10 +1,21 @@
 # ColdKeep U-22提出ビルド証拠
 
-> このファイルのAPKハッシュは2026-08-09に生成した旧提出候補の証拠です。
-> 2026-08-15のUI・信頼度ガード変更後は、Android SDKの`android-34`ディレクトリが
-> Windowsのアクセス拒否になっているため、APKを再生成してハッシュを更新する必要があります。
+更新日: 2026-08-15
 
-## Release APK（旧コードの提出候補）
+## Current standalone Preview APK
+
+- ビルド日時: 2026-08-15
+- コマンド: `cd android; ./gradlew.bat :app:assemblePreview --no-daemon --console=plain`
+- 署名: ローカルの一時Preview keystore（提出用の本番秘密鍵は使用しない）
+- APK: `android/app/build/outputs/apk/preview/app-preview.apk`
+- 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
+- サイズ: 48,235,298 bytes
+- SHA-256: `9599BAEF585F6BF69FA4CBB77E48967079C81DACAE32967230C34AE327F623D0`
+- JS bundle: APK内の`assets/index.android.bundle`（896,368 bytes）を確認
+- 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
+- Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
+
+## Release APK（旧コードの提出候補・参考）
 
 - ビルド日時: 2026-08-09
 - コマンド: `cd android; ./gradlew.bat :app:assembleRelease --no-daemon --offline --no-build-cache --console=plain -x lintVitalRelease -x lintVitalReportRelease`
@@ -15,7 +26,7 @@
 - SHA-256: `916B51B3C6DF75886D3DC86618073A3AF51C0A0C3FC1509EAD0F2DEB96617AD7`
 - JS bundle: APK内の`assets/index.android.bundle`（876,320 bytes）を確認
 
-## Debug APK（旧コードの提出候補）
+## Debug APK（旧コードの提出候補・Metro接続用）
 
 - ビルド日時: 2026-08-09
 - コマンド: `cd android; ./gradlew.bat :app:assembleDebug`
@@ -55,21 +66,21 @@ npm test -- --runInBand
 - Python ML: 10 tests 成功（現ワークツリー）
 - Rust: `cargo` 未導入のためローカル検証はスキップ。CIのRustジョブで`cargo test`を実行する。
 - React Native Android bundle生成: 成功
-- Gradle設定: Release署名チェックをDebug評価から分離済み。現環境ではAndroid SDK `android-34`のアクセス拒否でコンパイル未完了
-- Debug APK生成: 旧コードで成功。現行コードはSDK修復後に再生成が必要
-- Release APK生成: 旧コードで成功。現行コードは署名設定とSDK修復後に再生成が必要
+- Gradle設定: Release署名チェックとPreview一時署名チェックを分離済み
+- 現行Preview APK生成: 成功。JS bundleを含む単体APKとして静的検査済み
+- 現行Debug APK生成: 成功。ただしDebugはMetro接続が必要で、提出用単体APKにはPreviewを使う
+- Release APK生成: 本番秘密鍵が未設定のため意図的に未実行。Previewは本番Release鍵の代替ではない
 
 ## CI Androidビルド
 
-`.github/workflows/quality.yml` の `android-debug` ジョブは、PR/`main` push
-ごとにAndroid SDK 34とNDK 26.1でRust推論ライブラリを生成し、現行コミットの
-Debug APKへ同梱して、14日間のActions artifactとして保存する。これは未署名
-Releaseの代替ではなく、WindowsのSDK権限問題があっても現行コードとRust経路の
-Androidコンパイルを確認するための証跡である。
+`.github/workflows/quality.yml` の `android-preview` ジョブは、PR/`main` push
+ごとにAndroid SDK 34とNDK 26.1でRust推論ライブラリを生成し、CIごとの一時鍵で
+JS bundle入りPreview APKへ同梱して、14日間のActions artifactとして保存する。
+本番Release鍵はCIへ持ち込まず、Previewは審査用の再現可能な単体APKとして扱う。
 
 ## 端末で残る確認
 
-1. APKをAndroid端末へインストールする。
+1. `ColdKeep-u22-current-preview.apk`（またはCIのPreview artifact）をAndroid端末へインストールする。
 2. 初回マイク権限を許可する。
 3. 1秒以上録音して停止する。
 4. `TypeScript estimate complete` が表示され、水あり/なしと充填クラスが出ることを確認する。
