@@ -139,7 +139,6 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         ? 'なし'
         : '未判定';
   const hasResult = content !== 'UNKNOWN';
-  const hasIceResult = icePresence !== 'UNKNOWN';
   const modelActionLabel = COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION];
   const modelActionInstruction =
     COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION];
@@ -413,7 +412,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
           </View>
 
-          {hasResult && (content === 'WATER' || hasIceResult) ? (
+          {hasResult ? (
             <View style={styles.metricRow}>
               {content === 'WATER' ? (
                 <MetricCard
@@ -423,14 +422,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   color="#087ea4"
                 />
               ) : null}
-              {hasIceResult ? (
-                <MetricCard
-                  title="氷の有無"
-                  value={iceDisplay}
-                  unit="音からの目安"
-                  color="#168276"
-                />
-              ) : null}
+              <MetricCard
+                title="氷の有無"
+                value={iceDisplay}
+                unit={
+                  icePresence === 'UNKNOWN' ? '学習前は未判定' : '音からの目安'
+                }
+                color="#168276"
+              />
             </View>
           ) : null}
 
