@@ -19,6 +19,9 @@ through the platform share sheet.
 
 The release manifest does not request Internet access. The Internet permission
 and cleartext traffic are limited to debug builds for the React Native packager.
+The debug build does not require a release keystore; release tasks fail closed
+when the four private signing values are absent. This keeps reviewer builds
+reproducible without weakening release signing.
 
 ## Dependency audit
 
@@ -26,6 +29,12 @@ and cleartext traffic are limited to debug builds for the React Native packager.
 tooling. These packages are not imported by the release JavaScript entry point,
 but the audit should be rerun and reviewed when the React Native toolchain is
 updated.
+
+The audit is treated as a toolchain risk rather than a claim that the APK is
+vulnerability-free: the current React Native/Metro line has unresolved
+transitive advisories and a forced fix would change the framework major
+version. The release APK is offline by design, stores recordings privately,
+and does not ship the Metro development server.
 
 Please report security issues privately through GitHub's security reporting
 mechanism rather than publishing exploit details in a public issue.

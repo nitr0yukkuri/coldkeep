@@ -38,3 +38,19 @@ The app now uses the two evaluated outputs it can support:
 It deliberately does not display temperature or ice quantity. Recordings
 should contain a pouring action comparable to ACM-S2; arbitrary ambient audio,
 shaking, and empty containers are outside the current training distribution.
+
+## Shake-level experiment (not a production model)
+
+`train_shake_level.py` is a separate, conservative experiment for the later
+`shake` action. It accepts a labelled CSV exported from the app's collection
+screen and only trains when empty/half/full recordings exist in at least two
+sessions per class. The 10--30% and 70--90% transition bands are rejected
+instead of being guessed. Evaluation holds out complete sessions, containers,
+and devices are recorded in the report, and no artifact is written when the
+dataset is too small.
+
+The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
+pasta in one muesli box), so it intentionally cannot produce a trustworthy
+three-class shake model. This is an explicit data-collection gate, not a
+failed claim of shake support. Until that gate is met, the app's scan action
+remains `pour` and shake recordings are collected only for the next dataset.

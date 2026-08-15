@@ -8,7 +8,7 @@ ColdKeep — スマートフォンの音で水筒内部の水状態を推定す�
 
 ## 提出版の主張
 
-スマートフォンのマイクで水筒に水を注いだ音を録音し、端末内の音響特徴量と分類モデルから、水の有無と粗い充填クラス（50% / 90%）を表示します。氷のラベルが未学習の間は、氷を `未判定` と表示します。叩く・振る動作は現行モデルの評価対象外です。
+スマートフォンのマイクで水筒に水を注いだ音を録音し、端末内の音響特徴量と分類モデルから、水の有無と粗い充填クラス（50% / 90%）を表示します。氷のラベルが未学習の間は、氷を `未判定` と表示します。叩く・振る動作は別モデル用の収集対象で、現行モデルの評価対象外です。
 
 温度、冷たさの残り時間、氷の重量・個数を測定する作品ではありません。
 
@@ -33,7 +33,7 @@ cd android
 ./gradlew.bat :app:assembleRelease
 ```
 
-提出用の単体APKは`output/ColdKeep-u22-release.apk`です。端末へインストール後、
+提出用の単体APKは、ソースZIPとは別に生成する`output/ColdKeep-u22-release.apk`です。端末へインストール後、
 SCANでマイク権限を許可し、同じ水筒を1秒以上録音してください。
 
 ## ZIP内のファイル
@@ -47,6 +47,8 @@ SCANでマイク権限を許可し、同じ水筒を1秒以上録音してくだ
 - `ml/artifacts/public_audio_baseline.json`: 現行推論アーティファクト
 - `android/app/src/main/java/.../WavRecorderModule.kt`: Android録音
 - `android/app/src/main/java/.../RustAudioClassifierModule.kt`: Rust任意経路
+- `ios/ColdKeep/`: iOSネイティブ録音と権限設定
+- `expo-go/`: MacなしでExpo Goから確認するコンパニオン
 - `rust/coldkeep_ml/`: Rust推論コア
 - `U22_ARCHITECTURE.md`: 構成図
 - `U22_EVALUATION_REPORT.md`: 評価結果と限界

@@ -11,7 +11,8 @@
 | Rust `serde`, `serde_json`, `jni` | Rustブリッジ補助 | 各crateの配布条件をCargo.lockで確認 |
 | Android Gradle Plugin / Gradle | APKビルド | 各ツールのNOTICE/LICENSEを提出環境に従って確認 |
 | `ml/artifacts/public_audio_baseline.json` | 端末内の線形モデル | ColdKeep生成アーティファクト。元データの再配布条件を分離して管理 |
-| ACM-S2評価データ | 小規模な外部評価 | データセットの原ライセンスと引用条件を確認し、音声本体は提出ZIPに含めない |
+| ACM-S2評価データ | 小規模な外部評価 | Audio-based Containers Manipulation Setup 2 (Donaher, Xompero, Cavallaro), CC BY 4.0。音声本体は提出ZIPに含めず、[配布元](https://zenodo.org/records/4770439)を明記 |
+| `public_audio_baseline.json` | ACM-S2から生成した端末内モデル | ACM-S2の帰属表示を維持したColdKeep生成物。未知の水筒への精度を主張しない |
 
 ## 提出前チェック
 

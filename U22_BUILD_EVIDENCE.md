@@ -1,6 +1,10 @@
 # ColdKeep U-22提出ビルド証拠
 
-## Release APK（提出・単体起動用）
+> このファイルのAPKハッシュは2026-08-09に生成した旧提出候補の証拠です。
+> 2026-08-15のUI・信頼度ガード変更後は、Android SDKの`android-34`ディレクトリが
+> Windowsのアクセス拒否になっているため、APKを再生成してハッシュを更新する必要があります。
+
+## Release APK（旧コードの提出候補）
 
 - ビルド日時: 2026-08-09
 - コマンド: `cd android; ./gradlew.bat :app:assembleRelease --no-daemon --offline --no-build-cache --console=plain -x lintVitalRelease -x lintVitalReportRelease`
@@ -11,7 +15,7 @@
 - SHA-256: `916B51B3C6DF75886D3DC86618073A3AF51C0A0C3FC1509EAD0F2DEB96617AD7`
 - JS bundle: APK内の`assets/index.android.bundle`（876,320 bytes）を確認
 
-## Debug APK
+## Debug APK（旧コードの提出候補）
 
 - ビルド日時: 2026-08-09
 - コマンド: `cd android; ./gradlew.bat :app:assembleDebug`
@@ -26,10 +30,18 @@
 
 - 作成コマンド: `powershell -ExecutionPolicy Bypass -File .\package_u22.ps1`
 - ZIP: `output/ColdKeep-U22-source.zip`
-- SHA-256: 作成コマンドの出力値を提出時に記録する（このREADME自身をZIPに含めるため固定値は埋め込まない）
+- SHA-256: `package_u22.ps1`の出力を提出時に記録する（このREADME自身をZIPに含めるため固定値は埋め込まない）
 - 検査: `node_modules`、`dataset`、`build`、`.gradle`、`output`、`tmp`、`.git`を含まないことを確認済み
+- 検査: `android/local.properties`を含まず、ユーザー固有のSDK絶対パスを除外済み
+- 検査: `ios/` と `expo-go/` のソースを含み、Expoの生成物`expo-go/dist`は除外済み
 
 ## 成功した自動検証
+
+提出前の再検証は次で一括実行する（Android SDKが正常な環境では`-SkipAndroid`を外す）。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-submission.ps1 -SkipAndroid
+```
 
 ```powershell
 npx tsc --noEmit
@@ -39,11 +51,11 @@ npm test -- --runInBand
 
 - TypeScript: 成功
 - ESLint: 成功
-- Jest: 5 suites / 13 tests 成功
+- Jest: 10 suites / 34 tests 成功（現ワークツリー）
 - React Native Android bundle生成: 成功
-- Gradle設定タスク: 成功
-- Debug APK生成: 成功
-- Release APK生成: 成功（lintVitalは環境依存の未キャッシュ依存を除外）
+- Gradle設定: Release署名チェックをDebug評価から分離済み。現環境ではAndroid SDK `android-34`のアクセス拒否でコンパイル未完了
+- Debug APK生成: 旧コードで成功。現行コードはSDK修復後に再生成が必要
+- Release APK生成: 旧コードで成功。現行コードは署名設定とSDK修復後に再生成が必要
 
 ## 端末で残る確認
 
@@ -54,4 +66,4 @@ npm test -- --runInBand
 5. 同じ条件で3回実行し、2回以上結果が表示されることを記録する。
 6. `COLLECT DATA` でラベル付きWAVを1件保存し、共有テキストが生成されることを確認する。
 
-この端末確認が終わるまでは、U-22提出要件の「実機動作」を完了扱いにしない。
+この端末確認と現行コードでのAPK再生成が終わるまでは、U-22提出要件の「実機動作」を完了扱いにしない。
