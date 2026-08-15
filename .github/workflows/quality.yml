@@ -180,6 +180,9 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path rust/coldkeep_ml/Cargo.toml -- --check
+
       - name: Test inference core
         run: cargo test --manifest-path rust/coldkeep_ml/Cargo.toml
 
