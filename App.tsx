@@ -11,6 +11,8 @@ import {
 
 import type { AppDependencies } from './src/app/types';
 import {
+  COLLECTION_ACTION_LABELS,
+  COLLECTION_ACTION_INSTRUCTIONS,
   COLLECTION_ACTIONS,
   CollectionDraft,
   CollectionLabels,
@@ -18,6 +20,12 @@ import {
   validateCollectionDraft,
 } from './src/features/collection/domain/collection';
 import type { RecordingRef } from './src/features/shared/application/ports';
+import type { InferenceEngine } from './src/features/scan/domain/scanResult';
+import {
+  DEFAULT_HYDRATION_PROFILE,
+  HydrationState,
+} from './src/features/hydration/domain/hydration';
+import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
 
 const initialCollectionDraft: CollectionDraft = {
   sessionId: 'session-01',
@@ -48,7 +56,9 @@ const MetricCard = ({
     <Text
       style={[
         styles.metricValue,
-        typeof value === 'string' && value.length > 6 && styles.metricValueCompact,
+        typeof value === 'string' &&
+          value.length > 6 &&
+          styles.metricValueCompact,
         { color },
       ]}
     >
@@ -89,18 +99,52 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [status, setStatus] = useState('準備できました');
   const [content, setContent] = useState('UNKNOWN');
   const [fillLevel, setFillLevel] = useState('—');
+  const [waterConfidence, setWaterConfidence] = useState<number | null>(null);
+  const [fillConfidence, setFillConfidence] = useState<number | null>(null);
+  const [inferenceEngine, setInferenceEngine] =
+    useState<InferenceEngine | null>(null);
   const [icePresence, setIcePresence] = useState('UNKNOWN');
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [collectionDraft, setCollectionDraft] = useState(initialCollectionDraft);
-  const [pendingLabels, setPendingLabels] = useState<CollectionLabels | null>(null);
+  const [collectionDraft, setCollectionDraft] = useState(
+    initialCollectionDraft,
+  );
+  const [pendingLabels, setPendingLabels] = useState<CollectionLabels | null>(
+    null,
+  );
   const [savedRecordings, setSavedRecordings] = useState(0);
+  const [hydrationState, setHydrationState] = useState<HydrationState | null>(
+    null,
+  );
+  const [capacityText, setCapacityText] = useState(
+    String(DEFAULT_HYDRATION_PROFILE.capacityMl),
+  );
+  const [goalText, setGoalText] = useState(
+    String(DEFAULT_HYDRATION_PROFILE.dailyGoalMl),
+  );
+  const [intakeText, setIntakeText] = useState('250');
+  const [estimatedIntakeMl, setEstimatedIntakeMl] = useState<number | null>(
+    null,
+  );
   const waterDisplay =
-    content === 'WATER' ? '水あり' : content === 'NON-WATER' ? '水なし' : '未判定';
+    content === 'WATER'
+      ? '水あり'
+      : content === 'NON-WATER'
+        ? '水なし'
+        : '未判定';
   const iceDisplay =
-    icePresence === 'PRESENT' ? 'あり' : icePresence === 'ABSENT' ? 'なし' : '未判定';
+    icePresence === 'PRESENT'
+      ? 'あり'
+      : icePresence === 'ABSENT'
+        ? 'なし'
+        : '未判定';
   const hasResult = content !== 'UNKNOWN';
   const hasIceResult = icePresence !== 'UNKNOWN';
+  const modelActionLabel = COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION];
+  const modelActionInstruction =
+    COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION];
+  const formatProbability = (value: number | null) =>
+    value === null ? '—' : `${Math.round(value * 100)}%`;
 
   useEffect(() => {
     if (mode === 'collect') {
@@ -110,20 +154,55 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     }
   }, [mode]);
 
+  useEffect(() => {
+    let active = true;
+    app.hydration
+      .load()
+      .then(state => {
+        if (!active) {
+          return;
+        }
+        setHydrationState(state);
+        setCapacityText(String(state.profile.capacityMl));
+        setGoalText(String(state.profile.dailyGoalMl));
+      })
+      .catch(error => {
+        if (active) {
+          setStatus(
+            error instanceof Error
+              ? error.message
+              : '水分記録を読み込めませんでした',
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [app]);
+
   const updateCollectionField = useCallback(
-    <Key extends keyof CollectionDraft>(key: Key, value: CollectionDraft[Key]) => {
+    <Key extends keyof CollectionDraft>(
+      key: Key,
+      value: CollectionDraft[Key],
+    ) => {
       setCollectionDraft(current => ({ ...current, [key]: value }));
     },
     [],
   );
 
   const handleScan = useCallback(
-    async (uri: string) => {
+    async (recording: RecordingRef) => {
       try {
         setStatus('確認中…');
-        const result = await app.scan.execute({ uri });
+        setEstimatedIntakeMl(null);
+        const result = await app.scan.execute(recording);
         setContent(result.containsWater ? 'WATER' : 'NON-WATER');
-        setFillLevel(result.fillLevel === null ? 'N/A' : `${result.fillLevel}%`);
+        setFillLevel(
+          result.fillLevel === null ? 'N/A' : `${result.fillLevel}%`,
+        );
+        setWaterConfidence(result.waterConfidence);
+        setFillConfidence(result.fillConfidence);
+        setInferenceEngine(result.engine);
         setIcePresence(
           result.icePresence === null
             ? 'UNKNOWN'
@@ -131,17 +210,97 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               ? 'PRESENT'
               : 'ABSENT',
         );
+        if (result.containsWater && result.fillLevel !== null) {
+          const confidences = [
+            result.waterConfidence,
+            result.fillConfidence,
+          ].filter((value): value is number => value !== null);
+          const hydrationResult = await app.hydration.recordObservation({
+            remainingMl: Math.round(
+              ((hydrationState?.profile.capacityMl ??
+                DEFAULT_HYDRATION_PROFILE.capacityMl) *
+                result.fillLevel) /
+                100,
+            ),
+            fillLevel: result.fillLevel,
+            confidence: confidences.length ? Math.min(...confidences) : null,
+          });
+          setHydrationState(hydrationResult.state);
+          setEstimatedIntakeMl(hydrationResult.estimatedConsumedMl);
+        }
         setStatus('確認が完了しました');
       } catch (error) {
         console.error(error);
         setContent('UNKNOWN');
         setFillLevel('—');
+        setWaterConfidence(null);
+        setFillConfidence(null);
+        setInferenceEngine(null);
         setIcePresence('UNKNOWN');
-        setStatus(error instanceof Error ? error.message : '確認に失敗しました');
+        setStatus(
+          error instanceof Error ? error.message : '確認に失敗しました',
+        );
       }
     },
-    [app],
+    [app, hydrationState?.profile.capacityMl],
   );
+
+  async function saveHydrationProfile() {
+    try {
+      const state = await app.hydration.updateProfile({
+        capacityMl: Number(capacityText),
+        dailyGoalMl: Number(goalText),
+      });
+      setHydrationState(state);
+      setCapacityText(String(state.profile.capacityMl));
+      setGoalText(String(state.profile.dailyGoalMl));
+      setStatus('水分設定を保存しました');
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : '水分設定を保存できませんでした',
+      );
+    }
+  }
+
+  async function addManualIntake(amountOverride?: string) {
+    try {
+      const state = await app.hydration.addManualIntake(
+        Number(amountOverride ?? intakeText),
+      );
+      setHydrationState(state);
+      setIntakeText('250');
+      setStatus('飲水量を記録しました');
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : '飲水量を記録できませんでした',
+      );
+    }
+  }
+
+  async function acceptEstimatedIntake() {
+    if (estimatedIntakeMl === null) {
+      return;
+    }
+    try {
+      const latest =
+        hydrationState?.observations[hydrationState.observations.length - 1];
+      const state = await app.hydration.addEstimatedIntake(
+        estimatedIntakeMl,
+        latest?.confidence ?? null,
+      );
+      setHydrationState(state);
+      setEstimatedIntakeMl(null);
+      setStatus('音響推定の飲水量を記録しました');
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : '推定飲水量を記録できませんでした',
+      );
+    }
+  }
 
   async function startRecording() {
     if (isProcessing) {
@@ -159,7 +318,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     } catch (error) {
       console.error(error);
       setIsRecording(false);
-      setStatus(error instanceof Error ? error.message : '録音を開始できませんでした');
+      setStatus(
+        error instanceof Error ? error.message : '録音を開始できませんでした',
+      );
     }
   }
 
@@ -178,7 +339,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       await app.exportDataset.execute();
       setStatus('CSVを書き出しました');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'CSVを書き出せませんでした');
+      setStatus(
+        error instanceof Error ? error.message : 'CSVを書き出せませんでした',
+      );
     }
   }
 
@@ -199,14 +362,16 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         }
         await saveCollectionRecording(recording, pendingLabels);
       } else {
-        await handleScan(recording.uri);
+        await handleScan(recording);
       }
       setPendingLabels(null);
     } catch (error) {
       console.error(error);
       setIsRecording(false);
       setPendingLabels(null);
-      setStatus(error instanceof Error ? error.message : '録音を処理できませんでした');
+      setStatus(
+        error instanceof Error ? error.message : '録音を処理できませんでした',
+      );
     } finally {
       if (recording) {
         await app.recording.cleanup(recording).catch(() => undefined);
@@ -223,7 +388,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>ColdKeep</Text>
         <Text style={styles.headerSubtitle}>
-          {mode === 'scan' ? '水筒チェック' : 'データ収集'}
+          {mode === 'scan' ? '音響チェック' : 'データ収集'}
         </Text>
       </View>
 
@@ -241,7 +406,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
             <Text style={styles.heroDescription}>
               {content === 'UNKNOWN'
-                ? '水筒に水を注ぐ音でチェックします'
+                ? `${modelActionInstruction}を1秒以上録音します`
                 : content === 'WATER'
                   ? '水が入っています'
                   : '水が検出されませんでした'}
@@ -277,8 +442,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               {isProcessing
                 ? '確認中です。少しお待ちください'
                 : isRecording
-                ? '注ぎ終わったら停止してください'
-                : '水筒に水を注ぎながら1秒以上録音してください'}
+                  ? `${modelActionLabel}動作が終わったら停止してください`
+                  : `${modelActionInstruction}を1秒以上録音してください`}
             </Text>
             <TouchableOpacity
               disabled={isProcessing}
@@ -302,8 +467,42 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             ) : null}
           </View>
 
+          {hasResult ? (
+            <View style={styles.inferenceCard}>
+              <Text style={styles.inferenceTitle}>推論情報</Text>
+              <Text style={styles.inferenceText}>
+                {modelActionLabel}音モデル ·{' '}
+                {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}経路
+              </Text>
+              <Text style={styles.inferenceText}>
+                水判定確率 {formatProbability(waterConfidence)}
+                {content === 'WATER'
+                  ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
+                  : ''}
+              </Text>
+              <Text style={styles.inferenceHint}>
+                確率はこの録音に対するモデル出力で、正解率を意味しません。
+              </Text>
+            </View>
+          ) : null}
+
+          <HydrationPanel
+            state={hydrationState}
+            capacityText={capacityText}
+            goalText={goalText}
+            intakeText={intakeText}
+            estimatedIntakeMl={estimatedIntakeMl}
+            onChangeCapacity={setCapacityText}
+            onChangeGoal={setGoalText}
+            onChangeIntake={setIntakeText}
+            onSaveProfile={saveHydrationProfile}
+            onAddManualIntake={addManualIntake}
+            onAcceptEstimatedIntake={acceptEstimatedIntake}
+            modelActionLabel={modelActionLabel}
+          />
+
           <Text style={styles.resultNote}>
-            結果は注ぐ速度、録音距離、容器によって変わることがあります
+            結果は録音動作、距離、容器、周囲の音で変わります。前回の残量との差分は参考値として確認できます。
           </Text>
           <TouchableOpacity
             disabled={isRecording || isProcessing}
@@ -340,7 +539,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             <LabeledInput
               label="水筒"
               value={collectionDraft.containerId}
-              onChangeText={value => updateCollectionField('containerId', value)}
+              onChangeText={value =>
+                updateCollectionField('containerId', value)
+              }
               editable={!isRecording}
             />
             <LabeledInput
@@ -380,7 +581,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             <LabeledInput
               label="水温 (°C)"
               value={collectionDraft.temperatureC}
-              onChangeText={value => updateCollectionField('temperatureC', value)}
+              onChangeText={value =>
+                updateCollectionField('temperatureC', value)
+              }
               numeric
               editable={!isRecording}
             />
@@ -407,7 +610,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 onPress={() => updateCollectionField('action', action)}
               >
                 <Text style={styles.actionText}>
-                  {action === 'pour' ? '傾ける' : action === 'shake' ? '振る' : '静置'}
+                  {COLLECTION_ACTION_LABELS[action]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -429,7 +632,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
           </TouchableOpacity>
           {!isRecording ? (
-            <TouchableOpacity style={styles.exportButton} onPress={shareManifest}>
+            <TouchableOpacity
+              style={styles.exportButton}
+              onPress={shareManifest}
+            >
               <Text style={styles.exportText}>CSVを書き出す</Text>
             </TouchableOpacity>
           ) : null}
@@ -462,9 +668,19 @@ const styles = StyleSheet.create({
     borderColor: '#c4e2e6',
   },
   heroLabel: { color: '#5a737a', fontSize: 14, fontWeight: '600' },
-  heroValue: { color: '#087ea4', fontSize: 42, fontWeight: '800', marginTop: 10 },
+  heroValue: {
+    color: '#087ea4',
+    fontSize: 42,
+    fontWeight: '800',
+    marginTop: 10,
+  },
   heroValueCompact: { fontSize: 28 },
-  heroDescription: { color: '#45636a', fontSize: 15, marginTop: 4, textAlign: 'center' },
+  heroDescription: {
+    color: '#45636a',
+    fontSize: 15,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   metricRow: { flexDirection: 'row', width: '100%', gap: 10, marginTop: 12 },
   metricCard: {
     flex: 1,
@@ -477,7 +693,12 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
   },
   metricTitle: { color: '#36515a', fontSize: 13, fontWeight: '600' },
-  metricValue: { color: '#087ea4', fontSize: 25, fontWeight: '800', marginTop: 10 },
+  metricValue: {
+    color: '#087ea4',
+    fontSize: 25,
+    fontWeight: '800',
+    marginTop: 10,
+  },
   metricValueCompact: { fontSize: 17 },
   metricUnit: { color: '#73878c', fontSize: 11, marginTop: 5 },
   analysisCard: {
@@ -491,7 +712,12 @@ const styles = StyleSheet.create({
     borderColor: '#dce7e9',
   },
   analysisDescription: { color: '#36515a', fontSize: 15, fontWeight: '600' },
-  analysisHint: { color: '#73878c', fontSize: 13, marginTop: 5, textAlign: 'center' },
+  analysisHint: {
+    color: '#73878c',
+    fontSize: 13,
+    marginTop: 5,
+    textAlign: 'center',
+  },
   analysisButton: {
     width: '100%',
     minHeight: 54,
@@ -504,11 +730,43 @@ const styles = StyleSheet.create({
   analysisButtonActive: { backgroundColor: '#c94f57' },
   analysisButtonDisabled: { backgroundColor: '#9aa9ad' },
   analysisButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  analysisStatus: { color: '#b04b50', fontSize: 12, marginTop: 9, textAlign: 'center' },
-  resultNote: { color: '#73878c', fontSize: 12, marginTop: 14, textAlign: 'center' },
+  analysisStatus: {
+    color: '#b04b50',
+    fontSize: 12,
+    marginTop: 9,
+    textAlign: 'center',
+  },
+  inferenceCard: {
+    width: '100%',
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#dce7e9',
+  },
+  inferenceTitle: { color: '#36515a', fontSize: 13, fontWeight: '800' },
+  inferenceText: { color: '#587177', fontSize: 12, marginTop: 5 },
+  inferenceHint: {
+    color: '#8b9ba0',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 7,
+  },
+  resultNote: {
+    color: '#73878c',
+    fontSize: 12,
+    marginTop: 14,
+    textAlign: 'center',
+  },
   developerLink: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 10 },
   developerLinkText: { color: '#6d8489', fontSize: 12 },
-  collectionStatus: { color: '#62747a', fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  collectionStatus: {
+    color: '#62747a',
+    fontSize: 13,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
   collectionPanel: { width: '90%', marginBottom: 18 },
   collectionHeaderRow: {
     flexDirection: 'row',

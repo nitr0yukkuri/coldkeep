@@ -2,6 +2,7 @@ import { CollectSampleUseCase } from '../../src/features/collection/application/
 import { ExportDatasetUseCase } from '../../src/features/collection/application/exportDatasetUseCase';
 import { RecordingUseCase } from '../../src/features/scan/application/recordingUseCase';
 import { ScanBottleUseCase } from '../../src/features/scan/application/scanBottleUseCase';
+import { HydrationUseCase } from '../../src/features/hydration/application/hydrationUseCase';
 import { COLLECTION_ACTIONS } from '../../src/features/collection/domain/collection';
 import type { AppDependencies } from '../../src/app/types';
 import { TypeScriptClassifierAdapter } from '../../src/platform/ml/typescriptClassifier';
@@ -12,6 +13,7 @@ import {
   ExpoPcmRecorderAdapter,
 } from './audioAdapters';
 import { ExpoDatasetRepository } from './datasetRepository';
+import { ExpoHydrationRepository } from './hydrationRepository';
 
 export function createExpoAppDependencies(
   recorder: ExpoPcmRecorderAdapter,
@@ -27,5 +29,6 @@ export function createExpoAppDependencies(
       repository,
       new ReactNativeShareGateway(),
     ),
+    hydration: new HydrationUseCase(new ExpoHydrationRepository()),
   };
 }

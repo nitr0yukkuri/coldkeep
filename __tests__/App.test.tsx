@@ -26,13 +26,25 @@ jest.mock('../src/app/compositionRoot', () => ({
     scan: { execute: jest.fn() },
     collect: { execute: jest.fn() },
     exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => ({
+        profile: { capacityMl: 500, dailyGoalMl: 1500 },
+        observations: [],
+        intakes: [],
+      })),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
   }),
 }));
 
 import App from '../src/app/NativeApp';
 
 test('renders correctly', async () => {
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     ReactTestRenderer.create(<App />);
+    await Promise.resolve();
   });
 });
