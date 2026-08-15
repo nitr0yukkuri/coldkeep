@@ -436,7 +436,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 : content === 'UNKNOWN'
                   ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
                   : content === 'WATER'
-                    ? '水が入っています'
+                    ? fillLevel === 'N/A'
+                      ? '水は検出されましたが、充填状態は未判定です'
+                      : '水が入っています'
                     : '水が検出されませんでした'}
             </Text>
           </View>
