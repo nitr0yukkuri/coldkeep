@@ -90,6 +90,7 @@ const LabeledInput = ({
       style={[styles.input, !editable && styles.disabledInput]}
       value={value}
       onChangeText={onChangeText}
+      accessibilityLabel={label}
       keyboardType={numeric ? 'decimal-pad' : 'default'}
       autoCapitalize="none"
       editable={editable}
@@ -113,6 +114,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [iceConfidence, setIceConfidence] = useState<number | null>(null);
   const [hasScanResult, setHasScanResult] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
+    null,
+  );
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [collectionDraft, setCollectionDraft] = useState(
     initialCollectionDraft,
@@ -160,6 +165,16 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       setStatus('準備できました');
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!isRecording || recordingStartedAt === null) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setRecordingElapsedMs(Date.now() - recordingStartedAt);
+    }, 100);
+    return () => clearInterval(timer);
+  }, [isRecording, recordingStartedAt]);
 
   useEffect(() => {
     let active = true;
@@ -347,11 +362,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
       setPendingLabels(labels);
       setIsRecording(true);
+      setRecordingStartedAt(Date.now());
+      setRecordingElapsedMs(0);
       setIsProcessing(false);
       setStatus('録音中…');
     } catch (error) {
       console.error(error);
       setIsRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
       setStatus(
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
@@ -390,6 +409,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       recording = await app.recording.stop();
 
       setIsRecording(false);
+      setRecordingStartedAt(null);
       if (mode === 'collect') {
         if (!pendingLabels) {
           throw new Error('Collection labels were not captured');
@@ -402,6 +422,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     } catch (error) {
       console.error(error);
       setIsRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
       setPendingLabels(null);
       setStatus(
         error instanceof Error ? error.message : '録音を処理できませんでした',
@@ -410,6 +432,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       if (recording) {
         await app.recording.cleanup(recording).catch(() => undefined);
       }
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
       setIsProcessing(false);
     }
   }
@@ -491,6 +515,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
             <TouchableOpacity
               disabled={isProcessing}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isProcessing
+                  ? '音声を確認中'
+                  : isRecording
+                    ? '録音を停止して確認'
+                    : '水筒の音をチェックする'
+              }
               style={[
                 styles.analysisButton,
                 isRecording && styles.analysisButtonActive,
@@ -506,6 +538,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                     : 'チェックする'}
               </Text>
             </TouchableOpacity>
+            {isRecording ? (
+              <Text style={styles.recordingDuration}>
+                ● 録音 {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
+              </Text>
+            ) : null}
             {status !== '準備できました' && status !== '確認が完了しました' ? (
               <Text style={styles.analysisStatus}>{status}</Text>
             ) : null}
@@ -550,6 +587,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           </Text>
           <TouchableOpacity
             disabled={isRecording || isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel="データ収集画面を開く"
             style={styles.developerLink}
             onPress={() => setMode('collect')}
           >
@@ -567,6 +606,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </View>
             <TouchableOpacity
               disabled={isRecording || isProcessing}
+              accessibilityRole="button"
+              accessibilityLabel="音響チェック画面へ戻る"
               style={styles.backLink}
               onPress={() => setMode('scan')}
             >
@@ -647,6 +688,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               <TouchableOpacity
                 key={action}
                 disabled={isRecording}
+                accessibilityRole="button"
+                accessibilityLabel={`収集動作 ${COLLECTION_ACTION_LABELS[action]}`}
                 style={[
                   styles.actionButton,
                   collectionDraft.action === action && styles.activeAction,
@@ -668,6 +711,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           <Text style={styles.collectionStatus}>{status}</Text>
           <TouchableOpacity
             disabled={isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isRecording ? '録音を停止して保存' : 'ラベル付き録音を保存'
+            }
             style={[styles.button, isRecording && styles.activeRec]}
             onPress={isRecording ? stopRecording : startRecording}
           >
@@ -677,6 +724,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           </TouchableOpacity>
           {!isRecording ? (
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="CSVを書き出す"
               style={styles.exportButton}
               onPress={shareManifest}
             >
@@ -774,6 +823,12 @@ const styles = StyleSheet.create({
   analysisButtonActive: { backgroundColor: '#c94f57' },
   analysisButtonDisabled: { backgroundColor: '#9aa9ad' },
   analysisButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  recordingDuration: {
+    color: '#c44747',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 10,
+  },
   analysisStatus: {
     color: '#b04b50',
     fontSize: 12,
