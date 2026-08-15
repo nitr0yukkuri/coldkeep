@@ -72,6 +72,8 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
     """Load shake rows and report rows that cannot be used without guessing."""
     captures: list[Capture] = []
     diagnostics: list[str] = []
+    resolved_audio_root = audio_root.resolve()
+    seen_recording_ids: set[str] = set()
     with manifest.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
         required = {
@@ -96,12 +98,21 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                 water = float(_required(row, "water_ml", line))
                 if capacity <= 0 or water < 0 or water > capacity:
                     raise ValueError("capacity/water values are out of range")
-                audio = audio_root / _required(row, "audio_filename", line)
+                recording_id = _required(row, "recording_id", line)
+                if recording_id in seen_recording_ids:
+                    raise ValueError(f"duplicate recording_id: {recording_id}")
+                audio = (audio_root / _required(row, "audio_filename", line)).resolve()
+                if (
+                    audio != resolved_audio_root
+                    and resolved_audio_root not in audio.parents
+                ):
+                    raise ValueError("audio_filename escapes the audio root")
                 if not audio.is_file():
                     raise ValueError(f"audio file not found: {audio}")
+                seen_recording_ids.add(recording_id)
                 captures.append(
                     Capture(
-                        recording_id=_required(row, "recording_id", line),
+                        recording_id=recording_id,
                         session_id=_required(row, "session_id", line),
                         container_id=_required(row, "container_id", line),
                         device_id=_required(row, "device_id", line),
