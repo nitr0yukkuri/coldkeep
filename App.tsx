@@ -13,7 +13,6 @@ import type { AppDependencies } from './src/app/types';
 import {
   COLLECTION_ACTION_LABELS,
   COLLECTION_ACTION_INSTRUCTIONS,
-  COLLECTION_ACTIONS,
   CollectionDraft,
   CollectionLabels,
   MODEL_RECORDING_ACTION,
@@ -773,25 +772,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               editable={!isRecording}
             />
           </View>
-          <Text style={styles.inputLabel}>動作</Text>
-          <View style={styles.actionRow}>
-            {COLLECTION_ACTIONS.map(action => (
-              <TouchableOpacity
-                key={action}
-                disabled={isRecording}
-                accessibilityRole="button"
-                accessibilityLabel={`収集動作 ${COLLECTION_ACTION_LABELS[action]}`}
-                style={[
-                  styles.actionButton,
-                  collectionDraft.action === action && styles.activeAction,
-                ]}
-                onPress={() => updateCollectionField('action', action)}
-              >
-                <Text style={styles.actionText}>
-                  {COLLECTION_ACTION_LABELS[action]}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.inputLabel}>収集動作</Text>
+          <View style={styles.actionSummary}>
+            <Text style={styles.actionSummaryValue}>
+              {COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION]}
+            </Text>
+            <Text style={styles.actionSummaryHint}>
+              {COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION]}
+            </Text>
           </View>
           <Text style={styles.savedCount}>今回保存: {savedRecordings}件</Text>
         </View>
@@ -992,19 +980,16 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   disabledInput: { opacity: 0.55 },
-  actionRow: { flexDirection: 'row', marginBottom: 12 },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginRight: 6,
+  actionSummary: {
+    marginBottom: 12,
+    padding: 12,
     borderRadius: 9,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d4e1e3',
   },
-  activeAction: { backgroundColor: '#dceff1', borderColor: '#087ea4' },
-  actionText: { color: '#36515a', fontSize: 12, fontWeight: '700' },
+  actionSummaryValue: { color: '#17323b', fontSize: 14, fontWeight: '800' },
+  actionSummaryHint: { color: '#73878c', fontSize: 12, marginTop: 3 },
   savedCount: { color: '#73878c', textAlign: 'right' },
   exportButton: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 24 },
   exportText: { color: '#087ea4', fontWeight: '700' },

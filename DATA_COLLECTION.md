@@ -41,7 +41,9 @@ clearing app data or uninstalling the app.
 ## Recording protocol
 
 1. Measure and enter every label.
-2. Select exactly one action: pour, shake, or still.
+2. The app's current collection flow records exactly one action: `shake`.
+   Legacy `pour` and `still` rows remain valid for imported/comparison data,
+   but are not selectable in the product collection screen.
 3. Start recording, wait briefly, perform the action consistently, then stop.
 4. Confirm that the status begins with `Saved`.
 5. Change only the intended experimental condition before the next recording.
