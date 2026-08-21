@@ -28,6 +28,7 @@ import {
   levelToFillClass,
   remainingMlFromShake,
 } from './src/features/scan/domain/shakeFillLevel';
+import { iceAmountClassLabel } from './src/features/scan/domain/iceAmount';
 import {
   DEFAULT_HYDRATION_PROFILE,
   HydrationState,
@@ -119,6 +120,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     'untrained',
   );
   const [iceConfidence, setIceConfidence] = useState<number | null>(null);
+  const [iceAmount, setIceAmount] = useState<'none' | 'few' | 'many' | null>(
+    null,
+  );
+  const [iceAmountStatus, setIceAmountStatus] = useState<
+    'trained' | 'experimental' | 'untrained'
+  >('untrained');
+  const [iceAmountConfidence, setIceAmountConfidence] = useState<number | null>(
+    null,
+  );
   const [hasScanResult, setHasScanResult] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
@@ -152,16 +162,18 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         ? '未判定'
         : `残量 ${fillLevel}`
       : content === 'WATER'
-      ? '水あり'
-      : content === 'NON-WATER'
-        ? '水なし'
-        : '未判定';
+        ? '水あり'
+        : content === 'NON-WATER'
+          ? '水なし'
+          : '未判定';
   const iceDisplay =
-    icePresence === 'PRESENT'
-      ? 'あり'
-      : icePresence === 'ABSENT'
-        ? 'なし'
-        : '未判定';
+    iceAmount !== null
+      ? iceAmountClassLabel(iceAmount)
+      : icePresence === 'PRESENT'
+        ? 'あり'
+        : icePresence === 'ABSENT'
+          ? 'なし'
+          : '未判定';
   const hasResult = hasScanResult;
   const modelActionLabel = COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION];
   const modelActionInstruction =
@@ -230,33 +242,31 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setEstimatedIntakeMl(null);
         const result = await app.scan.execute(recording);
         const shakeMode = result.measurementAction === 'shake';
-        const waterIsReliable =
-          shakeMode
-            ? result.measurementStatus === 'trained' &&
-              result.fillConfidence !== null &&
+        const waterIsReliable = shakeMode
+          ? result.measurementStatus === 'trained' &&
+            result.fillConfidence !== null &&
+            Number.isFinite(result.fillConfidence) &&
+            result.fillConfidence >= MIN_SCAN_CONFIDENCE
+          : Number.isFinite(result.waterConfidence) &&
+            result.waterConfidence >= MIN_SCAN_CONFIDENCE;
+        const fillIsReliable = shakeMode
+          ? waterIsReliable &&
+            (result.fillLevel === 0 ||
+              result.fillLevel === 50 ||
+              result.fillLevel === 100)
+          : !result.containsWater ||
+            (result.fillConfidence !== null &&
               Number.isFinite(result.fillConfidence) &&
-              result.fillConfidence >= MIN_SCAN_CONFIDENCE
-            : Number.isFinite(result.waterConfidence) &&
-              result.waterConfidence >= MIN_SCAN_CONFIDENCE;
-        const fillIsReliable =
-          shakeMode
-            ? waterIsReliable &&
-              (result.fillLevel === 0 ||
-                result.fillLevel === 50 ||
-                result.fillLevel === 100)
-            : !result.containsWater ||
-              (result.fillConfidence !== null &&
-                Number.isFinite(result.fillConfidence) &&
-                result.fillConfidence >= MIN_SCAN_CONFIDENCE);
+              result.fillConfidence >= MIN_SCAN_CONFIDENCE);
         setHasScanResult(true);
         setContent(
           shakeMode
             ? 'SHAKE'
             : !waterIsReliable
-            ? 'UNKNOWN'
-            : result.containsWater
-              ? 'WATER'
-              : 'NON-WATER',
+              ? 'UNKNOWN'
+              : result.containsWater
+                ? 'WATER'
+                : 'NON-WATER',
         );
         setFillLevel(
           result.fillLevel === null || !fillIsReliable
@@ -276,6 +286,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         );
         setIceStatus(result.iceStatus);
         setIceConfidence(result.iceConfidence);
+        setIceAmount(result.iceAmount);
+        setIceAmountStatus(result.iceAmountStatus);
+        setIceAmountConfidence(result.iceAmountConfidence);
         if (
           waterIsReliable &&
           fillIsReliable &&
@@ -295,9 +308,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             DEFAULT_HYDRATION_PROFILE.capacityMl;
           const remainingMl = shakeMode
             ? remainingMlFromShake(capacity, {
-                fillClass: levelToFillClass(
-                  result.fillLevel as 0 | 50 | 100,
-                ),
+                fillClass: levelToFillClass(result.fillLevel as 0 | 50 | 100),
                 fillLevel: result.fillLevel as 0 | 50 | 100,
                 confidence: result.fillConfidence,
                 status: 'trained',
@@ -328,6 +339,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setIcePresence('UNKNOWN');
         setIceStatus('untrained');
         setIceConfidence(null);
+        setIceAmount(null);
+        setIceAmountStatus('untrained');
+        setIceAmountConfidence(null);
         setStatus(
           error instanceof Error ? error.message : '確認に失敗しました',
         );
@@ -513,13 +527,13 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                     : fillLevel === 'N/A'
                       ? '振り音の信頼度が低いため残量を判定できませんでした'
                       : '振り音から残量の3段階を判定しました'
-                : content === 'UNKNOWN'
-                  ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
-                  : content === 'WATER'
-                    ? fillLevel === 'N/A'
-                      ? '水は検出されましたが、充填状態は未判定です'
-                      : '水が入っています'
-                    : '水が検出されませんでした'}
+                  : content === 'UNKNOWN'
+                    ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
+                    : content === 'WATER'
+                      ? fillLevel === 'N/A'
+                        ? '水は検出されましたが、充填状態は未判定です'
+                        : '水が入っています'
+                      : '水が検出されませんでした'}
             </Text>
           </View>
 
@@ -540,20 +554,35 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   color="#087ea4"
                 />
               ) : null}
-              <MetricCard
-                title="氷の有無"
-                value={iceDisplay}
-                unit={
-                  icePresence === 'UNKNOWN'
-                    ? iceStatus === 'trained'
-                      ? iceConfidence === null
-                        ? '信頼度不足（再試行）'
-                        : `信頼度不足（${formatProbability(iceConfidence)}）`
+              {content === 'SHAKE' ? (
+                <MetricCard
+                  title="氷量"
+                  value={iceAmount !== null ? iceDisplay : '未判定'}
+                  unit={
+                    iceAmountStatus === 'trained' && iceAmount !== null
+                      ? `3段階の目安（${formatProbability(
+                          iceAmountConfidence,
+                        )}）`
                       : '学習前は未判定'
-                    : `音からの目安（${formatProbability(iceConfidence)}）`
-                }
-                color="#168276"
-              />
+                  }
+                  color="#168276"
+                />
+              ) : (
+                <MetricCard
+                  title="氷の有無"
+                  value={iceDisplay}
+                  unit={
+                    icePresence === 'UNKNOWN'
+                      ? iceStatus === 'trained'
+                        ? iceConfidence === null
+                          ? '信頼度不足（再試行）'
+                          : `信頼度不足（${formatProbability(iceConfidence)}）`
+                        : '学習前は未判定'
+                      : `音からの目安（${formatProbability(iceConfidence)}）`
+                  }
+                  color="#168276"
+                />
+              )}
             </View>
           ) : null}
 

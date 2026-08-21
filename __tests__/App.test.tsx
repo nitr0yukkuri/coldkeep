@@ -73,7 +73,12 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
         icePresence: null,
         iceConfidence: null,
         iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
         engine: 'typescript',
+        measurementAction: 'pour',
+        measurementStatus: 'trained',
       })),
     },
     collect: { execute: jest.fn() },
@@ -148,7 +153,12 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',
+    iceAmount: null,
+    iceAmountConfidence: null,
+    iceAmountStatus: 'untrained',
     engine: 'typescript',
+    measurementAction: 'pour',
+    measurementStatus: 'trained',
   });
   await ReactTestRenderer.act(async () => {
     await buttonFor('チェックする')?.props.onPress();
