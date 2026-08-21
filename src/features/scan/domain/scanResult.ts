@@ -1,3 +1,8 @@
+import {
+  ICE_AMOUNT_CONFIDENCE_THRESHOLD,
+  type IceAmountClass,
+} from './iceAmount';
+
 export type InferenceEngine = 'typescript' | 'rust';
 export type ScanAction = 'pour' | 'shake';
 export type ScanMeasurementStatus = 'trained' | 'experimental' | 'untrained';
@@ -15,6 +20,10 @@ export type ScanResult = {
   icePresence: boolean | null;
   iceConfidence: number | null;
   iceStatus: 'untrained' | 'trained';
+  /** Coarse shake-ice output; never an exact cube count. */
+  iceAmount: IceAmountClass | null;
+  iceAmountConfidence: number | null;
+  iceAmountStatus: ScanMeasurementStatus;
   engine: InferenceEngine;
 };
 
@@ -39,6 +48,9 @@ export function unknownScanResult(
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',
+    iceAmount: null,
+    iceAmountConfidence: null,
+    iceAmountStatus: 'untrained',
     engine,
   };
 }
@@ -70,6 +82,14 @@ export function normalizeScanResult(result: ScanResult): ScanResult {
     result.icePresence !== null &&
     candidateIceConfidence !== null &&
     candidateIceConfidence >= MIN_ICE_CONFIDENCE;
+  const candidateIceAmountConfidence = clampConfidence(
+    result.iceAmountConfidence,
+  );
+  const iceAmountIsReliable =
+    result.iceAmountStatus === 'trained' &&
+    result.iceAmount !== null &&
+    candidateIceAmountConfidence !== null &&
+    candidateIceAmountConfidence >= ICE_AMOUNT_CONFIDENCE_THRESHOLD;
 
   return {
     ...result,
@@ -78,5 +98,10 @@ export function normalizeScanResult(result: ScanResult): ScanResult {
     fillConfidence,
     icePresence: iceIsReliable ? result.icePresence : null,
     iceConfidence: iceIsReliable ? candidateIceConfidence : null,
+    iceAmount: iceAmountIsReliable ? result.iceAmount : null,
+    iceAmountConfidence: iceAmountIsReliable
+      ? candidateIceAmountConfidence
+      : null,
+    iceAmountStatus: result.iceAmountStatus,
   };
 }
