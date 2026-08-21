@@ -10,10 +10,7 @@ export class ExportDatasetUseCase {
   ) {}
 
   async execute(): Promise<void> {
-    const manifest = await this.repository.readManifest();
-    if (!manifest) {
-      throw new Error('No recordings have been saved yet');
-    }
-    await this.share.shareText('ColdKeep labels', manifest);
+    const archiveUri = await this.repository.createExportArchive();
+    await this.share.shareFile('ColdKeep dataset', archiveUri);
   }
 }

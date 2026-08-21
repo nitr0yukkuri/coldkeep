@@ -53,10 +53,13 @@ export interface DatasetRepository {
     audio: PcmAudio,
   ): Promise<CollectionRecord>;
   readManifest(): Promise<string | null>;
+  /** Creates a portable archive containing manifest, metadata, and WAV files. */
+  createExportArchive(): Promise<string>;
 }
 
 export interface ShareGateway {
   shareText(title: string, text: string): Promise<void>;
+  shareFile(title: string, uri: string): Promise<void>;
 }
 
 export interface HydrationRepository {
