@@ -246,9 +246,7 @@ fn low_pass_filter(samples: &[f64], source_rate: u32, target_rate: u32) -> Vec<f
         };
         *value = cutoff
             * sinc
-            * (0.54
-                - 0.46
-                    * (2.0 * std::f64::consts::PI * tap as f64 / (taps - 1) as f64).cos());
+            * (0.54 - 0.46 * (2.0 * std::f64::consts::PI * tap as f64 / (taps - 1) as f64).cos());
         sum += *value;
     }
     for value in &mut kernel {
