@@ -12,6 +12,8 @@ use std::collections::BTreeMap;
 const MODEL_JSON: &str = include_str!("../../../ml/artifacts/public_audio_baseline.json");
 const SHAKE_MODEL_JSON: &str = include_str!("../../../ml/artifacts/shake_fill_level_pilot.json");
 const ICE_MODEL_JSON: &str = include_str!(concat!(env!("OUT_DIR"), "/ice_presence_model.json"));
+const SHAKE_ICE_MODEL_JSON: &str =
+    include_str!(concat!(env!("OUT_DIR"), "/shake_ice_amount_model.json"));
 const FFT_SIZE: usize = 512;
 const FRAME_SIZE: usize = 400;
 const FRAME_HOP: usize = 160;
@@ -49,6 +51,12 @@ pub struct Prediction {
     pub ice_presence: Option<bool>,
     pub ice_confidence: Option<f64>,
     pub ice_status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ice_amount: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ice_amount_confidence: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ice_amount_status: Option<&'static str>,
     pub engine: &'static str,
     pub model_version: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -73,6 +81,35 @@ fn shake_status(status: &str) -> &'static str {
         "trained" => "trained",
         "experimental" => "experimental",
         _ => "untrained",
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ShakeIceAmountArtifact {
+    status: String,
+    classes: Vec<String>,
+    model: Option<LinearModel>,
+}
+
+fn shake_ice_artifact() -> Result<ShakeIceAmountArtifact, String> {
+    serde_json::from_str(SHAKE_ICE_MODEL_JSON)
+        .map_err(|error| format!("shake ice amount model artifact: {error}"))
+}
+
+fn shake_ice_status(status: &str) -> &'static str {
+    match status {
+        "trained" => "trained",
+        "experimental" => "experimental",
+        _ => "untrained",
+    }
+}
+
+fn shake_ice_class(class: &str) -> Option<&'static str> {
+    match class {
+        "none" => Some("none"),
+        "few" => Some("few"),
+        "many" => Some("many"),
+        _ => None,
     }
 }
 
@@ -454,6 +491,9 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             } else {
                 "untrained"
             },
+            ice_amount: None,
+            ice_amount_confidence: None,
+            ice_amount_status: None,
             engine: "rust",
             model_version: 1,
             measurement_action: Some("pour"),
@@ -484,6 +524,9 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         } else {
             "untrained"
         },
+        ice_amount: None,
+        ice_amount_confidence: None,
+        ice_amount_status: None,
         engine: "rust",
         model_version: 1,
         measurement_action: Some("pour"),
@@ -598,6 +641,8 @@ pub extern "system" fn Java_com_anonymous_coldkeep_RustAudioClassifierModule_nat
 pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
     let shake = shake_artifact()?;
     let status = shake_status(&shake.status);
+    let shake_ice = shake_ice_artifact()?;
+    let ice_status = shake_ice_status(&shake_ice.status);
     let Some(shake_model) = shake.model.as_ref() else {
         return parse_wav(bytes).map(|_| Prediction {
             contains_water: false,
@@ -607,6 +652,9 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             ice_presence: None,
             ice_confidence: None,
             ice_status: "untrained",
+            ice_amount: None,
+            ice_amount_confidence: None,
+            ice_amount_status: Some(ice_status),
             engine: "rust",
             model_version: 1,
             measurement_action: Some("shake"),
@@ -639,6 +687,30 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         _ => return Err("shake model class must be 0, 1, or 2".to_string()),
     };
     let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
+    let (ice_amount, ice_amount_confidence) = if ice_status == "trained"
+        && shake_ice.model.is_some()
+        && shake_ice.classes.len() == 3
+    {
+        let ice_model = shake_ice.model.as_ref().expect("checked above");
+        let ice_probabilities = averaged_prediction(&features, ice_model);
+        let ice_index = ice_probabilities
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        let ice_class = shake_ice
+            .classes
+            .get(ice_index)
+            .and_then(|class| shake_ice_class(class))
+            .ok_or("shake ice model class must be none, few, or many")?;
+        (
+            Some(ice_class),
+            ice_probabilities.get(ice_index).copied(),
+        )
+    } else {
+        (None, None)
+    };
     Ok(Prediction {
         contains_water: true,
         water_confidence: confidence,
@@ -646,7 +718,14 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         fill_confidence: Some(confidence),
         ice_presence: None,
         ice_confidence: None,
-        ice_status: "untrained",
+        ice_status: if ice_status == "trained" {
+            "trained"
+        } else {
+            "untrained"
+        },
+        ice_amount,
+        ice_amount_confidence,
+        ice_amount_status: Some(ice_status),
         engine: "rust",
         model_version: 1,
         measurement_action: Some("shake"),
