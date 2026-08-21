@@ -69,14 +69,18 @@ test('scan use case falls back across classifier adapters', async () => {
   const fallbackClassifier: AudioClassifier = {
     classify: jest.fn(async () => result),
   };
-  const useCase = new ScanBottleUseCase(reader, [
-    failingClassifier,
-    fallbackClassifier,
-  ]);
+  const useCase = new ScanBottleUseCase(
+    reader,
+    [failingClassifier, fallbackClassifier],
+    'shake',
+  );
 
   await expect(useCase.execute({ uri: 'file:///recording.wav' })).resolves.toEqual(result);
   expect(failingClassifier.classify).toHaveBeenCalledTimes(1);
   expect(fallbackClassifier.classify).toHaveBeenCalledTimes(1);
+  expect(fallbackClassifier.classify).toHaveBeenCalledWith(
+    expect.objectContaining({ action: 'shake' }),
+  );
 });
 
 test('collection and export use cases depend on ports, not RNFS', async () => {

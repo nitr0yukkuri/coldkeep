@@ -1,17 +1,17 @@
 # ColdKeep U-22提出ビルド証拠
 
-更新日: 2026-08-15
+更新日: 2026-08-21
 
 ## Current standalone Preview APK
 
-- ビルド日時: 2026-08-15
+- ビルド日時: 2026-08-21
 - コマンド: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-preview.ps1`
 - 署名: ローカルの一時Preview keystore（提出用の本番秘密鍵は使用しない）
 - APK: `android/app/build/outputs/apk/preview/app-preview.apk`
 - 生成物コピー: `output/ColdKeep-u22-current-preview.apk`
-- サイズ: 48,236,626 bytes
-- SHA-256: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
-- JS bundle: APK内の`assets/index.android.bundle`（898,168 bytes）を確認
+- サイズ: 48,238,842 bytes
+- SHA-256: `E0FD6EBC57982301DD162C1FE472DCD661CA4B6CC2E4B99D5E75FB249B6F4833`
+- JS bundle: APK内の`assets/index.android.bundle`（901,616 bytes）を確認
 - 静的検査: `com.anonymous.coldkeep`、compile/target SDK 34、`RECORD_AUDIO`のみを確認。ストレージ/オーバーレイ権限は含めない
 - Rust `.so`: ローカルではcargo未導入のため未同梱。TypeScript推論へフォールバックする。CI Preview artifactではRustライブラリを生成して同梱する
 - 再現性: `scripts/build-preview.ps1`が実行時だけ一時署名鍵を作成し、終了時に削除する。本番鍵・パスワードはリポジトリへ保存しない
@@ -92,17 +92,17 @@ JS bundle入りPreview APKへ同梱して、14日間のActions artifactとして
 - 現行Preview APKを旧署名アプリ削除後にクリーンインストールし、Metroなしで`MainActivity`を起動
 - 初回の`RECORD_AUDIO`許可ダイアログを確認
 - 録音中画面で経過時間（`1.9秒`）と停止ボタンを確認（`tmp/android-smoke/recording-progress.png`）
-- 2秒録音後に停止し、エミュレータの低信号入力を`有効な音声信号がありません。水筒へ水を注ぐ音を録音してください`として拒否
+- 2秒録音後に停止し、エミュレータの低信号入力を`有効な音声信号がありません。水筒を振る音を録音してください`として拒否
 - 拒否後も`未判定`へ戻り、再試行ボタンが表示された（`tmp/android-smoke/latest-after-stop.png`）
-- アプリプロセスは維持され、誤った水あり/90%表示やクラッシュは発生しなかった
+- アプリプロセスは維持され、未学習の振り音で誤った残量表示やクラッシュは発生しなかった
 - これはエミュレータの入力品質ゲート証拠であり、実水筒の分類精度・実機3回成功の代替ではない
 
 ## 端末で残る確認
 
 1. `ColdKeep-u22-current-preview.apk`（またはCIのPreview artifact）をAndroid端末へインストールする。
 2. 初回マイク権限を許可する。
-3. 1秒以上録音して停止する。
-4. `TypeScript estimate complete` が表示され、水あり/なしと充填クラスが出ることを確認する。
+3. 水筒を振りながら1秒以上録音して停止する。
+4. 振り音の学習状態と残量クラスが表示されることを確認する。未学習アーティファクトなら`未判定`が表示される。
 5. 同じ条件で3回実行し、2回以上結果が表示されることを記録する。
 6. `COLLECT DATA` でラベル付きWAVを1件保存し、共有テキストが生成されることを確認する。
 

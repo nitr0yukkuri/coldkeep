@@ -49,15 +49,16 @@ clearing app data or uninstalling the app.
 Never randomly split windows from one WAV across training and evaluation. Hold
 out complete sessions, containers, and phones to measure real generalization.
 
-The current `SCAN` baseline accepts only `pour`: ACM-S2 water recordings use a
-pouring action. `shake` and `still` are retained here as experimental collection
-labels, but they are out of distribution for the current scan model and must not
-be presented as evaluated scan inputs.
+The current `SCAN` contract requests `shake`. The checked-in shake artifact is
+still `untrained`, so the app returns `未判定` until phone/water-bottle data has
+passed the gate below. The older ACM-S2 `pour` model remains a research
+baseline and is never reused for shake input. `still` remains a comparison
+label.
 
 ## Shake fill-level pilot
 
-The `shake` action is a separate experiment from the current `pour` scan. If
-you want to test fill-level inference from shaking, collect the following
+The `shake` action is the product path. To activate fill-level inference from
+shaking, collect the following
 three broad classes:
 
 - `empty`: 0% of the measured capacity
@@ -86,8 +87,9 @@ The command performs session-held-out evaluation and refuses to write a model
 when a class or session is missing. It reports container and device coverage,
 but does not claim container- or phone-held-out generalization yet. Until this
 gate passes on phone-recorded water-bottle data, the production scan must
-continue to request a `pour` recording; a `shake` recording is not silently
-treated as a pour.
+request a `shake` recording and will not silently treat it as a pour. Replace
+the checked-in manifest-only artifact only after the report has been reviewed
+and the phone/water-bottle domain gap is addressed.
 
 ## Ice binary model
 

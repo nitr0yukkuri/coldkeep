@@ -6,7 +6,7 @@
 Release署名鍵はリポジトリへ保存していないため、提出時はCI artifactまたは手元で再生成したPreviewを使います。
 
 - ローカルAPK: `output/ColdKeep-u22-current-preview.apk`
-- ローカルAPK SHA-256（2026-08-15生成）: `8B15A452CAB8BDE0192AF26224DFC9CB29BADE1B6E022B3CF2C3ED92FADEB0BD`
+- ローカルAPK SHA-256（2026-08-21生成・振り音経路対応）: `E0FD6EBC57982301DD162C1FE472DCD661CA4B6CC2E4B99D5E75FB249B6F4833`
 - CI Preview artifact: [Quality run 20](https://github.com/nitr0yukkuri/coldkeep/actions/runs/31881389325)（artifactは2026-08-29まで）
 - CI source artifactも同じrunに保存している。APKとソースのheadは`dcbcad0d94cccb80768948193d1918f28498e570`。
 
@@ -28,7 +28,7 @@ Previewは一時署名のため、異なる署名の旧アプリが入ってい�
 
 1. 初回マイク権限を許可する。
 2. SCANで同じ水筒を1秒以上録音する。
-3. 停止後に水あり/なし、充填クラス、推論経路が表示される。
+3. 停止後に振り音モデルの残量クラス、学習状態、推論経路が表示される（未学習時は`未判定`）。
 4. 同じ条件で3回実行し、成功回数と端末名/OSを記録する。
 5. 失敗時にクラッシュせず、`未判定` と再試行が表示される。
 6. COLLECT DATAでラベル付き録音を1件保存する。
