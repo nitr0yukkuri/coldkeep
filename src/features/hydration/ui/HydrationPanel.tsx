@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,6 +14,7 @@ import {
   reliableObservationDeltaMl,
   todayIntakeMl,
 } from '../domain/hydration';
+import { HydrationHistoryChart } from './HydrationHistoryChart';
 
 type HydrationPanelProps = {
   state: HydrationState | null;
@@ -46,6 +47,8 @@ export function HydrationPanel({
   modelActionLabel,
   disabled = false,
 }: HydrationPanelProps) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
   const intakeMl = state ? todayIntakeMl(state) : 0;
   const goalMl = state?.profile.dailyGoalMl ?? 1_500;
   const progress = Math.min(1, goalMl > 0 ? intakeMl / goalMl : 0);
@@ -70,72 +73,104 @@ export function HydrationPanel({
       </View>
       <Text style={styles.goalText}>目標 {goalMl} mL</Text>
 
-      <View style={styles.inputRow}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>水筒容量</Text>
-          <TextInput
-            style={styles.input}
-            value={capacityText}
-            onChangeText={onChangeCapacity}
-            keyboardType="number-pad"
-            editable={!disabled}
-          />
-          <Text style={styles.inputUnit}>mL</Text>
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>1日の目標</Text>
-          <TextInput
-            style={styles.input}
-            value={goalText}
-            onChangeText={onChangeGoal}
-            keyboardType="number-pad"
-            editable={!disabled}
-          />
-          <Text style={styles.inputUnit}>mL</Text>
-        </View>
-      </View>
+      <HydrationHistoryChart state={state} />
+
       <TouchableOpacity
         disabled={disabled}
-        style={styles.secondaryButton}
-        onPress={onSaveProfile}
+        style={styles.sectionToggle}
+        onPress={() => setShowSettings(value => !value)}
       >
-        <Text style={styles.secondaryButtonText}>設定を保存</Text>
+        <Text style={styles.sectionToggleText}>
+          水筒・目標の設定 {showSettings ? '▲' : '▼'}
+        </Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionLabel}>飲んだ量を追加</Text>
-      <View style={styles.quickRow}>
-        {[100, 250, 500].map(amount => (
+      {showSettings ? (
+        <View style={styles.settingsBox}>
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>水筒容量</Text>
+              <TextInput
+                style={styles.input}
+                value={capacityText}
+                onChangeText={onChangeCapacity}
+                keyboardType="number-pad"
+                accessibilityLabel="水筒容量"
+                editable={!disabled}
+              />
+              <Text style={styles.inputUnit}>mL</Text>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>1日の目標</Text>
+              <TextInput
+                style={styles.input}
+                value={goalText}
+                onChangeText={onChangeGoal}
+                keyboardType="number-pad"
+                accessibilityLabel="1日の目標"
+                editable={!disabled}
+              />
+              <Text style={styles.inputUnit}>mL</Text>
+            </View>
+          </View>
           <TouchableOpacity
-            key={amount}
             disabled={disabled}
-            style={styles.quickButton}
-            onPress={() => {
-              onChangeIntake(String(amount));
-              onAddManualIntake(String(amount));
-            }}
+            style={styles.secondaryButton}
+            onPress={onSaveProfile}
           >
-            <Text style={styles.quickButtonText}>＋{amount} mL</Text>
+            <Text style={styles.secondaryButtonText}>設定を保存</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-      <View style={styles.customRow}>
-        <TextInput
-          style={styles.customInput}
-          value={intakeText}
-          onChangeText={onChangeIntake}
-          keyboardType="number-pad"
-          placeholder="任意の量"
-          placeholderTextColor="#8b9ba0"
-          editable={!disabled}
-        />
-        <TouchableOpacity
-          disabled={disabled}
-          style={styles.addButton}
-          onPress={() => onAddManualIntake()}
-        >
-          <Text style={styles.addButtonText}>追加</Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        disabled={disabled}
+        style={styles.sectionToggle}
+        onPress={() => setShowManualEntry(value => !value)}
+      >
+        <Text style={styles.sectionToggleText}>
+          飲んだ量を手動で追加 {showManualEntry ? '▲' : '▼'}
+        </Text>
+      </TouchableOpacity>
+
+      {showManualEntry ? (
+        <View style={styles.manualEntryBox}>
+          <View style={styles.quickRow}>
+            {[100, 250, 500].map(amount => (
+              <TouchableOpacity
+                key={amount}
+                disabled={disabled}
+                style={styles.quickButton}
+                onPress={() => {
+                  onChangeIntake(String(amount));
+                  onAddManualIntake(String(amount));
+                }}
+              >
+                <Text style={styles.quickButtonText}>＋{amount} mL</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.customRow}>
+            <TextInput
+              style={styles.customInput}
+              value={intakeText}
+              onChangeText={onChangeIntake}
+              keyboardType="number-pad"
+              accessibilityLabel="任意の飲水量"
+              placeholder="任意の量"
+              placeholderTextColor="#8b9ba0"
+              editable={!disabled}
+            />
+            <TouchableOpacity
+              disabled={disabled}
+              style={styles.addButton}
+              onPress={() => onAddManualIntake()}
+            >
+              <Text style={styles.addButtonText}>追加</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       {observation ? (
         <View style={styles.observationBox}>
@@ -191,21 +226,21 @@ export function HydrationPanel({
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 16,
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 18,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#dce7e9',
   },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start' },
   titleCopy: { flex: 1 },
-  title: { color: '#17323b', fontSize: 18, fontWeight: '800' },
-  subtitle: { color: '#73878c', fontSize: 12, marginTop: 3 },
-  total: { color: '#087ea4', fontSize: 21, fontWeight: '800' },
+  title: { color: '#17323b', fontSize: 20, fontWeight: '800' },
+  subtitle: { color: '#73878c', fontSize: 12, marginTop: 5 },
+  total: { color: '#087ea4', fontSize: 23, fontWeight: '800' },
   progressTrack: {
     height: 9,
-    marginTop: 14,
+    marginTop: 18,
     borderRadius: 5,
     backgroundColor: '#e4eef0',
     overflow: 'hidden',
@@ -237,20 +272,32 @@ const styles = StyleSheet.create({
     color: '#73878c',
     fontSize: 11,
   },
+  settingsBox: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8fbfb',
+  },
+  manualEntryBox: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8fbfb',
+  },
+  sectionToggle: {
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+  },
+  sectionToggleText: { color: '#087ea4', fontSize: 13, fontWeight: '700' },
   secondaryButton: {
     alignSelf: 'flex-end',
-    marginTop: 8,
+    marginTop: 12,
     paddingVertical: 5,
     paddingHorizontal: 8,
   },
   secondaryButtonText: { color: '#087ea4', fontSize: 12, fontWeight: '700' },
-  sectionLabel: {
-    color: '#36515a',
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 10,
-  },
-  quickRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  quickRow: { flexDirection: 'row', gap: 8 },
   quickButton: {
     flex: 1,
     alignItems: 'center',
