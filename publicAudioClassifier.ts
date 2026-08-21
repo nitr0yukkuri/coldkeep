@@ -3,7 +3,7 @@
 import modelArtifact from './ml/artifacts/public_audio_baseline.json';
 import { resamplePcm } from './src/platform/audio/resamplePcm';
 
-type LinearModel = {
+export type LinearModel = {
   classes: number[];
   featureMean: number[];
   featureScale: number[];
@@ -11,7 +11,7 @@ type LinearModel = {
   bias: number[];
 };
 
-type ModelArtifact = {
+export type ModelArtifact = {
   sampleRate: number;
   windowSamples: number;
   hopSamples: number;
@@ -26,12 +26,14 @@ type ModelArtifact = {
 export type PublicAudioPrediction = {
   containsWater: boolean;
   waterConfidence: number;
-  fillLevel: 50 | 90 | null;
+  fillLevel: 0 | 50 | 90 | 100 | null;
   fillConfidence: number | null;
   icePresence: boolean | null;
   iceConfidence: number | null;
   iceStatus: 'untrained' | 'trained';
   engine: 'typescript' | 'rust';
+  measurementAction?: 'pour' | 'shake';
+  measurementStatus?: 'trained' | 'experimental' | 'untrained';
 };
 
 const artifact = modelArtifact as ModelArtifact;
@@ -128,7 +130,7 @@ function makeMelFilters(): Float64Array[] {
 
 const melFilters = makeMelFilters();
 
-function extractWindowFeatures(input: Float32Array): number[] {
+export function extractWindowFeatures(input: Float32Array): number[] {
   const samples = new Float32Array(input);
   let mean = 0;
   for (const sample of samples) {
@@ -179,7 +181,7 @@ function extractWindowFeatures(input: Float32Array): number[] {
   return [...summarize(logMel), ...summarize(delta)];
 }
 
-function recordingWindows(samples: Float32Array): Float32Array[] {
+export function recordingWindows(samples: Float32Array): Float32Array[] {
   if (samples.length <= artifact.windowSamples) {
     const padded = new Float32Array(artifact.windowSamples);
     padded.set(samples);
@@ -217,7 +219,7 @@ function predict(features: number[], model: LinearModel): number[] {
   return exponentials.map(value => value / total);
 }
 
-function averagedPrediction(features: number[][], model: LinearModel): number[] {
+export function averagedPrediction(features: number[][], model: LinearModel): number[] {
   const average = model.classes.map(() => 0);
   for (const window of features) {
     predict(window, model).forEach((value, index) => {
@@ -249,6 +251,8 @@ export function classifyPublicAudio(
       iceConfidence: null,
       iceStatus: 'untrained',
       engine: 'typescript',
+      measurementAction: 'pour',
+      measurementStatus: 'trained',
     };
   }
   const fillModel = artifact.models.fill_level_water;
@@ -263,5 +267,7 @@ export function classifyPublicAudio(
     iceConfidence: null,
     iceStatus: 'untrained',
     engine: 'typescript',
+    measurementAction: 'pour',
+    measurementStatus: 'trained',
   };
 }

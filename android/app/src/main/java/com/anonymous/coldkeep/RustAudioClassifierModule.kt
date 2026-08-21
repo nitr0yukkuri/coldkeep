@@ -47,6 +47,45 @@ class RustAudioClassifierModule(
       putNullableDouble(result, "iceConfidence", json)
       result.putString("iceStatus", json.optString("iceStatus", "untrained"))
       result.putString("engine", json.optString("engine", "rust"))
+      if (!json.isNull("measurementAction")) {
+        result.putString("measurementAction", json.optString("measurementAction"))
+      }
+      if (!json.isNull("measurementStatus")) {
+        result.putString("measurementStatus", json.optString("measurementStatus"))
+      }
+      result.putInt("modelVersion", json.optInt("modelVersion", 1))
+      promise.resolve(result)
+    } catch (error: LinkageError) {
+      promise.reject("RUST_INFERENCE_FAILED", error.message, error)
+    } catch (error: Exception) {
+      promise.reject("RUST_INFERENCE_FAILED", error.message, error)
+    }
+  }
+
+  @ReactMethod
+  fun classifyShakeWav(uri: String, promise: Promise) {
+    if (!libraryLoaded) {
+      promise.reject("RUST_UNAVAILABLE", "libcoldkeep_ml.so is not bundled")
+      return
+    }
+    try {
+      val path = resolvePath(uri)
+      val json = JSONObject(nativeClassifyShakeWav(path))
+      if (json.has("error")) {
+        promise.reject("RUST_INFERENCE_FAILED", json.optString("error"))
+        return
+      }
+      val result = Arguments.createMap()
+      result.putBoolean("containsWater", json.optBoolean("containsWater"))
+      result.putDouble("waterConfidence", json.optDouble("waterConfidence"))
+      putNullableDouble(result, "fillLevel", json, integer = true)
+      putNullableDouble(result, "fillConfidence", json)
+      putNullableBoolean(result, "icePresence", json)
+      putNullableDouble(result, "iceConfidence", json)
+      result.putString("iceStatus", json.optString("iceStatus", "untrained"))
+      result.putString("engine", json.optString("engine", "rust"))
+      result.putString("measurementAction", json.optString("measurementAction", "shake"))
+      result.putString("measurementStatus", json.optString("measurementStatus", "untrained"))
       result.putInt("modelVersion", json.optInt("modelVersion", 1))
       promise.resolve(result)
     } catch (error: LinkageError) {
@@ -89,4 +128,5 @@ class RustAudioClassifierModule(
   }
 
   private external fun nativeClassifyWav(path: String): String
+  private external fun nativeClassifyShakeWav(path: String): String
 }

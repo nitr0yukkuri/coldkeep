@@ -9,7 +9,7 @@ export type HydrationObservation = {
   observationId: string;
   recordedAt: string;
   remainingMl: number;
-  fillLevel: 50 | 90;
+  fillLevel: 0 | 50 | 90 | 100;
   confidence: number | null;
   source: 'acoustic';
 };
@@ -30,7 +30,7 @@ export type HydrationState = {
 
 export type HydrationMeasurement = {
   remainingMl: number;
-  fillLevel: 50 | 90;
+  fillLevel: 0 | 50 | 90 | 100;
   confidence: number | null;
 };
 
@@ -271,7 +271,10 @@ function isHydrationObservation(value: unknown): value is HydrationObservation {
     typeof candidate.observationId === 'string' &&
     typeof candidate.recordedAt === 'string' &&
     Number.isFinite(candidate.remainingMl) &&
-    (candidate.fillLevel === 50 || candidate.fillLevel === 90) &&
+    (candidate.fillLevel === 0 ||
+      candidate.fillLevel === 50 ||
+      candidate.fillLevel === 90 ||
+      candidate.fillLevel === 100) &&
     (candidate.confidence === null || Number.isFinite(candidate.confidence)) &&
     candidate.source === 'acoustic'
   );

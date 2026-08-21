@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 const MODEL_JSON: &str = include_str!("../../../ml/artifacts/public_audio_baseline.json");
+const SHAKE_MODEL_JSON: &str = include_str!("../../../ml/artifacts/shake_fill_level_pilot.json");
 const ICE_MODEL_JSON: &str = include_str!(concat!(env!("OUT_DIR"), "/ice_presence_model.json"));
 const FFT_SIZE: usize = 512;
 const FRAME_SIZE: usize = 400;
@@ -50,6 +51,30 @@ pub struct Prediction {
     pub ice_status: &'static str,
     pub engine: &'static str,
     pub model_version: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub measurement_action: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub measurement_status: Option<&'static str>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShakeModelArtifact {
+    status: String,
+    classes: Vec<String>,
+    model: Option<LinearModel>,
+}
+
+fn shake_artifact() -> Result<ShakeModelArtifact, String> {
+    serde_json::from_str(SHAKE_MODEL_JSON)
+        .map_err(|error| format!("shake model artifact: {error}"))
+}
+
+fn shake_status(status: &str) -> &'static str {
+    match status {
+        "trained" => "trained",
+        "experimental" => "experimental",
+        _ => "untrained",
+    }
 }
 
 fn artifact() -> Result<ModelArtifact, String> {
@@ -432,6 +457,8 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             },
             engine: "rust",
             model_version: 1,
+            measurement_action: Some("pour"),
+            measurement_status: Some("trained"),
         });
     }
     let fill_model = model
@@ -460,6 +487,8 @@ pub fn classify_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         },
         engine: "rust",
         model_version: 1,
+        measurement_action: Some("pour"),
+        measurement_status: Some("trained"),
     })
 }
 
@@ -544,4 +573,90 @@ mod tests {
             (false, 0.8)
         );
     }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_anonymous_coldkeep_RustAudioClassifierModule_nativeClassifyShakeWav(
+    mut env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+    path: jni::objects::JString,
+) -> jni::sys::jstring {
+    let path = env
+        .get_string(&path)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let result = classify_shake_wav_path(&path)
+        .unwrap_or_else(|error| serde_json::json!({"error": error}).to_string());
+    env.new_string(result)
+        .map(|value| value.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// Run the action-specific shake model. The checked-in artifact is deliberately
+/// manifest-only, so this returns a safe untrained prediction until the
+/// phone/water-bottle training gate has produced a real model.
+pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
+    let shake = shake_artifact()?;
+    let status = shake_status(&shake.status);
+    let Some(shake_model) = shake.model.as_ref() else {
+        return parse_wav(bytes).map(|_| Prediction {
+            contains_water: false,
+            water_confidence: 0.0,
+            fill_level: None,
+            fill_confidence: None,
+            ice_presence: None,
+            ice_confidence: None,
+            ice_status: "untrained",
+            engine: "rust",
+            model_version: 1,
+            measurement_action: Some("shake"),
+            measurement_status: Some(status),
+        });
+    };
+    if shake.classes.len() != 3 {
+        return Err("shake model must contain empty/half/full classes".to_string());
+    }
+    let baseline = artifact()?;
+    let (samples, source_rate) = parse_wav(bytes)?;
+    let samples = resample(&samples, source_rate, baseline.sample_rate);
+    let windows = recording_windows(&samples, baseline.window_samples, baseline.hop_samples);
+    let features = windows
+        .iter()
+        .map(|window| extract_features(window, &baseline))
+        .collect::<Vec<_>>();
+    let probabilities = averaged_prediction(&features, shake_model);
+    let best_index = probabilities
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| left.total_cmp(right))
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let fill_class = shake_model.classes.get(best_index).copied().unwrap_or(0);
+    let fill_level = match fill_class {
+        0 => 0,
+        1 => 50,
+        2 => 100,
+        _ => return Err("shake model class must be 0, 1, or 2".to_string()),
+    };
+    let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
+    Ok(Prediction {
+        contains_water: true,
+        water_confidence: confidence,
+        fill_level: Some(fill_level),
+        fill_confidence: Some(confidence),
+        ice_presence: None,
+        ice_confidence: None,
+        ice_status: "untrained",
+        engine: "rust",
+        model_version: 1,
+        measurement_action: Some("shake"),
+        measurement_status: Some(status),
+    })
+}
+
+pub fn classify_shake_wav_path(path: &str) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|error| format!("read WAV: {error}"))?;
+    serde_json::to_string(&classify_shake_wav_bytes(&bytes).map_err(|error| error.to_string())?)
+        .map_err(|error| format!("serialize prediction: {error}"))
 }
