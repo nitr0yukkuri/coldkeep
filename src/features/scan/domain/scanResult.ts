@@ -1,10 +1,17 @@
 export type InferenceEngine = 'typescript' | 'rust';
+export type ScanAction = 'pour' | 'shake';
+export type ScanMeasurementStatus = 'trained' | 'experimental' | 'untrained';
 
 export type ScanResult = {
   containsWater: boolean;
   waterConfidence: number;
-  fillLevel: 50 | 90 | null;
+  /** Pour models use 50/90; shake models use 0/50/100. */
+  fillLevel: 0 | 50 | 90 | 100 | null;
   fillConfidence: number | null;
+  /** Which physical action the returned model was trained for. */
+  measurementAction?: ScanAction;
+  /** Whether the action-specific model is deployable for user-facing math. */
+  measurementStatus?: ScanMeasurementStatus;
   icePresence: boolean | null;
   iceConfidence: number | null;
   iceStatus: 'untrained' | 'trained';
@@ -27,6 +34,8 @@ export function unknownScanResult(
     waterConfidence: 0,
     fillLevel: null,
     fillConfidence: null,
+    measurementAction: 'pour',
+    measurementStatus: 'untrained',
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',

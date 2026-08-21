@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "task": "shake_fill_level",
+  "status": "untrained",
+  "classes": ["empty", "half", "full"],
+  "sampleRate": 16000,
+  "windowSamples": 16000,
+  "hopSamples": 8000,
+  "featureSize": 128,
+  "model": null,
+  "trainingGate": {
+    "requiredClasses": ["empty", "half", "full"],
+    "minimumRecordingsPerClass": 2,
+    "minimumSessionsPerClass": 2,
+    "activation": "Replace this manifest-only artifact with the output of ml/train_shake_level.py after phone/water-bottle validation."
+  }
+}

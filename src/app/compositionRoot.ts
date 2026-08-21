@@ -12,7 +12,10 @@ import { RustClassifierAdapter } from '../platform/ml/rustClassifier';
 import { TypeScriptClassifierAdapter } from '../platform/ml/typescriptClassifier';
 import { RnfsDatasetRepository } from '../platform/storage/rnfsDatasetRepository';
 import { ReactNativeShareGateway } from '../platform/sharing/reactNativeShareGateway';
-import { COLLECTION_ACTIONS } from '../features/collection/domain/collection';
+import {
+  COLLECTION_ACTIONS,
+  MODEL_RECORDING_ACTION,
+} from '../features/collection/domain/collection';
 import { HydrationUseCase } from '../features/hydration/application/hydrationUseCase';
 import { RnfsHydrationRepository } from '../platform/storage/rnfsHydrationRepository';
 
@@ -33,10 +36,11 @@ export function createAppDependencies() {
   return {
     collectionActions: COLLECTION_ACTIONS,
     recording,
-    scan: new ScanBottleUseCase(reader, [
-      new RustClassifierAdapter(),
-      new TypeScriptClassifierAdapter(),
-    ]),
+    scan: new ScanBottleUseCase(
+      reader,
+      [new RustClassifierAdapter(), new TypeScriptClassifierAdapter()],
+      MODEL_RECORDING_ACTION,
+    ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(
       repository,

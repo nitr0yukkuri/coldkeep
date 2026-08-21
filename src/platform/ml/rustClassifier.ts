@@ -8,6 +8,7 @@ import { normalizeScanResult } from '../../features/scan/domain/scanResult';
 
 type NativeRustClassifier = {
   classifyWav(uri: string): Promise<ReturnType<typeof normalizeScanResult>>;
+  classifyShakeWav?(uri: string): Promise<ReturnType<typeof normalizeScanResult>>;
 };
 
 export class RustClassifierAdapter implements AudioClassifier {
@@ -17,6 +18,14 @@ export class RustClassifierAdapter implements AudioClassifier {
       | undefined;
     if (!classifier) {
       throw new Error('Rust inference is unavailable');
+    }
+    if (input.action === 'shake') {
+      if (!classifier.classifyShakeWav) {
+        throw new Error('Rust shake inference is unavailable');
+      }
+      return normalizeScanResult(
+        await classifier.classifyShakeWav(input.recording.uri),
+      );
     }
     return normalizeScanResult(await classifier.classifyWav(input.recording.uri));
   }

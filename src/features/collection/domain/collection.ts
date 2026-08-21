@@ -1,11 +1,11 @@
 export const COLLECTION_ACTIONS = ['pour', 'shake', 'still'] as const;
 
 /**
- * The public scan model was trained and evaluated on pouring recordings.
- * Shake/still remain collection labels for future experiments, but they are
- * not valid inputs for the current scan model.
+ * The product scan now asks for a shake. The action-specific artifact is
+ * checked at runtime; until a phone/water-bottle model is installed the UI
+ * shows `未学習` instead of falling back to the unrelated pour model.
  */
-export const MODEL_RECORDING_ACTION = 'pour' as const;
+export const MODEL_RECORDING_ACTION = 'shake' as const;
 
 export const COLLECTION_ACTION_LABELS: Record<CollectionAction, string> = {
   pour: '注ぐ',

@@ -25,6 +25,10 @@ import {
   InferenceEngine,
 } from './src/features/scan/domain/scanResult';
 import {
+  levelToFillClass,
+  remainingMlFromShake,
+} from './src/features/scan/domain/shakeFillLevel';
+import {
   DEFAULT_HYDRATION_PROFILE,
   HydrationState,
 } from './src/features/hydration/domain/hydration';
@@ -105,6 +109,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [fillLevel, setFillLevel] = useState('—');
   const [waterConfidence, setWaterConfidence] = useState<number | null>(null);
   const [fillConfidence, setFillConfidence] = useState<number | null>(null);
+  const [measurementStatus, setMeasurementStatus] = useState<
+    'trained' | 'experimental' | 'untrained'
+  >('untrained');
   const [inferenceEngine, setInferenceEngine] =
     useState<InferenceEngine | null>(null);
   const [icePresence, setIcePresence] = useState('UNKNOWN');
@@ -140,7 +147,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     null,
   );
   const waterDisplay =
-    content === 'WATER'
+    content === 'SHAKE'
+      ? fillLevel === 'N/A'
+        ? '未判定'
+        : `残量 ${fillLevel}`
+      : content === 'WATER'
       ? '水あり'
       : content === 'NON-WATER'
         ? '水なし'
@@ -218,17 +229,30 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setStatus('確認中…');
         setEstimatedIntakeMl(null);
         const result = await app.scan.execute(recording);
+        const shakeMode = result.measurementAction === 'shake';
         const waterIsReliable =
-          Number.isFinite(result.waterConfidence) &&
-          result.waterConfidence >= MIN_SCAN_CONFIDENCE;
+          shakeMode
+            ? result.measurementStatus === 'trained' &&
+              result.fillConfidence !== null &&
+              Number.isFinite(result.fillConfidence) &&
+              result.fillConfidence >= MIN_SCAN_CONFIDENCE
+            : Number.isFinite(result.waterConfidence) &&
+              result.waterConfidence >= MIN_SCAN_CONFIDENCE;
         const fillIsReliable =
-          !result.containsWater ||
-          (result.fillConfidence !== null &&
-            Number.isFinite(result.fillConfidence) &&
-            result.fillConfidence >= MIN_SCAN_CONFIDENCE);
+          shakeMode
+            ? waterIsReliable &&
+              (result.fillLevel === 0 ||
+                result.fillLevel === 50 ||
+                result.fillLevel === 100)
+            : !result.containsWater ||
+              (result.fillConfidence !== null &&
+                Number.isFinite(result.fillConfidence) &&
+                result.fillConfidence >= MIN_SCAN_CONFIDENCE);
         setHasScanResult(true);
         setContent(
-          !waterIsReliable
+          shakeMode
+            ? 'SHAKE'
+            : !waterIsReliable
             ? 'UNKNOWN'
             : result.containsWater
               ? 'WATER'
@@ -241,6 +265,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         );
         setWaterConfidence(result.waterConfidence);
         setFillConfidence(result.fillConfidence);
+        setMeasurementStatus(result.measurementStatus ?? 'trained');
         setInferenceEngine(result.engine);
         setIcePresence(
           result.icePresence === null
@@ -254,21 +279,37 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         if (
           waterIsReliable &&
           fillIsReliable &&
-          result.containsWater &&
-          result.fillLevel !== null
+          (shakeMode || result.containsWater) &&
+          result.fillLevel !== null &&
+          (!shakeMode ||
+            result.fillLevel === 0 ||
+            result.fillLevel === 50 ||
+            result.fillLevel === 100)
         ) {
           const confidences = [
             result.waterConfidence,
             result.fillConfidence,
           ].filter((value): value is number => value !== null);
+          const capacity =
+            hydrationState?.profile.capacityMl ??
+            DEFAULT_HYDRATION_PROFILE.capacityMl;
+          const remainingMl = shakeMode
+            ? remainingMlFromShake(capacity, {
+                fillClass: levelToFillClass(
+                  result.fillLevel as 0 | 50 | 100,
+                ),
+                fillLevel: result.fillLevel as 0 | 50 | 100,
+                confidence: result.fillConfidence,
+                status: 'trained',
+              })
+            : Math.round((capacity * result.fillLevel) / 100);
+          if (remainingMl === null) {
+            setStatus('振り音の信頼度が不足しているため残量を記録できません');
+            return;
+          }
           const hydrationResult = await app.hydration.recordObservation({
-            remainingMl: Math.round(
-              ((hydrationState?.profile.capacityMl ??
-                DEFAULT_HYDRATION_PROFILE.capacityMl) *
-                result.fillLevel) /
-                100,
-            ),
-            fillLevel: result.fillLevel,
+            remainingMl,
+            fillLevel: result.fillLevel as 0 | 50 | 90 | 100,
             confidence: confidences.length ? Math.min(...confidences) : null,
           });
           setHydrationState(hydrationResult.state);
@@ -282,6 +323,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setFillLevel('—');
         setWaterConfidence(null);
         setFillConfidence(null);
+        setMeasurementStatus('untrained');
         setInferenceEngine(null);
         setIcePresence('UNKNOWN');
         setIceStatus('untrained');
@@ -465,6 +507,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             <Text style={styles.heroDescription}>
               {!hasScanResult
                 ? `${modelActionInstruction}を1秒以上録音します`
+                : content === 'SHAKE'
+                  ? measurementStatus === 'untrained'
+                    ? '振り音モデルは未学習です。データ収集後にモデルを有効化します'
+                    : fillLevel === 'N/A'
+                      ? '振り音の信頼度が低いため残量を判定できませんでした'
+                      : '振り音から残量の3段階を判定しました'
                 : content === 'UNKNOWN'
                   ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
                   : content === 'WATER'
@@ -477,7 +525,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
           {hasResult ? (
             <View style={styles.metricRow}>
-              {content === 'WATER' && fillLevel !== 'N/A' ? (
+              {content === 'SHAKE' && fillLevel !== 'N/A' ? (
+                <MetricCard
+                  title="残量"
+                  value={fillLevel}
+                  unit="容量に対する3段階の目安"
+                  color="#087ea4"
+                />
+              ) : content === 'WATER' && fillLevel !== 'N/A' ? (
                 <MetricCard
                   title="充填率"
                   value={fillLevel}
@@ -504,7 +559,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
           <View style={styles.analysisCard}>
             <Text style={styles.analysisDescription}>
-              水筒の音を聞いて状態を確認します
+              水筒を振った音から残量を確認します
             </Text>
             <Text style={styles.analysisHint}>
               {isProcessing
@@ -556,10 +611,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}経路
               </Text>
               <Text style={styles.inferenceText}>
-                水判定確率 {formatProbability(waterConfidence)}
-                {content === 'WATER'
-                  ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
-                  : ''}
+                {content === 'SHAKE'
+                  ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
+                      measurementStatus === 'trained' ? '学習済み' : '未学習'
+                    }`
+                  : `水判定確率 ${formatProbability(waterConfidence)}${
+                      content === 'WATER'
+                        ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
+                        : ''
+                    }`}
               </Text>
               <Text style={styles.inferenceHint}>
                 確率はこの録音に対するモデル出力で、正解率を意味しません。

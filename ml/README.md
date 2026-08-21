@@ -30,16 +30,16 @@ contains the same standardized linear models in an app-readable format. This
 allows honest prototype inference without pretending that the tiny ACM-S2
 training set is a production-ready TFLite model.
 
-The app now uses the two evaluated outputs it can support:
+The checked-in pour artifact supports the two evaluated research outputs:
 
 - `WATER` / `NON-WATER`, trained from water versus pasta/rice pours.
 - `50%` / `90%` fill level, shown only when the first model predicts water.
 
-It deliberately does not display temperature or ice quantity. Recordings
-should contain a pouring action comparable to ACM-S2; arbitrary ambient audio,
-shaking, and empty containers are outside the current training distribution.
+It deliberately does not display temperature or ice quantity. The product
+screen uses the separate shake contract described below; the pour artifact is
+not applied to shake recordings.
 
-## Shake-level experiment (not a production model)
+## Shake-level product path (artifact-gated)
 
 `train_shake_level.py` is a separate, conservative experiment for the later
 `shake` action. It accepts a labelled CSV exported from the app's collection
@@ -52,9 +52,27 @@ artifact is written when the dataset is too small.
 
 The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
 pasta in one muesli box), so it intentionally cannot produce a trustworthy
-three-class shake model. This is an explicit data-collection gate, not a
-failed claim of shake support. Until that gate is met, the app's scan action
-remains `pour` and shake recordings are collected only for the next dataset.
+three-class shake model. The app's scan action is now `shake`, but the checked-in
+`ml/artifacts/shake_fill_level_pilot.json` is explicitly `untrained`; the UI
+returns `未判定` rather than falling back to the unrelated pour model. Replace
+that artifact only after phone/water-bottle validation passes.
+
+For public CORSMAL pre-training, `import_corsmal_shake.py` converts only an
+explicit list of known shake IDs. The action list is required because the
+official annotation table does not encode ColdKeep's action label:
+
+```powershell
+python ml/import_corsmal_shake.py `
+  --data-root <CCM train root> `
+  --annotations <ccm_train_annotation.csv> `
+  --shake-ids <shake_ids.txt> `
+  --output <work>\corsmal-shake-manifest.csv
+```
+
+This importer does not copy the 2.8 GB archive or invent phone labels. Its
+default session is deliberately a single `corsmal-train` group, so the
+session-held-out trainer remains blocked until a real session map and a
+phone/water-bottle validation set are supplied.
 
 The same rule applies to `train_ice_presence.py`: it requires at least two
 recordings of each binary class across at least two containers and reports a

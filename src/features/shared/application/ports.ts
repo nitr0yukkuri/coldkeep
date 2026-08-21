@@ -3,6 +3,7 @@ import {
   CollectionRecord,
 } from '../../collection/domain/collection';
 import { ScanResult } from '../../scan/domain/scanResult';
+import { ScanAction } from '../../scan/domain/scanResult';
 import { HydrationState } from '../../hydration/domain/hydration';
 
 export type PcmAudio = {
@@ -23,6 +24,8 @@ export type RecordingRef = {
 export type AudioInput = {
   recording: RecordingRef;
   audio: PcmAudio;
+  /** The physical action the caller asked the classifier to measure. */
+  action?: ScanAction;
 };
 
 export interface MicrophonePermission {

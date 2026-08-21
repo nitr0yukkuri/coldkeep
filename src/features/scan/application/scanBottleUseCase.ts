@@ -4,12 +4,17 @@ import {
   RecordingRef,
 } from '../../shared/application/ports';
 import { hasUsableScanSignal } from '../domain/audioQuality';
-import { normalizeScanResult, ScanResult } from '../domain/scanResult';
+import {
+  normalizeScanResult,
+  ScanAction,
+  ScanResult,
+} from '../domain/scanResult';
 
 export class ScanBottleUseCase {
   constructor(
     private readonly reader: AudioReader,
     private readonly classifiers: readonly AudioClassifier[],
+    private readonly action: ScanAction = 'pour',
   ) {}
 
   async execute(recording: RecordingRef): Promise<ScanResult> {
@@ -27,7 +32,9 @@ export class ScanBottleUseCase {
     }
     if (!hasUsableScanSignal(audio.samples)) {
       throw new Error(
-        '有効な音声信号がありません。水筒へ水を注ぐ音を録音してください',
+        `有効な音声信号がありません。${
+          this.action === 'shake' ? '水筒を振る音' : '水筒へ水を注ぐ音'
+        }を録音してください`,
       );
     }
 
@@ -35,7 +42,7 @@ export class ScanBottleUseCase {
     for (const classifier of this.classifiers) {
       try {
         return normalizeScanResult(
-          await classifier.classify({ recording, audio }),
+          await classifier.classify({ recording, audio, action: this.action }),
         );
       } catch (error) {
         lastError = error;
