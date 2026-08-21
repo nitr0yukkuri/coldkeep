@@ -211,18 +211,61 @@ fn resample(samples: &[f64], source_rate: u32, target_rate: u32) -> Vec<f64> {
     if source_rate == target_rate {
         return samples.to_vec();
     }
-    let length = ((samples.len() as f64 * target_rate as f64) / source_rate as f64)
+    let filtered = if target_rate < source_rate {
+        low_pass_filter(samples, source_rate, target_rate)
+    } else {
+        samples.to_vec()
+    };
+    let length = ((filtered.len() as f64 * target_rate as f64) / source_rate as f64)
         .round()
         .max(1.0) as usize;
     (0..length)
         .map(|index| {
             let source = index as f64 * source_rate as f64 / target_rate as f64;
-            let left = (source.floor() as usize).min(samples.len() - 1);
-            let right = (left + 1).min(samples.len() - 1);
+            let left = (source.floor() as usize).min(filtered.len() - 1);
+            let right = (left + 1).min(filtered.len() - 1);
             let fraction = source - left as f64;
-            samples[left] * (1.0 - fraction) + samples[right] * fraction
+            filtered[left] * (1.0 - fraction) + filtered[right] * fraction
         })
         .collect()
+}
+
+fn low_pass_filter(samples: &[f64], source_rate: u32, target_rate: u32) -> Vec<f64> {
+    let taps = 127usize;
+    let cutoff = 0.94 * target_rate as f64 / source_rate as f64;
+    let center = (taps - 1) as f64 / 2.0;
+    let mut kernel = vec![0.0; taps];
+    let mut sum = 0.0;
+    for (tap, value) in kernel.iter_mut().enumerate() {
+        let position = tap as f64 - center;
+        let sinc = if position == 0.0 {
+            1.0
+        } else {
+            (std::f64::consts::PI * cutoff * position).sin()
+                / (std::f64::consts::PI * cutoff * position)
+        };
+        *value = cutoff
+            * sinc
+            * (0.54
+                - 0.46
+                    * (2.0 * std::f64::consts::PI * tap as f64 / (taps - 1) as f64).cos());
+        sum += *value;
+    }
+    for value in &mut kernel {
+        *value /= sum;
+    }
+    let mut output = vec![0.0; samples.len()];
+    for (index, output_value) in output.iter_mut().enumerate() {
+        let mut value = 0.0;
+        for (tap, coefficient) in kernel.iter().enumerate() {
+            let source_index = index as isize + tap as isize - center as isize;
+            if source_index >= 0 && (source_index as usize) < samples.len() {
+                value += samples[source_index as usize] * coefficient;
+            }
+        }
+        *output_value = value;
+    }
+    output
 }
 
 fn fft_power(frame: &[f64]) -> Vec<f64> {

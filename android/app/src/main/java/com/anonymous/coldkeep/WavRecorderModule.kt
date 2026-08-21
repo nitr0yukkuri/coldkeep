@@ -15,6 +15,8 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class WavRecorderModule(
   private val reactContext: ReactApplicationContext,
@@ -30,6 +32,7 @@ class WavRecorderModule(
   private var audioRecord: AudioRecord? = null
   private var outputFile: File? = null
   private var recordingThread: Thread? = null
+  private var writerFinished = CountDownLatch(0)
 
   override fun getName() = "WavRecorder"
 
@@ -79,6 +82,7 @@ class WavRecorderModule(
 
       audioRecord = recorder
       outputFile = file
+      writerFinished = CountDownLatch(1)
       recording.set(true)
       recorder.startRecording()
       recordingThread = Thread({ writeAudio(recorder, file, minimumBufferSize * 2) }, "ColdKeepRecorder")
@@ -101,7 +105,16 @@ class WavRecorderModule(
 
     try {
       audioRecord?.stop()
-      recordingThread?.join(2_000)
+      var finished = writerFinished.await(2, TimeUnit.SECONDS)
+      if (!finished) {
+        // AudioRecord.read can remain blocked on a busy device. Releasing the
+        // recorder is the documented way to unblock it before the final wait.
+        audioRecord?.release()
+        finished = writerFinished.await(1, TimeUnit.SECONDS)
+      }
+      if (!finished) {
+        throw IllegalStateException("Audio writer did not finish before timeout")
+      }
       releaseRecorder()
       writeWavHeader(file)
       promise.resolve(Uri.fromFile(file).toString())
@@ -114,14 +127,18 @@ class WavRecorderModule(
 
   private fun writeAudio(recorder: AudioRecord, file: File, bufferSize: Int) {
     val buffer = ByteArray(bufferSize)
-    RandomAccessFile(file, "rw").use { wav ->
-      wav.seek(WAV_HEADER_SIZE.toLong())
-      while (recording.get()) {
-        val read = recorder.read(buffer, 0, buffer.size)
-        if (read > 0) {
-          wav.write(buffer, 0, read)
+    try {
+      RandomAccessFile(file, "rw").use { wav ->
+        wav.seek(WAV_HEADER_SIZE.toLong())
+        while (recording.get()) {
+          val read = recorder.read(buffer, 0, buffer.size)
+          if (read > 0) {
+            wav.write(buffer, 0, read)
+          }
         }
       }
+    } finally {
+      writerFinished.countDown()
     }
   }
 
@@ -153,6 +170,7 @@ class WavRecorderModule(
     audioRecord?.release()
     audioRecord = null
     recordingThread = null
+    writerFinished = CountDownLatch(0)
     outputFile = null
   }
 
@@ -160,7 +178,7 @@ class WavRecorderModule(
     val file = outputFile
     if (recording.getAndSet(false)) {
       runCatching { audioRecord?.stop() }
-      recordingThread?.join(500)
+      writerFinished.await(500, TimeUnit.MILLISECONDS)
     }
     file?.delete()
     releaseRecorder()

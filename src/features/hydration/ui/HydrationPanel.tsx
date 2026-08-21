@@ -28,6 +28,7 @@ type HydrationPanelProps = {
   onAddManualIntake(amountOverride?: string): void;
   onAcceptEstimatedIntake(): void;
   modelActionLabel: string;
+  disabled?: boolean;
 };
 
 export function HydrationPanel({
@@ -43,6 +44,7 @@ export function HydrationPanel({
   onAddManualIntake,
   onAcceptEstimatedIntake,
   modelActionLabel,
+  disabled = false,
 }: HydrationPanelProps) {
   const intakeMl = state ? todayIntakeMl(state) : 0;
   const goalMl = state?.profile.dailyGoalMl ?? 1_500;
@@ -76,7 +78,7 @@ export function HydrationPanel({
             value={capacityText}
             onChangeText={onChangeCapacity}
             keyboardType="number-pad"
-            editable
+            editable={!disabled}
           />
           <Text style={styles.inputUnit}>mL</Text>
         </View>
@@ -87,12 +89,16 @@ export function HydrationPanel({
             value={goalText}
             onChangeText={onChangeGoal}
             keyboardType="number-pad"
-            editable
+            editable={!disabled}
           />
           <Text style={styles.inputUnit}>mL</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.secondaryButton} onPress={onSaveProfile}>
+      <TouchableOpacity
+        disabled={disabled}
+        style={styles.secondaryButton}
+        onPress={onSaveProfile}
+      >
         <Text style={styles.secondaryButtonText}>設定を保存</Text>
       </TouchableOpacity>
 
@@ -101,6 +107,7 @@ export function HydrationPanel({
         {[100, 250, 500].map(amount => (
           <TouchableOpacity
             key={amount}
+            disabled={disabled}
             style={styles.quickButton}
             onPress={() => {
               onChangeIntake(String(amount));
@@ -119,8 +126,10 @@ export function HydrationPanel({
           keyboardType="number-pad"
           placeholder="任意の量"
           placeholderTextColor="#8b9ba0"
+          editable={!disabled}
         />
         <TouchableOpacity
+          disabled={disabled}
           style={styles.addButton}
           onPress={() => onAddManualIntake()}
         >
@@ -163,6 +172,7 @@ export function HydrationPanel({
             補充・こぼれがあった場合は飲水量として記録しないでください
           </Text>
           <TouchableOpacity
+            disabled={disabled}
             style={styles.estimateButton}
             onPress={onAcceptEstimatedIntake}
           >
