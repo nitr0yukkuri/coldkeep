@@ -559,10 +559,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   title="氷量"
                   value={iceAmount !== null ? iceDisplay : '未判定'}
                   unit={
-                    iceAmountStatus === 'trained' && iceAmount !== null
-                      ? `3段階の目安（${formatProbability(
-                          iceAmountConfidence,
-                        )}）`
+                    iceAmountStatus === 'trained'
+                      ? iceAmount !== null
+                        ? `3段階の目安（${formatProbability(
+                            iceAmountConfidence,
+                          )}）`
+                        : '信頼度不足（再試行）'
                       : '学習前は未判定'
                   }
                   color="#168276"
