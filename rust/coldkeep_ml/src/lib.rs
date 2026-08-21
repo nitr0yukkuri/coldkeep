@@ -65,8 +65,7 @@ struct ShakeModelArtifact {
 }
 
 fn shake_artifact() -> Result<ShakeModelArtifact, String> {
-    serde_json::from_str(SHAKE_MODEL_JSON)
-        .map_err(|error| format!("shake model artifact: {error}"))
+    serde_json::from_str(SHAKE_MODEL_JSON).map_err(|error| format!("shake model artifact: {error}"))
 }
 
 fn shake_status(status: &str) -> &'static str {
