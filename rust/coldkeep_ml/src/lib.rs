@@ -687,30 +687,25 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         _ => return Err("shake model class must be 0, 1, or 2".to_string()),
     };
     let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
-    let (ice_amount, ice_amount_confidence) = if ice_status == "trained"
-        && shake_ice.model.is_some()
-        && shake_ice.classes.len() == 3
-    {
-        let ice_model = shake_ice.model.as_ref().expect("checked above");
-        let ice_probabilities = averaged_prediction(&features, ice_model);
-        let ice_index = ice_probabilities
-            .iter()
-            .enumerate()
-            .max_by(|(_, left), (_, right)| left.total_cmp(right))
-            .map(|(index, _)| index)
-            .unwrap_or(0);
-        let ice_class = shake_ice
-            .classes
-            .get(ice_index)
-            .and_then(|class| shake_ice_class(class))
-            .ok_or("shake ice model class must be none, few, or many")?;
-        (
-            Some(ice_class),
-            ice_probabilities.get(ice_index).copied(),
-        )
-    } else {
-        (None, None)
-    };
+    let (ice_amount, ice_amount_confidence) =
+        if ice_status == "trained" && shake_ice.model.is_some() && shake_ice.classes.len() == 3 {
+            let ice_model = shake_ice.model.as_ref().expect("checked above");
+            let ice_probabilities = averaged_prediction(&features, ice_model);
+            let ice_index = ice_probabilities
+                .iter()
+                .enumerate()
+                .max_by(|(_, left), (_, right)| left.total_cmp(right))
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+            let ice_class = shake_ice
+                .classes
+                .get(ice_index)
+                .and_then(|class| shake_ice_class(class))
+                .ok_or("shake ice model class must be none, few, or many")?;
+            (Some(ice_class), ice_probabilities.get(ice_index).copied())
+        } else {
+            (None, None)
+        };
     Ok(Prediction {
         contains_water: true,
         water_confidence: confidence,

@@ -23,6 +23,5 @@ fn main() {
     let shake_ice_destination = out_dir.join("shake_ice_amount_model.json");
     let shake_ice_contents =
         fs::read_to_string(&shake_ice_source).unwrap_or_else(|_| "null".to_string());
-    fs::write(shake_ice_destination, shake_ice_contents)
-        .expect("write optional shake ice model");
+    fs::write(shake_ice_destination, shake_ice_contents).expect("write optional shake ice model");
 }
