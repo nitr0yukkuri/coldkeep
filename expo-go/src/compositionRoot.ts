@@ -14,6 +14,7 @@ import {
 } from './audioAdapters';
 import { ExpoDatasetRepository } from './datasetRepository';
 import { ExpoHydrationRepository } from './hydrationRepository';
+import { MODEL_RECORDING_ACTION } from '../../src/features/collection/domain/collection';
 
 export function createExpoAppDependencies(
   recorder: ExpoPcmRecorderAdapter,
@@ -23,7 +24,11 @@ export function createExpoAppDependencies(
   return {
     collectionActions: COLLECTION_ACTIONS,
     recording: new RecordingUseCase(new ExpoMicrophonePermission(), recorder),
-    scan: new ScanBottleUseCase(reader, [new TypeScriptClassifierAdapter()]),
+    scan: new ScanBottleUseCase(
+      reader,
+      [new TypeScriptClassifierAdapter()],
+      MODEL_RECORDING_ACTION,
+    ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(
       repository,

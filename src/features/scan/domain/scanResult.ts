@@ -14,9 +14,9 @@ export type ScanResult = {
   fillLevel: 0 | 50 | 90 | 100 | null;
   fillConfidence: number | null;
   /** Which physical action the returned model was trained for. */
-  measurementAction?: ScanAction;
+  measurementAction: ScanAction;
   /** Whether the action-specific model is deployable for user-facing math. */
-  measurementStatus?: ScanMeasurementStatus;
+  measurementStatus: ScanMeasurementStatus;
   icePresence: boolean | null;
   iceConfidence: number | null;
   iceStatus: 'untrained' | 'trained';
@@ -26,6 +26,12 @@ export type ScanResult = {
   iceAmountStatus: ScanMeasurementStatus;
   engine: InferenceEngine;
 };
+
+/** Raw classifier payload accepted at the application boundary. Native
+ * bridges and older model artifacts may omit the action/status fields; the
+ * boundary fills those fields conservatively and never treats them as
+ * deployable by default. */
+export type ScanResultInput = Partial<ScanResult>;
 
 /**
  * The public baseline is not calibrated enough to turn every softmax output
@@ -69,21 +75,38 @@ function clampConfidence(value: number | null): number | null {
  * Enforces the public result contract at the application boundary.
  * A classifier is not allowed to expose a fill level when it predicts no water.
  */
-export function normalizeScanResult(result: ScanResult): ScanResult {
-  const waterConfidence = clampConfidence(result.waterConfidence) ?? 0;
-  const fillLevel = result.containsWater ? result.fillLevel : null;
-  const fillConfidence = result.containsWater
-    ? clampConfidence(result.fillConfidence)
-    : null;
+export function normalizeScanResult(
+  result: ScanResultInput,
+  expectedAction?: ScanAction,
+): ScanResult {
+  const action = expectedAction ?? result.measurementAction ?? 'pour';
+  const actionMatches =
+    result.measurementAction === undefined ||
+    result.measurementAction === action;
+  const measurementStatus: ScanMeasurementStatus =
+    actionMatches && result.measurementStatus
+      ? result.measurementStatus
+      : 'untrained';
+  const containsWater = result.containsWater === true;
+  const waterConfidence = clampConfidence(result.waterConfidence ?? 0) ?? 0;
+  const fillLevel =
+    containsWater && actionMatches ? (result.fillLevel ?? null) : null;
+  const fillConfidence =
+    containsWater && actionMatches
+      ? clampConfidence(result.fillConfidence ?? null)
+      : null;
   const candidateIceConfidence =
-    result.icePresence === null ? null : clampConfidence(result.iceConfidence);
+    result.icePresence === null || result.icePresence === undefined
+      ? null
+      : clampConfidence(result.iceConfidence ?? null);
   const iceIsReliable =
     result.iceStatus === 'trained' &&
     result.icePresence !== null &&
+    result.icePresence !== undefined &&
     candidateIceConfidence !== null &&
     candidateIceConfidence >= MIN_ICE_CONFIDENCE;
   const candidateIceAmountConfidence = clampConfidence(
-    result.iceAmountConfidence,
+    result.iceAmountConfidence ?? null,
   );
   const iceAmountIsReliable =
     result.iceAmountStatus === 'trained' &&
@@ -92,16 +115,24 @@ export function normalizeScanResult(result: ScanResult): ScanResult {
     candidateIceAmountConfidence >= ICE_AMOUNT_CONFIDENCE_THRESHOLD;
 
   return {
-    ...result,
+    containsWater,
     waterConfidence,
     fillLevel,
     fillConfidence,
-    icePresence: iceIsReliable ? result.icePresence : null,
+    measurementAction: action,
+    measurementStatus,
+    icePresence: iceIsReliable ? (result.icePresence ?? null) : null,
     iceConfidence: iceIsReliable ? candidateIceConfidence : null,
-    iceAmount: iceAmountIsReliable ? result.iceAmount : null,
+    iceStatus: result.iceStatus === 'trained' ? 'trained' : 'untrained',
+    iceAmount: iceAmountIsReliable ? (result.iceAmount ?? null) : null,
     iceAmountConfidence: iceAmountIsReliable
       ? candidateIceAmountConfidence
       : null,
-    iceAmountStatus: result.iceAmountStatus,
+    iceAmountStatus:
+      result.iceAmountStatus === 'trained' ||
+      result.iceAmountStatus === 'experimental'
+        ? result.iceAmountStatus
+        : 'untrained',
+    engine: result.engine === 'rust' ? 'rust' : 'typescript',
   };
 }

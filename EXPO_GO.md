@@ -29,7 +29,7 @@ App StoreまたはAndroidのPlay StoreでExpo Goを最新版へ更新してか�
 - `expo-audio` の `useAudioStream` で16-bit PCMをメモリに受け取る
 - モノラル化・リサンプリングを行い、ネイティブ経路と同じ16 kHz `PcmAudio`に正規化する
 - 既存の `ScanBottleUseCase` と `publicAudioClassifier.ts`（TypeScript経路）へ渡す
-- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存する
+- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、共有時は音声込みZIPを作る
 - 個人向け画面では水筒容量・1日目標・手動飲水量・音響残量観測をDocument directoryへ保存する
 
 Expo GoにはこのリポジトリのRust/TFLiteカスタムネイティブモジュールは含まれないため、
@@ -41,10 +41,10 @@ Expo経路の推論エンジン表示はTypeScriptになります。氷モデル
 
 ## 入力動作の注意
 
-現行の公開モデルが学習・評価したのはACM-S2の **pour（注ぐ）** 録音です。研究用ベースラインを
-再現する場合は水筒へ水を注ぐ音を録音してください。個人向け画面の残量差分も、現行モデルの
-入力動作に合わせて注ぐ音のチェック結果を比較する設計です。`shake` は別モデルを作るための
-データ収集用ラベルで、現行モデルの入力には使いません。`still` は比較用ラベルです。
+個人向けのSCANとデータ収集は **shake（振る）** に固定しています。1秒以上、一定の強さで
+水筒を振ってください。振り音モデルが未学習または信頼度不足の場合は `未判定` となり、
+注ぐ音モデルへ自動フォールバックしません。`pour`（注ぐ）と`still`（静置）は比較データの
+互換ラベルとしてのみ残しています。
 
 ## 検証
 

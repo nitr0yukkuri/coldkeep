@@ -5,12 +5,19 @@ import {
   AudioInput,
 } from '../../features/shared/application/ports';
 import { ScanResult } from '../../features/scan/domain/scanResult';
+import { normalizeScanResult } from '../../features/scan/domain/scanResult';
 
 export class TypeScriptClassifierAdapter implements AudioClassifier {
   async classify(input: AudioInput): Promise<ScanResult> {
     if (input.action === 'shake') {
-      return classifyShakeAudio(input.audio.samples, input.audio.sampleRate);
+      return normalizeScanResult(
+        classifyShakeAudio(input.audio.samples, input.audio.sampleRate),
+        'shake',
+      );
     }
-    return classifyPublicAudio(input.audio.samples, input.audio.sampleRate);
+    return normalizeScanResult(
+      classifyPublicAudio(input.audio.samples, input.audio.sampleRate),
+      'pour',
+    );
   }
 }

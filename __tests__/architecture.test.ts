@@ -113,8 +113,12 @@ test('collection and export use cases depend on ports, not RNFS', async () => {
   const repository: DatasetRepository = {
     save: jest.fn(async () => record),
     readManifest: jest.fn(async () => 'header\nrow'),
+    createExportArchive: jest.fn(async () => 'file:///dataset.zip'),
   };
-  const share: ShareGateway = { shareText: jest.fn(async () => undefined) };
+  const share: ShareGateway = {
+    shareText: jest.fn(async () => undefined),
+    shareFile: jest.fn(async () => undefined),
+  };
   const collect = new CollectSampleUseCase(reader, repository);
   const exportDataset = new ExportDatasetUseCase(repository, share);
 
@@ -123,8 +127,8 @@ test('collection and export use cases depend on ports, not RNFS', async () => {
   ).resolves.toEqual(record);
   await expect(exportDataset.execute()).resolves.toBeUndefined();
   expect(repository.save).toHaveBeenCalledTimes(1);
-  expect(share.shareText).toHaveBeenCalledWith(
-    'ColdKeep labels',
-    'header\nrow',
+  expect(share.shareFile).toHaveBeenCalledWith(
+    'ColdKeep dataset',
+    'file:///dataset.zip',
   );
 });

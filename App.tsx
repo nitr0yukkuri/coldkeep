@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -33,6 +33,7 @@ import {
   HydrationState,
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
+import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
 
 const initialCollectionDraft: CollectionDraft = {
   sessionId: 'session-01',
@@ -155,6 +156,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [estimatedIntakeMl, setEstimatedIntakeMl] = useState<number | null>(
     null,
   );
+  const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const stopInFlightRef = useRef(false);
   const waterDisplay =
     content === 'SHAKE'
       ? fillLevel === 'N/A'
@@ -197,6 +200,18 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     }, 100);
     return () => clearInterval(timer);
   }, [isRecording, recordingStartedAt]);
+
+  useEffect(() => {
+    if (
+      !isRecording ||
+      isProcessing ||
+      recordingElapsedMs < MAX_CAPTURE_SECONDS * 1000
+    ) {
+      return;
+    }
+    const pendingStop = stopRecordingRef.current?.();
+    pendingStop?.catch(() => undefined);
+  }, [isProcessing, isRecording, recordingElapsedMs]);
 
   useEffect(() => {
     let active = true;
@@ -274,7 +289,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         );
         setWaterConfidence(result.waterConfidence);
         setFillConfidence(result.fillConfidence);
-        setMeasurementStatus(result.measurementStatus ?? 'trained');
+        setMeasurementStatus(result.measurementStatus);
         setInferenceEngine(result.engine);
         setIcePresence(
           result.icePresence === null
@@ -445,20 +460,22 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   async function shareManifest() {
     try {
       await app.exportDataset.execute();
-      setStatus('CSVを書き出しました');
+      setStatus('音声とラベルをZIPで書き出しました');
     } catch (error) {
       setStatus(
-        error instanceof Error ? error.message : 'CSVを書き出せませんでした',
+        error instanceof Error ? error.message : 'データを書き出せませんでした',
       );
     }
   }
 
   async function stopRecording() {
-    if (!isRecording || isProcessing) {
+    if (!isRecording || isProcessing || stopInFlightRef.current) {
       return;
     }
+    stopInFlightRef.current = true;
     setIsProcessing(true);
     let recording: RecordingRef | null = null;
+    let cleanupFailed = false;
     try {
       setStatus(mode === 'collect' ? '録音を保存中…' : '確認中…');
       recording = await app.recording.stop();
@@ -485,13 +502,24 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       );
     } finally {
       if (recording) {
-        await app.recording.cleanup(recording).catch(() => undefined);
+        try {
+          await app.recording.cleanup(recording);
+        } catch (error) {
+          cleanupFailed = true;
+          console.warn('録音ファイルの後始末に失敗しました', error);
+        }
+      }
+      if (cleanupFailed) {
+        setStatus('録音ファイルの後始末に失敗しました');
       }
       setRecordingStartedAt(null);
       setRecordingElapsedMs(0);
       setIsProcessing(false);
+      stopInFlightRef.current = false;
     }
   }
+
+  stopRecordingRef.current = stopRecording;
 
   return (
     <ScrollView
@@ -670,6 +698,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             onAddManualIntake={addManualIntake}
             onAcceptEstimatedIntake={acceptEstimatedIntake}
             modelActionLabel={modelActionLabel}
+            disabled={isRecording || isProcessing}
           />
 
           <Text style={styles.resultNote}>

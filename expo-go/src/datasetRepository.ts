@@ -14,6 +14,8 @@ import type {
   RecordingRef,
 } from '../../src/features/shared/application/ports';
 import { encodePcm16WavBase64 } from '../../src/platform/audio/pcmWav';
+import { createStoreZipBase64 } from '../../src/platform/archive/storeZip';
+import { writeTextAtomically } from '../../src/platform/storage/atomicTextFile';
 
 function documentRoot(): string {
   if (!FileSystem.documentDirectory) {
@@ -23,11 +25,26 @@ function documentRoot(): string {
 }
 
 export class ExpoDatasetRepository implements DatasetRepository {
+  private saveQueue: Promise<void> = Promise.resolve();
+
   async save(
     _recording: RecordingRef,
     labels: CollectionLabels,
     audio: PcmAudio,
   ): Promise<CollectionRecord> {
+    const operation = this.saveInternal(labels, audio);
+    this.saveQueue = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }
+
+  private async saveInternal(
+    labels: CollectionLabels,
+    audio: PcmAudio,
+  ): Promise<CollectionRecord> {
+    await this.saveQueue;
     const recordedAt = new Date();
     const recordingId = createRecordingId(labels, recordedAt);
     const root = documentRoot();
@@ -47,8 +64,12 @@ export class ExpoDatasetRepository implements DatasetRepository {
       platform: Platform.OS,
     };
 
-    await FileSystem.makeDirectoryAsync(audioDirectory, { intermediates: true });
-    await FileSystem.makeDirectoryAsync(metadataDirectory, { intermediates: true });
+    await FileSystem.makeDirectoryAsync(audioDirectory, {
+      intermediates: true,
+    });
+    await FileSystem.makeDirectoryAsync(metadataDirectory, {
+      intermediates: true,
+    });
     await FileSystem.writeAsStringAsync(
       `${root}${audioFilename}`,
       encodePcm16WavBase64(audio),
@@ -65,10 +86,24 @@ export class ExpoDatasetRepository implements DatasetRepository {
           encoding: FileSystem.EncodingType.UTF8,
         })
       : COLLECTION_CSV_HEADER;
-    await FileSystem.writeAsStringAsync(
+    await writeTextAtomically(
       manifestUri,
       `${existing.trimEnd()}\n${collectionRecordToCsv(record)}\n`,
-      { encoding: FileSystem.EncodingType.UTF8 },
+      {
+        exists: async candidate =>
+          (await FileSystem.getInfoAsync(candidate)).exists,
+        readFile: candidate =>
+          FileSystem.readAsStringAsync(candidate, {
+            encoding: FileSystem.EncodingType.UTF8,
+          }),
+        writeFile: (candidate, contents) =>
+          FileSystem.writeAsStringAsync(candidate, contents, {
+            encoding: FileSystem.EncodingType.UTF8,
+          }),
+        moveFile: (from, to) => FileSystem.moveAsync({ from, to }),
+        unlink: candidate =>
+          FileSystem.deleteAsync(candidate, { idempotent: true }),
+      },
     );
     return record;
   }
@@ -82,5 +117,51 @@ export class ExpoDatasetRepository implements DatasetRepository {
     return FileSystem.readAsStringAsync(manifestUri, {
       encoding: FileSystem.EncodingType.UTF8,
     });
+  }
+
+  async createExportArchive(): Promise<string> {
+    const root = documentRoot();
+    const manifestUri = `${root}manifest.csv`;
+    if (!(await FileSystem.getInfoAsync(manifestUri)).exists) {
+      throw new Error('No recordings have been saved yet');
+    }
+    const files = await this.readFiles(root, root);
+    const archiveDirectory = `${root}exports/`;
+    await FileSystem.makeDirectoryAsync(archiveDirectory, {
+      intermediates: true,
+    });
+    const archiveUri = `${archiveDirectory}coldkeep-dataset-${Date.now()}.zip`;
+    await FileSystem.writeAsStringAsync(
+      archiveUri,
+      createStoreZipBase64(files),
+      { encoding: FileSystem.EncodingType.Base64 },
+    );
+    return archiveUri;
+  }
+
+  private async readFiles(
+    directory: string,
+    root: string,
+  ): Promise<Array<{ name: string; base64: string }>> {
+    const names = await FileSystem.readDirectoryAsync(directory);
+    const files: Array<{ name: string; base64: string }> = [];
+    for (const name of names) {
+      if (name.endsWith('.zip')) {
+        continue;
+      }
+      const uri = `${directory}${name}`;
+      const info = await FileSystem.getInfoAsync(uri);
+      if (info.isDirectory) {
+        files.push(...(await this.readFiles(`${uri}/`, root)));
+      } else {
+        files.push({
+          name: uri.slice(root.length),
+          base64: await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          }),
+        });
+      }
+    }
+    return files;
   }
 }

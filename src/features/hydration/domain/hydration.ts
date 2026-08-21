@@ -92,6 +92,24 @@ function sameLocalDay(left: string, right: Date): boolean {
   );
 }
 
+function loggedIntakeBetween(
+  state: HydrationState,
+  previousRecordedAt: string,
+  currentRecordedAt: Date,
+): number {
+  const previousTime = Date.parse(previousRecordedAt);
+  return state.intakes
+    .filter(intake => {
+      const intakeTime = Date.parse(intake.recordedAt);
+      return (
+        intakeTime > previousTime &&
+        intakeTime <= currentRecordedAt.getTime() &&
+        sameLocalDay(intake.recordedAt, currentRecordedAt)
+      );
+    })
+    .reduce((total, intake) => total + intake.amountMl, 0);
+}
+
 export function todayIntakeMl(state: HydrationState, now = new Date()): number {
   return state.intakes
     .filter(intake => sameLocalDay(intake.recordedAt, now))
@@ -132,7 +150,15 @@ export function reliableObservationDeltaMl(
   if (!sameLocalDay(previous.recordedAt, new Date(current.recordedAt))) {
     return null;
   }
-  return previous.remainingMl - current.remainingMl;
+  return (
+    previous.remainingMl -
+    current.remainingMl -
+    loggedIntakeBetween(
+      state,
+      previous.recordedAt,
+      new Date(current.recordedAt),
+    )
+  );
 }
 
 export function addManualIntake(
@@ -225,15 +251,24 @@ export function recordObservation(
       ? previous.remainingMl - remainingMl
       : null;
   const estimatedConsumedMl =
-    delta !== null && delta >= 10 && delta <= state.profile.capacityMl
-      ? delta
+    delta !== null
+      ? Math.round(
+          delta -
+            loggedIntakeBetween(state, previous?.recordedAt ?? '', recordedAt),
+        )
+      : null;
+  const boundedEstimate =
+    estimatedConsumedMl !== null &&
+    estimatedConsumedMl >= 10 &&
+    estimatedConsumedMl <= state.profile.capacityMl
+      ? estimatedConsumedMl
       : null;
   return {
     state: {
       ...state,
       observations: [...state.observations, observation],
     },
-    estimatedConsumedMl,
+    estimatedConsumedMl: boundedEstimate,
     observation,
   };
 }
@@ -245,37 +280,48 @@ export function normalizeHydrationState(value: unknown): HydrationState {
   }
   const candidate = value as Partial<HydrationState>;
   const profile = candidate.profile;
-  try {
-    const normalizedProfile = validateHydrationProfile({
-      capacityMl: Number(profile?.capacityMl),
-      dailyGoalMl: Number(profile?.dailyGoalMl),
-    });
-    const observations = Array.isArray(candidate.observations)
-      ? candidate.observations.filter(isHydrationObservation)
-      : [];
-    const intakes = Array.isArray(candidate.intakes)
-      ? candidate.intakes.filter(isHydrationIntake)
-      : [];
-    return { profile: normalizedProfile, observations, intakes };
-  } catch {
-    return fallback;
-  }
+  const normalizedProfile = validateHydrationProfile({
+    capacityMl: Number(profile?.capacityMl),
+    dailyGoalMl: Number(profile?.dailyGoalMl),
+  });
+  const observations = Array.isArray(candidate.observations)
+    ? candidate.observations.filter(observationValue =>
+        isHydrationObservation(observationValue, normalizedProfile.capacityMl),
+      )
+    : [];
+  const intakes = Array.isArray(candidate.intakes)
+    ? candidate.intakes.filter(isHydrationIntake)
+    : [];
+  return { profile: normalizedProfile, observations, intakes };
 }
 
-function isHydrationObservation(value: unknown): value is HydrationObservation {
+function isHydrationObservation(
+  value: unknown,
+  capacityMl: number,
+): value is HydrationObservation {
   if (!value || typeof value !== 'object') {
     return false;
   }
   const candidate = value as Partial<HydrationObservation>;
+  const remainingMl = candidate.remainingMl;
+  const confidence = candidate.confidence;
   return (
     typeof candidate.observationId === 'string' &&
     typeof candidate.recordedAt === 'string' &&
-    Number.isFinite(candidate.remainingMl) &&
+    Number.isFinite(Date.parse(candidate.recordedAt)) &&
+    typeof remainingMl === 'number' &&
+    Number.isFinite(remainingMl) &&
+    remainingMl >= 0 &&
+    remainingMl <= capacityMl &&
     (candidate.fillLevel === 0 ||
       candidate.fillLevel === 50 ||
       candidate.fillLevel === 90 ||
       candidate.fillLevel === 100) &&
-    (candidate.confidence === null || Number.isFinite(candidate.confidence)) &&
+    (confidence === null ||
+      (typeof confidence === 'number' &&
+        Number.isFinite(confidence) &&
+        confidence >= 0 &&
+        confidence <= 1)) &&
     candidate.source === 'acoustic'
   );
 }
@@ -285,11 +331,21 @@ function isHydrationIntake(value: unknown): value is HydrationIntake {
     return false;
   }
   const candidate = value as Partial<HydrationIntake>;
+  const amountMl = candidate.amountMl;
+  const confidence = candidate.confidence;
   return (
     typeof candidate.intakeId === 'string' &&
     typeof candidate.recordedAt === 'string' &&
-    Number.isFinite(candidate.amountMl) &&
+    Number.isFinite(Date.parse(candidate.recordedAt)) &&
+    typeof amountMl === 'number' &&
+    Number.isFinite(amountMl) &&
+    amountMl >= 10 &&
+    amountMl <= 5_000 &&
     (candidate.source === 'manual' || candidate.source === 'acoustic') &&
-    (candidate.confidence === null || Number.isFinite(candidate.confidence))
+    (confidence === null ||
+      (typeof confidence === 'number' &&
+        Number.isFinite(confidence) &&
+        confidence >= 0 &&
+        confidence <= 1))
   );
 }

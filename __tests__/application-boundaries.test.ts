@@ -130,6 +130,7 @@ test('collection rejects short recordings before persisting labels', async () =>
   const repository: DatasetRepository = {
     save: jest.fn(),
     readManifest: jest.fn(),
+    createExportArchive: jest.fn(),
   };
   const useCase = new CollectSampleUseCase(reader, repository);
 
@@ -160,6 +161,7 @@ test('collection rejects invalid PCM before persisting labels', async () => {
   const repository: DatasetRepository = {
     save: jest.fn(),
     readManifest: jest.fn(),
+    createExportArchive: jest.fn(),
   };
   const useCase = new CollectSampleUseCase(reader, repository);
 
@@ -193,6 +195,7 @@ test('collection rejects a silent recording before persisting labels', async () 
   const repository: DatasetRepository = {
     save: jest.fn(),
     readManifest: jest.fn(),
+    createExportArchive: jest.fn(),
   };
   const useCase = new CollectSampleUseCase(reader, repository);
 
@@ -245,6 +248,8 @@ test('scan result normalization enforces the public result contract', () => {
     iceAmountConfidence: null,
     iceAmountStatus: 'untrained',
     engine: 'typescript',
+    measurementAction: 'pour',
+    measurementStatus: 'untrained',
   });
 });
 

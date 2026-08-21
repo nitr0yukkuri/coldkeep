@@ -10,6 +10,8 @@ export type PcmCaptureChunk = {
   encoding: PcmCaptureEncoding;
 };
 
+export const MAX_CAPTURE_SECONDS = 10;
+
 type StoredChunk = {
   samples: Float32Array;
   sampleRate: number;
@@ -25,11 +27,14 @@ export class PcmCaptureAccumulator {
 
   private capturing = false;
 
+  private capturedSeconds = 0;
+
   start(): void {
     if (this.capturing) {
       throw new Error('PCM capture is already in progress');
     }
     this.chunks = [];
+    this.capturedSeconds = 0;
     this.capturing = true;
   }
 
@@ -57,8 +62,15 @@ export class PcmCaptureAccumulator {
       }
       mono[frame] = sum / chunk.channels;
     }
-    if (mono.length > 0) {
-      this.chunks.push({ samples: mono, sampleRate: chunk.sampleRate });
+    if (mono.length > 0 && this.capturedSeconds < MAX_CAPTURE_SECONDS) {
+      const remainingFrames = Math.floor(
+        (MAX_CAPTURE_SECONDS - this.capturedSeconds) * chunk.sampleRate,
+      );
+      const bounded = mono.slice(0, Math.min(mono.length, remainingFrames));
+      if (bounded.length > 0) {
+        this.chunks.push({ samples: bounded, sampleRate: chunk.sampleRate });
+        this.capturedSeconds += bounded.length / chunk.sampleRate;
+      }
     }
   }
 
@@ -67,6 +79,7 @@ export class PcmCaptureAccumulator {
       throw new Error('PCM capture is not in progress');
     }
     this.capturing = false;
+    this.capturedSeconds = 0;
     const chunks = this.chunks;
     this.chunks = [];
     if (chunks.length === 0) {
@@ -96,6 +109,7 @@ export class PcmCaptureAccumulator {
   abort(): void {
     this.capturing = false;
     this.chunks = [];
+    this.capturedSeconds = 0;
   }
 
   private decodeInt16(data: ArrayBuffer): Float32Array {
