@@ -129,7 +129,7 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
       );
 
   await ReactTestRenderer.act(async () => {
-    await buttonFor('チェックする')?.props.onPress();
+    await buttonFor('振って測定する')?.props.onPress();
   });
   await ReactTestRenderer.act(async () => {
     await buttonFor('停止して確認')?.props.onPress();
@@ -140,6 +140,7 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
     .map(text => textContent(text.props.children));
   expect(textValues).toContain('氷の有無');
   expect(textValues).toContain('未判定');
+  expect(textValues).not.toContain('データ収集（開発用）');
 
   const testApp = app as unknown as {
     scan: { execute: jest.Mock };
@@ -161,7 +162,7 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
     measurementStatus: 'trained',
   });
   await ReactTestRenderer.act(async () => {
-    await buttonFor('チェックする')?.props.onPress();
+    await buttonFor('振って測定する')?.props.onPress();
   });
   await ReactTestRenderer.act(async () => {
     await buttonFor('停止して確認')?.props.onPress();

@@ -1,23 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Platform,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
 import type { AppDependencies } from './src/app/types';
-import {
-  COLLECTION_ACTION_LABELS,
-  COLLECTION_ACTION_INSTRUCTIONS,
-  CollectionDraft,
-  CollectionLabels,
-  MODEL_RECORDING_ACTION,
-  validateCollectionDraft,
-} from './src/features/collection/domain/collection';
 import type { RecordingRef } from './src/features/shared/application/ports';
 import {
   MIN_SCAN_CONFIDENCE,
@@ -34,19 +25,6 @@ import {
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
-
-const initialCollectionDraft: CollectionDraft = {
-  sessionId: 'session-01',
-  containerId: 'bottle-01',
-  deviceId: Platform.OS,
-  capacityMl: '500',
-  waterMl: '250',
-  iceCount: '0',
-  iceMassG: '0',
-  temperatureC: '20',
-  microphoneDistanceCm: '10',
-  action: MODEL_RECORDING_ACTION,
-};
 
 const MetricCard = ({
   title,
@@ -76,35 +54,7 @@ const MetricCard = ({
   </View>
 );
 
-const LabeledInput = ({
-  label,
-  value,
-  onChangeText,
-  numeric = false,
-  editable = true,
-}: {
-  label: string;
-  value: string;
-  onChangeText(value: string): void;
-  numeric?: boolean;
-  editable?: boolean;
-}) => (
-  <View style={styles.inputGroup}>
-    <Text style={styles.inputLabel}>{label}</Text>
-    <TextInput
-      style={[styles.input, !editable && styles.disabledInput]}
-      value={value}
-      onChangeText={onChangeText}
-      accessibilityLabel={label}
-      keyboardType={numeric ? 'decimal-pad' : 'default'}
-      autoCapitalize="none"
-      editable={editable}
-    />
-  </View>
-);
-
 export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
-  const [mode, setMode] = useState<'scan' | 'collect'>('scan');
   const [status, setStatus] = useState('準備できました');
   const [content, setContent] = useState('UNKNOWN');
   const [fillLevel, setFillLevel] = useState('—');
@@ -136,13 +86,6 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [collectionDraft, setCollectionDraft] = useState(
-    initialCollectionDraft,
-  );
-  const [pendingLabels, setPendingLabels] = useState<CollectionLabels | null>(
-    null,
-  );
-  const [savedRecordings, setSavedRecordings] = useState(0);
   const [hydrationState, setHydrationState] = useState<HydrationState | null>(
     null,
   );
@@ -156,8 +99,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [estimatedIntakeMl, setEstimatedIntakeMl] = useState<number | null>(
     null,
   );
+  const [showMeasurementDetails, setShowMeasurementDetails] = useState(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
+
   const waterDisplay =
     content === 'SHAKE'
       ? fillLevel === 'N/A'
@@ -176,20 +121,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         : icePresence === 'ABSENT'
           ? 'なし'
           : '未判定';
-  const hasResult = hasScanResult;
-  const modelActionLabel = COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION];
-  const modelActionInstruction =
-    COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION];
+  const modelActionLabel = '振る';
   const formatProbability = (value: number | null) =>
     value === null ? '—' : `${Math.round(value * 100)}%`;
-
-  useEffect(() => {
-    if (mode === 'collect') {
-      setStatus('データ収集の準備ができました');
-    } else {
-      setStatus('準備できました');
-    }
-  }, [mode]);
 
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
@@ -209,8 +143,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     ) {
       return;
     }
-    const pendingStop = stopRecordingRef.current?.();
-    pendingStop?.catch(() => undefined);
+    stopRecordingRef.current?.().catch(() => undefined);
   }, [isProcessing, isRecording, recordingElapsedMs]);
 
   useEffect(() => {
@@ -238,16 +171,6 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       active = false;
     };
   }, [app]);
-
-  const updateCollectionField = useCallback(
-    <Key extends keyof CollectionDraft>(
-      key: Key,
-      value: CollectionDraft[Key],
-    ) => {
-      setCollectionDraft(current => ({ ...current, [key]: value }));
-    },
-    [],
-  );
 
   const handleScan = useCallback(
     async (recording: RecordingRef) => {
@@ -422,15 +345,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   }
 
   async function startRecording() {
-    if (isProcessing) {
+    if (isProcessing || isRecording) {
       return;
     }
     try {
-      const labels =
-        mode === 'collect' ? validateCollectionDraft(collectionDraft) : null;
       await app.recording.start();
-
-      setPendingLabels(labels);
       setIsRecording(true);
       setRecordingStartedAt(Date.now());
       setRecordingElapsedMs(0);
@@ -447,27 +366,6 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     }
   }
 
-  async function saveCollectionRecording(
-    recording: RecordingRef,
-    labels: CollectionLabels,
-  ) {
-    setStatus('録音を保存中…');
-    const record = await app.collect.execute(recording, labels);
-    setSavedRecordings(count => count + 1);
-    setStatus(`保存しました（${record.recordingId}）`);
-  }
-
-  async function shareManifest() {
-    try {
-      await app.exportDataset.execute();
-      setStatus('音声とラベルをZIPで書き出しました');
-    } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : 'データを書き出せませんでした',
-      );
-    }
-  }
-
   async function stopRecording() {
     if (!isRecording || isProcessing || stopInFlightRef.current) {
       return;
@@ -477,26 +375,16 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     let recording: RecordingRef | null = null;
     let cleanupFailed = false;
     try {
-      setStatus(mode === 'collect' ? '録音を保存中…' : '確認中…');
+      setStatus('確認中…');
       recording = await app.recording.stop();
-
       setIsRecording(false);
       setRecordingStartedAt(null);
-      if (mode === 'collect') {
-        if (!pendingLabels) {
-          throw new Error('Collection labels were not captured');
-        }
-        await saveCollectionRecording(recording, pendingLabels);
-      } else {
-        await handleScan(recording);
-      }
-      setPendingLabels(null);
+      await handleScan(recording);
     } catch (error) {
       console.error(error);
       setIsRecording(false);
       setRecordingStartedAt(null);
       setRecordingElapsedMs(0);
-      setPendingLabels(null);
       setStatus(
         error instanceof Error ? error.message : '録音を処理できませんでした',
       );
@@ -522,21 +410,22 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   stopRecordingRef.current = stopRecording;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>ColdKeep</Text>
-        <Text style={styles.headerSubtitle}>
-          {mode === 'scan' ? '音響チェック' : 'データ収集'}
-        </Text>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>COLDKEEP</Text>
+          <Text style={styles.headerTitle}>水筒の状態を確認</Text>
+          <Text style={styles.headerSubtitle}>
+            水筒を振るだけで、残量と氷の状態を記録できます
+          </Text>
+        </View>
 
-      {mode === 'scan' ? (
         <View style={styles.scanScreen}>
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>現在の状態</Text>
+            <Text style={styles.heroLabel}>現在の残量</Text>
             <Text
               style={[
                 styles.heroValue,
@@ -547,10 +436,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
             <Text style={styles.heroDescription}>
               {!hasScanResult
-                ? `${modelActionInstruction}を1秒以上録音します`
+                ? '水筒を1秒以上振って測定します'
                 : content === 'SHAKE'
                   ? measurementStatus === 'untrained'
-                    ? '振り音モデルは未学習です。データ収集後にモデルを有効化します'
+                    ? '振り音モデルは未学習のため、まだ残量を判定できません'
                     : fillLevel === 'N/A'
                       ? '振り音の信頼度が低いため残量を判定できませんでした'
                       : '振り音から残量の3段階を判定しました'
@@ -564,7 +453,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
           </View>
 
-          {hasResult ? (
+          {hasScanResult ? (
             <View style={styles.metricRow}>
               {content === 'SHAKE' && fillLevel !== 'N/A' ? (
                 <MetricCard
@@ -623,8 +512,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               {isProcessing
                 ? '確認中です。少しお待ちください'
                 : isRecording
-                  ? `${modelActionLabel}動作が終わったら停止してください`
-                  : `${modelActionInstruction}を1秒以上録音してください`}
+                  ? '振る動作が終わったら停止してください'
+                  : '1秒以上、一定の強さで振ってください'}
             </Text>
             <TouchableOpacity
               disabled={isProcessing}
@@ -634,7 +523,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   ? '音声を確認中'
                   : isRecording
                     ? '録音を停止して確認'
-                    : '水筒の音をチェックする'
+                    : '水筒を振って測定する'
               }
               style={[
                 styles.analysisButton,
@@ -648,7 +537,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   ? '確認中…'
                   : isRecording
                     ? '停止して確認'
-                    : 'チェックする'}
+                    : '振って測定する'}
               </Text>
             </TouchableOpacity>
             {isRecording ? (
@@ -657,32 +546,47 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               </Text>
             ) : null}
             {status !== '準備できました' && status !== '確認が完了しました' ? (
-              <Text style={styles.analysisStatus}>{status}</Text>
+              <Text style={styles.analysisStatus} accessibilityLiveRegion="polite">
+                {status}
+              </Text>
             ) : null}
           </View>
 
-          {hasResult ? (
-            <View style={styles.inferenceCard}>
-              <Text style={styles.inferenceTitle}>推論情報</Text>
-              <Text style={styles.inferenceText}>
-                {modelActionLabel}音モデル ·{' '}
-                {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}経路
-              </Text>
-              <Text style={styles.inferenceText}>
-                {content === 'SHAKE'
-                  ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
-                      measurementStatus === 'trained' ? '学習済み' : '未学習'
-                    }`
-                  : `水判定確率 ${formatProbability(waterConfidence)}${
-                      content === 'WATER'
-                        ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
-                        : ''
-                    }`}
-              </Text>
-              <Text style={styles.inferenceHint}>
-                確率はこの録音に対するモデル出力で、正解率を意味しません。
-              </Text>
-            </View>
+          {hasScanResult ? (
+            <>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.detailsToggle}
+                onPress={() => setShowMeasurementDetails(value => !value)}
+              >
+                <Text style={styles.detailsToggleText}>
+                  測定の詳細 {showMeasurementDetails ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+              {showMeasurementDetails ? (
+                <View style={styles.inferenceCard}>
+                  <Text style={styles.inferenceTitle}>測定の詳細</Text>
+                  <Text style={styles.inferenceText}>
+                    {modelActionLabel}音モデル ·{' '}
+                    {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}経路
+                  </Text>
+                  <Text style={styles.inferenceText}>
+                    {content === 'SHAKE'
+                      ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
+                          measurementStatus === 'trained' ? '学習済み' : '未学習'
+                        }`
+                      : `水判定確率 ${formatProbability(waterConfidence)}${
+                          content === 'WATER'
+                            ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
+                            : ''
+                        }`}
+                  </Text>
+                  <Text style={styles.inferenceHint}>
+                    確率はこの録音に対するモデル出力で、正解率を意味しません。
+                  </Text>
+                </View>
+              ) : null}
+            </>
           ) : null}
 
           <HydrationPanel
@@ -697,173 +601,55 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             onSaveProfile={saveHydrationProfile}
             onAddManualIntake={addManualIntake}
             onAcceptEstimatedIntake={acceptEstimatedIntake}
-            modelActionLabel={modelActionLabel}
+            modelActionLabel="振る"
             disabled={isRecording || isProcessing}
           />
 
           <Text style={styles.resultNote}>
-            結果は録音動作、距離、容器、周囲の音で変わります。前回の残量との差分は参考値として確認できます。
+            結果は録音動作、距離、容器、周囲の音で変わります。残量は参考値として確認してください。
           </Text>
-          <TouchableOpacity
-            disabled={isRecording || isProcessing}
-            accessibilityRole="button"
-            accessibilityLabel="データ収集画面を開く"
-            style={styles.developerLink}
-            onPress={() => setMode('collect')}
-          >
-            <Text style={styles.developerLinkText}>データ収集（開発用）</Text>
-          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.collectionPanel}>
-          <View style={styles.collectionHeaderRow}>
-            <View style={styles.collectionHeaderText}>
-              <Text style={styles.sectionTitle}>データ収集</Text>
-              <Text style={styles.sectionHint}>
-                学習用の録音と実測値を保存します
-              </Text>
-            </View>
-            <TouchableOpacity
-              disabled={isRecording || isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel="音響チェック画面へ戻る"
-              style={styles.backLink}
-              onPress={() => setMode('scan')}
-            >
-              <Text style={styles.backLinkText}>チェック画面へ</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.inputGrid}>
-            <LabeledInput
-              label="セッション"
-              value={collectionDraft.sessionId}
-              onChangeText={value => updateCollectionField('sessionId', value)}
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="水筒"
-              value={collectionDraft.containerId}
-              onChangeText={value =>
-                updateCollectionField('containerId', value)
-              }
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="端末"
-              value={collectionDraft.deviceId}
-              onChangeText={value => updateCollectionField('deviceId', value)}
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="容量 (mL)"
-              value={collectionDraft.capacityMl}
-              onChangeText={value => updateCollectionField('capacityMl', value)}
-              numeric
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="水量 (mL)"
-              value={collectionDraft.waterMl}
-              onChangeText={value => updateCollectionField('waterMl', value)}
-              numeric
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="氷の個数"
-              value={collectionDraft.iceCount}
-              onChangeText={value => updateCollectionField('iceCount', value)}
-              numeric
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="氷の重さ (g)"
-              value={collectionDraft.iceMassG}
-              onChangeText={value => updateCollectionField('iceMassG', value)}
-              numeric
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="水温 (°C)"
-              value={collectionDraft.temperatureC}
-              onChangeText={value =>
-                updateCollectionField('temperatureC', value)
-              }
-              numeric
-              editable={!isRecording}
-            />
-            <LabeledInput
-              label="マイク距離 (cm)"
-              value={collectionDraft.microphoneDistanceCm}
-              onChangeText={value =>
-                updateCollectionField('microphoneDistanceCm', value)
-              }
-              numeric
-              editable={!isRecording}
-            />
-          </View>
-          <Text style={styles.inputLabel}>収集動作</Text>
-          <View style={styles.actionSummary}>
-            <Text style={styles.actionSummaryValue}>
-              {COLLECTION_ACTION_LABELS[MODEL_RECORDING_ACTION]}
-            </Text>
-            <Text style={styles.actionSummaryHint}>
-              {COLLECTION_ACTION_INSTRUCTIONS[MODEL_RECORDING_ACTION]}
-            </Text>
-          </View>
-          <Text style={styles.savedCount}>今回保存: {savedRecordings}件</Text>
-        </View>
-      )}
-
-      {mode === 'collect' ? (
-        <View style={styles.controls}>
-          <Text style={styles.collectionStatus}>{status}</Text>
-          <TouchableOpacity
-            disabled={isProcessing}
-            accessibilityRole="button"
-            accessibilityLabel={
-              isRecording ? '録音を停止して保存' : 'ラベル付き録音を保存'
-            }
-            style={[styles.button, isRecording && styles.activeRec]}
-            onPress={isRecording ? stopRecording : startRecording}
-          >
-            <Text style={styles.buttonText}>
-              {isRecording ? '停止して保存' : '録音して保存'}
-            </Text>
-          </TouchableOpacity>
-          {!isRecording ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="CSVを書き出す"
-              style={styles.exportButton}
-              onPress={shareManifest}
-            >
-              <Text style={styles.exportText}>CSVを書き出す</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f4f7f8' },
   container: {
     flexGrow: 1,
     backgroundColor: '#f4f7f8',
     alignItems: 'center',
-    paddingTop: 36,
-    paddingBottom: 40,
+    paddingHorizontal: 22,
+    paddingTop: 28,
+    paddingBottom: 56,
   },
-  header: { marginBottom: 24, alignItems: 'center' },
-  headerTitle: { fontSize: 30, fontWeight: '800', color: '#17323b' },
-  headerSubtitle: { color: '#62747a', marginTop: 4, fontSize: 15 },
-  scanScreen: { width: '90%', alignItems: 'center' },
+  header: { width: '100%', marginBottom: 28, alignItems: 'center' },
+  eyebrow: {
+    color: '#087ea4',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#17323b',
+    marginTop: 8,
+  },
+  headerSubtitle: {
+    color: '#62747a',
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  scanScreen: { width: '100%', alignItems: 'center' },
   heroCard: {
     width: '100%',
     alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    borderRadius: 20,
     backgroundColor: '#e8f4f6',
     borderWidth: 1,
     borderColor: '#c4e2e6',
@@ -873,21 +659,22 @@ const styles = StyleSheet.create({
     color: '#087ea4',
     fontSize: 42,
     fontWeight: '800',
-    marginTop: 10,
+    marginTop: 12,
   },
   heroValueCompact: { fontSize: 28 },
   heroDescription: {
     color: '#45636a',
-    fontSize: 15,
-    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
     textAlign: 'center',
   },
-  metricRow: { flexDirection: 'row', width: '100%', gap: 10, marginTop: 12 },
+  metricRow: { flexDirection: 'row', width: '100%', gap: 12, marginTop: 18 },
   metricCard: {
     flex: 1,
-    minHeight: 112,
-    padding: 14,
-    borderRadius: 12,
+    minHeight: 120,
+    padding: 16,
+    borderRadius: 14,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#dce7e9',
@@ -898,128 +685,77 @@ const styles = StyleSheet.create({
     color: '#087ea4',
     fontSize: 25,
     fontWeight: '800',
-    marginTop: 10,
+    marginTop: 12,
   },
   metricValueCompact: { fontSize: 17 },
-  metricUnit: { color: '#73878c', fontSize: 11, marginTop: 5 },
+  metricUnit: { color: '#73878c', fontSize: 11, lineHeight: 16, marginTop: 6 },
   analysisCard: {
     width: '100%',
     alignItems: 'center',
-    padding: 16,
-    marginTop: 12,
-    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    borderRadius: 18,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#dce7e9',
   },
-  analysisDescription: { color: '#36515a', fontSize: 15, fontWeight: '600' },
+  analysisDescription: { color: '#36515a', fontSize: 16, fontWeight: '700' },
   analysisHint: {
     color: '#73878c',
     fontSize: 13,
-    marginTop: 5,
+    lineHeight: 20,
+    marginTop: 8,
     textAlign: 'center',
   },
   analysisButton: {
     width: '100%',
-    minHeight: 54,
+    minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 13,
-    borderRadius: 12,
+    marginTop: 18,
+    borderRadius: 13,
     backgroundColor: '#087ea4',
   },
   analysisButtonActive: { backgroundColor: '#c94f57' },
   analysisButtonDisabled: { backgroundColor: '#9aa9ad' },
-  analysisButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  analysisButtonText: { color: '#fff', fontSize: 17, fontWeight: '800' },
   recordingDuration: {
     color: '#c44747',
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 10,
+    marginTop: 12,
   },
   analysisStatus: {
     color: '#b04b50',
     fontSize: 12,
-    marginTop: 9,
+    lineHeight: 18,
+    marginTop: 12,
     textAlign: 'center',
   },
+  detailsToggle: { marginTop: 18, paddingVertical: 10, paddingHorizontal: 4 },
+  detailsToggleText: { color: '#087ea4', fontSize: 13, fontWeight: '700' },
   inferenceCard: {
     width: '100%',
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 12,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 14,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#dce7e9',
   },
   inferenceTitle: { color: '#36515a', fontSize: 13, fontWeight: '800' },
-  inferenceText: { color: '#587177', fontSize: 12, marginTop: 5 },
+  inferenceText: { color: '#587177', fontSize: 12, lineHeight: 18, marginTop: 6 },
   inferenceHint: {
     color: '#8b9ba0',
     fontSize: 11,
     lineHeight: 16,
-    marginTop: 7,
+    marginTop: 8,
   },
   resultNote: {
     color: '#73878c',
     fontSize: 12,
-    marginTop: 14,
+    lineHeight: 18,
+    marginTop: 20,
     textAlign: 'center',
   },
-  developerLink: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 10 },
-  developerLinkText: { color: '#6d8489', fontSize: 12 },
-  collectionStatus: {
-    color: '#62747a',
-    fontSize: 13,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  collectionPanel: { width: '90%', marginBottom: 18 },
-  collectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  collectionHeaderText: { flex: 1, paddingRight: 12 },
-  sectionTitle: { color: '#17323b', fontSize: 20, fontWeight: '800' },
-  sectionHint: { color: '#62747a', fontSize: 13, lineHeight: 18, marginTop: 5 },
-  backLink: { paddingVertical: 4 },
-  backLinkText: { color: '#087ea4', fontSize: 12, fontWeight: '700' },
-  controls: { alignItems: 'center', width: '90%' },
-  button: {
-    width: '100%',
-    alignItems: 'center',
-    backgroundColor: '#087ea4',
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  activeRec: { backgroundColor: '#c94f57' },
-  buttonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  inputGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
-  inputGroup: { width: '50%', paddingHorizontal: 5, marginBottom: 12 },
-  inputLabel: { color: '#62747a', fontSize: 12, marginBottom: 5 },
-  input: {
-    color: '#17323b',
-    backgroundColor: '#fff',
-    borderColor: '#d4e1e3',
-    borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  disabledInput: { opacity: 0.55 },
-  actionSummary: {
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 9,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d4e1e3',
-  },
-  actionSummaryValue: { color: '#17323b', fontSize: 14, fontWeight: '800' },
-  actionSummaryHint: { color: '#73878c', fontSize: 12, marginTop: 3 },
-  savedCount: { color: '#73878c', textAlign: 'right' },
-  exportButton: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 24 },
-  exportText: { color: '#087ea4', fontWeight: '700' },
 });
