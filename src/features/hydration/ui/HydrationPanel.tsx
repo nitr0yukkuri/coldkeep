@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,6 @@ import {
   HydrationState,
   MIN_ACOUSTIC_CONFIDENCE,
   latestObservation,
-  reliableObservationDeltaMl,
   todayIntakeMl,
 } from '../domain/hydration';
 import { HydrationHistoryChart } from './HydrationHistoryChart';
@@ -19,15 +18,9 @@ import { HydrationHistoryChart } from './HydrationHistoryChart';
 type HydrationPanelProps = {
   state: HydrationState | null;
   capacityText: string;
-  goalText: string;
-  intakeText: string;
-  estimatedIntakeMl: number | null;
+  autoRecordedIntakeMl: number | null;
   onChangeCapacity(value: string): void;
-  onChangeGoal(value: string): void;
-  onChangeIntake(value: string): void;
   onSaveProfile(): void;
-  onAddManualIntake(amountOverride?: string): void;
-  onAcceptEstimatedIntake(): void;
   modelActionLabel: string;
   disabled?: boolean;
 };
@@ -35,25 +28,14 @@ type HydrationPanelProps = {
 export function HydrationPanel({
   state,
   capacityText,
-  goalText,
-  intakeText,
-  estimatedIntakeMl,
+  autoRecordedIntakeMl,
   onChangeCapacity,
-  onChangeGoal,
-  onChangeIntake,
   onSaveProfile,
-  onAddManualIntake,
-  onAcceptEstimatedIntake,
   modelActionLabel,
   disabled = false,
 }: HydrationPanelProps) {
-  const [showSettings, setShowSettings] = useState(false);
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const intakeMl = state ? todayIntakeMl(state) : 0;
-  const goalMl = state?.profile.dailyGoalMl ?? 1_500;
-  const progress = Math.min(1, goalMl > 0 ? intakeMl / goalMl : 0);
   const observation = state ? latestObservation(state) : null;
-  const remainingDeltaMl = state ? reliableObservationDeltaMl(state) : null;
+  const intakeMl = state ? todayIntakeMl(state) : 0;
   const observationIsReliable =
     observation?.confidence !== null &&
     observation?.confidence !== undefined &&
@@ -64,160 +46,66 @@ export function HydrationPanel({
       <View style={styles.titleRow}>
         <View style={styles.titleCopy}>
           <Text style={styles.title}>今日の水分</Text>
-          <Text style={styles.subtitle}>飲んだ量を自分で記録できます</Text>
+          <Text style={styles.subtitle}>振る音から自動で記録します</Text>
         </View>
         <Text style={styles.total}>{intakeMl} mL</Text>
       </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <Text style={styles.goalText}>目標 {goalMl} mL</Text>
 
       <HydrationHistoryChart state={state} />
 
-      <TouchableOpacity
-        disabled={disabled}
-        style={styles.sectionToggle}
-        onPress={() => setShowSettings(value => !value)}
-      >
-        <Text style={styles.sectionToggleText}>
-          水筒・目標の設定 {showSettings ? '▲' : '▼'}
-        </Text>
-      </TouchableOpacity>
-
-      {showSettings ? (
-        <View style={styles.settingsBox}>
-          <View style={styles.inputRow}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>水筒容量</Text>
-              <TextInput
-                style={styles.input}
-                value={capacityText}
-                onChangeText={onChangeCapacity}
-                keyboardType="number-pad"
-                accessibilityLabel="水筒容量"
-                editable={!disabled}
-              />
-              <Text style={styles.inputUnit}>mL</Text>
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>1日の目標</Text>
-              <TextInput
-                style={styles.input}
-                value={goalText}
-                onChangeText={onChangeGoal}
-                keyboardType="number-pad"
-                accessibilityLabel="1日の目標"
-                editable={!disabled}
-              />
-              <Text style={styles.inputUnit}>mL</Text>
-            </View>
+      <View style={styles.capacitySection}>
+        <View style={styles.capacityCopy}>
+          <Text style={styles.inputLabel}>水筒容量</Text>
+          <Text style={styles.capacityHint}>
+            容量だけ最初に設定してください
+          </Text>
+        </View>
+        <View style={styles.capacityInputRow}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              value={capacityText}
+              onChangeText={onChangeCapacity}
+              keyboardType="number-pad"
+              accessibilityLabel="水筒容量"
+              editable={!disabled}
+            />
+            <Text style={styles.inputUnit}>mL</Text>
           </View>
           <TouchableOpacity
             disabled={disabled}
-            style={styles.secondaryButton}
+            accessibilityRole="button"
+            style={styles.saveButton}
             onPress={onSaveProfile}
           >
-            <Text style={styles.secondaryButtonText}>設定を保存</Text>
+            <Text style={styles.saveButtonText}>保存</Text>
           </TouchableOpacity>
         </View>
-      ) : null}
-
-      <TouchableOpacity
-        disabled={disabled}
-        style={styles.sectionToggle}
-        onPress={() => setShowManualEntry(value => !value)}
-      >
-        <Text style={styles.sectionToggleText}>
-          飲んだ量を手動で追加 {showManualEntry ? '▲' : '▼'}
-        </Text>
-      </TouchableOpacity>
-
-      {showManualEntry ? (
-        <View style={styles.manualEntryBox}>
-          <View style={styles.quickRow}>
-            {[100, 250, 500].map(amount => (
-              <TouchableOpacity
-                key={amount}
-                disabled={disabled}
-                style={styles.quickButton}
-                onPress={() => {
-                  onChangeIntake(String(amount));
-                  onAddManualIntake(String(amount));
-                }}
-              >
-                <Text style={styles.quickButtonText}>＋{amount} mL</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.customRow}>
-            <TextInput
-              style={styles.customInput}
-              value={intakeText}
-              onChangeText={onChangeIntake}
-              keyboardType="number-pad"
-              accessibilityLabel="任意の飲水量"
-              placeholder="任意の量"
-              placeholderTextColor="#8b9ba0"
-              editable={!disabled}
-            />
-            <TouchableOpacity
-              disabled={disabled}
-              style={styles.addButton}
-              onPress={() => onAddManualIntake()}
-            >
-              <Text style={styles.addButtonText}>追加</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      </View>
 
       {observation ? (
         <View style={styles.observationBox}>
           <Text style={styles.observationText}>
             現在の推定残量: 約{observation.remainingMl} mL
           </Text>
-          {!observationIsReliable ? (
+          {autoRecordedIntakeMl !== null ? (
             <Text style={styles.observationSubtext}>
-              モデル確率が低いため、飲水量の差分は作成しません
+              音から約{autoRecordedIntakeMl} mLを自動記録しました
             </Text>
-          ) : remainingDeltaMl === null ? (
+          ) : !observationIsReliable ? (
             <Text style={styles.observationSubtext}>
-              次の音響チェック結果と比較すると飲水量候補を確認できます
-            </Text>
-          ) : remainingDeltaMl > 0 ? (
-            <Text style={styles.observationSubtext}>
-              前回から約{remainingDeltaMl} mL減少
-            </Text>
-          ) : remainingDeltaMl < 0 ? (
-            <Text style={styles.observationSubtext}>
-              前回から約{Math.abs(remainingDeltaMl)} mL増加（補充など）
+              信頼度が低いため、飲水量は自動記録しません
             </Text>
           ) : (
-            <Text style={styles.observationSubtext}>前回から変化なし</Text>
+            <Text style={styles.observationSubtext}>
+              次の測定で残量の差分を自動計算します
+            </Text>
           )}
         </View>
       ) : null}
-      {estimatedIntakeMl ? (
-        <View style={styles.estimateBox}>
-          <Text style={styles.estimateText}>
-            前回の残量との差は約{estimatedIntakeMl} mLです
-          </Text>
-          <Text style={styles.estimateSubtext}>
-            補充・こぼれがあった場合は飲水量として記録しないでください
-          </Text>
-          <TouchableOpacity
-            disabled={disabled}
-            style={styles.estimateButton}
-            onPress={onAcceptEstimatedIntake}
-          >
-            <Text style={styles.estimateButtonText}>飲水量として記録</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+
       <Text style={styles.note}>
-        「{modelActionLabel}
-        」音のモデルによる残量観測は参考値です。水筒・距離・動作・周囲の音で誤差が出ます。必要なら手動で修正してください。
+        「{modelActionLabel}」音の信頼度が十分なときだけ、残量の差分を飲水量として自動記録します。
       </Text>
     </View>
   );
@@ -238,118 +126,50 @@ const styles = StyleSheet.create({
   title: { color: '#17323b', fontSize: 20, fontWeight: '800' },
   subtitle: { color: '#73878c', fontSize: 12, marginTop: 5 },
   total: { color: '#087ea4', fontSize: 23, fontWeight: '800' },
-  progressTrack: {
-    height: 9,
-    marginTop: 18,
-    borderRadius: 5,
-    backgroundColor: '#e4eef0',
-    overflow: 'hidden',
+  capacitySection: {
+    marginTop: 20,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#e2ecee',
   },
-  progressFill: { height: '100%', borderRadius: 5, backgroundColor: '#087ea4' },
-  goalText: {
-    color: '#73878c',
-    fontSize: 12,
-    marginTop: 5,
-    textAlign: 'right',
-  },
-  inputRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  inputGroup: { flex: 1, position: 'relative' },
-  inputLabel: { color: '#62747a', fontSize: 12, marginBottom: 5 },
+  capacityCopy: { marginBottom: 9 },
+  inputLabel: { color: '#36515a', fontSize: 13, fontWeight: '700' },
+  capacityHint: { color: '#73878c', fontSize: 11, marginTop: 3 },
+  capacityInputRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  inputWrapper: { flex: 1, position: 'relative' },
   input: {
     color: '#17323b',
     backgroundColor: '#f8fbfb',
     borderColor: '#d4e1e3',
     borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    paddingRight: 30,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    paddingRight: 42,
   },
   inputUnit: {
     position: 'absolute',
-    right: 9,
-    bottom: 10,
+    right: 12,
+    top: 12,
     color: '#73878c',
     fontSize: 11,
   },
-  settingsBox: {
-    marginTop: 10,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#f8fbfb',
-  },
-  manualEntryBox: {
-    marginTop: 10,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#f8fbfb',
-  },
-  sectionToggle: {
-    marginTop: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 2,
-  },
-  sectionToggleText: { color: '#087ea4', fontSize: 13, fontWeight: '700' },
-  secondaryButton: {
-    alignSelf: 'flex-end',
-    marginTop: 12,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-  },
-  secondaryButtonText: { color: '#087ea4', fontSize: 12, fontWeight: '700' },
-  quickRow: { flexDirection: 'row', gap: 8 },
-  quickButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 9,
-    backgroundColor: '#e8f4f6',
-  },
-  quickButtonText: { color: '#087ea4', fontSize: 12, fontWeight: '700' },
-  customRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  customInput: {
-    flex: 1,
-    color: '#17323b',
-    borderColor: '#d4e1e3',
-    borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  addButton: {
-    justifyContent: 'center',
+  saveButton: {
+    minHeight: 44,
     paddingHorizontal: 18,
-    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
     backgroundColor: '#087ea4',
   },
-  addButtonText: { color: '#fff', fontWeight: '700' },
+  saveButtonText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   observationBox: {
-    marginTop: 14,
-    padding: 10,
-    borderRadius: 9,
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: '#f4fafb',
   },
-  observationText: { color: '#36515a', fontSize: 12 },
-  observationSubtext: { color: '#587177', fontSize: 12, marginTop: 4 },
-  estimateBox: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 9,
-    backgroundColor: '#fff7e6',
-  },
-  estimateText: { color: '#765a1f', fontSize: 12 },
-  estimateSubtext: {
-    color: '#8a6d32',
-    fontSize: 11,
-    marginTop: 4,
-    lineHeight: 15,
-  },
-  estimateButton: {
-    alignSelf: 'flex-start',
-    marginTop: 7,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-  },
-  estimateButtonText: { color: '#9a6d14', fontSize: 12, fontWeight: '700' },
-  note: { color: '#8b9ba0', fontSize: 11, lineHeight: 16, marginTop: 12 },
+  observationText: { color: '#36515a', fontSize: 13, fontWeight: '700' },
+  observationSubtext: { color: '#587177', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  note: { color: '#8b9ba0', fontSize: 11, lineHeight: 17, marginTop: 16 },
 });

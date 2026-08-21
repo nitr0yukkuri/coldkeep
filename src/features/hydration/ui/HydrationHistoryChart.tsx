@@ -51,8 +51,7 @@ export function HydrationHistoryChart({
   state,
 }: HydrationHistoryChartProps) {
   const points = state ? createDayPoints(state) : [];
-  const goalMl = state?.profile.dailyGoalMl ?? 1_500;
-  const maxMl = Math.max(goalMl, ...points.map(point => point.amountMl), 1);
+  const maxMl = Math.max(...points.map(point => point.amountMl), 1);
 
   return (
     <View
@@ -63,12 +62,11 @@ export function HydrationHistoryChart({
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>7日間の摂取量</Text>
-          <Text style={styles.subtitle}>目標 {goalMl} mLを基準に表示</Text>
+          <Text style={styles.subtitle}>保存済みの摂取量を自動集計</Text>
         </View>
         <Text style={styles.unit}>mL</Text>
       </View>
       <View style={styles.chart}>
-        <View style={styles.goalLine} />
         {points.map(point => {
           const height = Math.max(4, (point.amountMl / maxMl) * 100);
           return (
@@ -123,15 +121,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 18,
     position: 'relative',
-  },
-  goalLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 27 + 96,
-    borderTopWidth: 1,
-    borderTopColor: '#c4e2e6',
-    borderStyle: 'dashed',
   },
   column: { flex: 1, height: '100%', alignItems: 'center' },
   amountLabel: {

@@ -92,13 +92,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [capacityText, setCapacityText] = useState(
     String(DEFAULT_HYDRATION_PROFILE.capacityMl),
   );
-  const [goalText, setGoalText] = useState(
-    String(DEFAULT_HYDRATION_PROFILE.dailyGoalMl),
-  );
-  const [intakeText, setIntakeText] = useState('250');
-  const [estimatedIntakeMl, setEstimatedIntakeMl] = useState<number | null>(
-    null,
-  );
+  const [autoRecordedIntakeMl, setAutoRecordedIntakeMl] = useState<
+    number | null
+  >(null);
   const [showMeasurementDetails, setShowMeasurementDetails] = useState(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
@@ -156,7 +152,6 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         }
         setHydrationState(state);
         setCapacityText(String(state.profile.capacityMl));
-        setGoalText(String(state.profile.dailyGoalMl));
       })
       .catch(error => {
         if (active) {
@@ -176,7 +171,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     async (recording: RecordingRef) => {
       try {
         setStatus('確認中…');
-        setEstimatedIntakeMl(null);
+        setAutoRecordedIntakeMl(null);
         const result = await app.scan.execute(recording);
         const shakeMode = result.measurementAction === 'shake';
         const waterIsReliable = shakeMode
@@ -260,8 +255,25 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             fillLevel: result.fillLevel as 0 | 50 | 90 | 100,
             confidence: confidences.length ? Math.min(...confidences) : null,
           });
-          setHydrationState(hydrationResult.state);
-          setEstimatedIntakeMl(hydrationResult.estimatedConsumedMl);
+          let nextHydrationState = hydrationResult.state;
+          let autoRecordFailed = false;
+          if (hydrationResult.estimatedConsumedMl !== null) {
+            try {
+              nextHydrationState = await app.hydration.addEstimatedIntake(
+                hydrationResult.estimatedConsumedMl,
+                hydrationResult.observation.confidence,
+              );
+              setAutoRecordedIntakeMl(hydrationResult.estimatedConsumedMl);
+            } catch (error) {
+              autoRecordFailed = true;
+              console.warn('音響推定の自動記録に失敗しました', error);
+            }
+          }
+          setHydrationState(nextHydrationState);
+          if (autoRecordFailed) {
+            setStatus('確認は完了しましたが、飲水量を自動記録できませんでした');
+            return;
+          }
         }
         setStatus('確認が完了しました');
       } catch (error) {
@@ -291,55 +303,18 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     try {
       const state = await app.hydration.updateProfile({
         capacityMl: Number(capacityText),
-        dailyGoalMl: Number(goalText),
+        dailyGoalMl:
+          hydrationState?.profile.dailyGoalMl ??
+          DEFAULT_HYDRATION_PROFILE.dailyGoalMl,
       });
       setHydrationState(state);
       setCapacityText(String(state.profile.capacityMl));
-      setGoalText(String(state.profile.dailyGoalMl));
       setStatus('水分設定を保存しました');
     } catch (error) {
       setStatus(
         error instanceof Error
           ? error.message
           : '水分設定を保存できませんでした',
-      );
-    }
-  }
-
-  async function addManualIntake(amountOverride?: string) {
-    try {
-      const state = await app.hydration.addManualIntake(
-        Number(amountOverride ?? intakeText),
-      );
-      setHydrationState(state);
-      setIntakeText('250');
-      setStatus('飲水量を記録しました');
-    } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : '飲水量を記録できませんでした',
-      );
-    }
-  }
-
-  async function acceptEstimatedIntake() {
-    if (estimatedIntakeMl === null) {
-      return;
-    }
-    try {
-      const latest =
-        hydrationState?.observations[hydrationState.observations.length - 1];
-      const state = await app.hydration.addEstimatedIntake(
-        estimatedIntakeMl,
-        latest?.confidence ?? null,
-      );
-      setHydrationState(state);
-      setEstimatedIntakeMl(null);
-      setStatus('音響推定の飲水量を記録しました');
-    } catch (error) {
-      setStatus(
-        error instanceof Error
-          ? error.message
-          : '推定飲水量を記録できませんでした',
       );
     }
   }
@@ -592,15 +567,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           <HydrationPanel
             state={hydrationState}
             capacityText={capacityText}
-            goalText={goalText}
-            intakeText={intakeText}
-            estimatedIntakeMl={estimatedIntakeMl}
+            autoRecordedIntakeMl={autoRecordedIntakeMl}
             onChangeCapacity={setCapacityText}
-            onChangeGoal={setGoalText}
-            onChangeIntake={setIntakeText}
             onSaveProfile={saveHydrationProfile}
-            onAddManualIntake={addManualIntake}
-            onAcceptEstimatedIntake={acceptEstimatedIntake}
             modelActionLabel="振る"
             disabled={isRecording || isProcessing}
           />
