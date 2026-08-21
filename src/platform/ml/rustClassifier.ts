@@ -4,11 +4,14 @@ import {
   AudioClassifier,
   AudioInput,
 } from '../../features/shared/application/ports';
-import { normalizeScanResult } from '../../features/scan/domain/scanResult';
+import {
+  normalizeScanResult,
+  ScanResultInput,
+} from '../../features/scan/domain/scanResult';
 
 type NativeRustClassifier = {
-  classifyWav(uri: string): Promise<ReturnType<typeof normalizeScanResult>>;
-  classifyShakeWav?(uri: string): Promise<ReturnType<typeof normalizeScanResult>>;
+  classifyWav(uri: string): Promise<ScanResultInput>;
+  classifyShakeWav?(uri: string): Promise<ScanResultInput>;
 };
 
 export class RustClassifierAdapter implements AudioClassifier {
@@ -25,8 +28,12 @@ export class RustClassifierAdapter implements AudioClassifier {
       }
       return normalizeScanResult(
         await classifier.classifyShakeWav(input.recording.uri),
+        'shake',
       );
     }
-    return normalizeScanResult(await classifier.classifyWav(input.recording.uri));
+    return normalizeScanResult(
+      await classifier.classifyWav(input.recording.uri),
+      'pour',
+    );
   }
 }

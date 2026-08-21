@@ -43,6 +43,7 @@ export class ScanBottleUseCase {
       try {
         return normalizeScanResult(
           await classifier.classify({ recording, audio, action: this.action }),
+          this.action,
         );
       } catch (error) {
         lastError = error;
