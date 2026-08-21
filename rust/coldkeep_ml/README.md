@@ -17,16 +17,17 @@ The script uses `cargo ndk` when available and writes libraries into
 
 ## Ice label policy
 
-`ice_presence` is derived from the collection manifest (`ice_count > 0`).
-The public audio baseline has no paired ice labels, so the Rust prediction is
-`iceStatus: "untrained"` and `icePresence: null` until a manifest containing
-both classes is trained:
+The shake path derives a coarse amount class from the collection manifest:
+`none` (0), `few` (1--2), or `many` (3+). Exact cube counts and ice mass are
+not part of the Rust prediction. The checked-in artifact is manifest-only, so
+the prediction is `iceAmountStatus: "untrained"` and `iceAmount: null` until
+phone/water-bottle recordings pass the session-held-out gate:
 
 ```powershell
-python ml/train_ice_presence.py --manifest <exported-manifest.csv> --audio-root <dataset-root>
+python ml/train_shake_ice_amount.py --manifest <exported-manifest.csv> --audio-root <dataset-root> --output ml/artifacts/shake_ice_amount_pilot.json
 ```
 
-After `ml/artifacts/ice_presence_baseline.json` exists, the next Rust build
-embeds it automatically and returns `iceStatus: "trained"` with a binary
-`icePresence` value.  The training script still labels the artifact as a
-baseline; container-held-out evaluation is required before product claims.
+After `ml/artifacts/shake_ice_amount_pilot.json` exists, the next Rust build
+embeds it automatically and returns a trained `iceAmount` only when the
+artifact gate passes. The legacy `icePresence` field remains for the pour
+baseline and is independent of the shake amount task.
