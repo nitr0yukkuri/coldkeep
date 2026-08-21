@@ -50,14 +50,14 @@ App StoreまたはAndroidのPlay StoreでExpo Goを最新版へ更新してか�
 - モノラル化・リサンプリングを行い、ネイティブ経路と同じ16 kHz `PcmAudio`に正規化する
 - 既存の `ScanBottleUseCase` と `publicAudioClassifier.ts`（TypeScript経路）へ渡す
 - `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、共有時は音声込みZIPを作る
-- 個人向け画面では水筒容量・1日目標・手動飲水量・音響残量観測をDocument directoryへ保存する
+- 個人向け画面では水筒容量・音響残量観測・音響由来の自動飲水量をDocument directoryへ保存する
 
 Expo GoにはこのリポジトリのRust/TFLiteカスタムネイティブモジュールは含まれないため、
 Expo経路の推論エンジン表示はTypeScriptになります。氷モデルは現時点で未学習なので、
 振り音の氷量は引き続き `未判定` です。
 
-水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。音響差分を
-飲水量へ追加する場合も、画面の確認ボタンを押したときだけ保存します。
+水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。信頼度を満たす
+音響差分だけを、確認ボタンなしで飲水量へ自動保存します。
 
 ## 入力動作の注意
 
