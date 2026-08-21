@@ -14,8 +14,9 @@ import { ScanResult } from '../src/features/scan/domain/scanResult';
 import { CollectionLabels } from '../dataCollection';
 
 const audio = {
-  samples: Float32Array.from({ length: 16_000 }, (_, index) =>
-    0.05 * Math.sin((2 * Math.PI * 700 * index) / 16_000),
+  samples: Float32Array.from(
+    { length: 16_000 },
+    (_, index) => 0.05 * Math.sin((2 * Math.PI * 700 * index) / 16_000),
   ),
   sampleRate: 16_000,
 };
@@ -41,11 +42,18 @@ const result: ScanResult = {
   icePresence: null,
   iceConfidence: null,
   iceStatus: 'untrained',
+  iceAmount: null,
+  iceAmountConfidence: null,
+  iceAmountStatus: 'untrained',
   engine: 'typescript',
+  measurementAction: 'shake',
+  measurementStatus: 'untrained',
 };
 
 test('recording use case owns permission and recorder sequencing', async () => {
-  const permission: MicrophonePermission = { ensure: jest.fn(async () => true) };
+  const permission: MicrophonePermission = {
+    ensure: jest.fn(async () => true),
+  };
   const recorder: AudioRecorder = {
     start: jest.fn(async () => ({ uri: 'file:///recording.wav' })),
     stop: jest.fn(async () => ({ uri: 'file:///recording.wav' })),
@@ -53,8 +61,12 @@ test('recording use case owns permission and recorder sequencing', async () => {
   };
   const useCase = new RecordingUseCase(permission, recorder);
 
-  await expect(useCase.start()).resolves.toEqual({ uri: 'file:///recording.wav' });
-  await expect(useCase.stop()).resolves.toEqual({ uri: 'file:///recording.wav' });
+  await expect(useCase.start()).resolves.toEqual({
+    uri: 'file:///recording.wav',
+  });
+  await expect(useCase.stop()).resolves.toEqual({
+    uri: 'file:///recording.wav',
+  });
   expect(permission.ensure).toHaveBeenCalledTimes(1);
   expect(recorder.start).toHaveBeenCalledTimes(1);
 });
@@ -75,7 +87,9 @@ test('scan use case falls back across classifier adapters', async () => {
     'shake',
   );
 
-  await expect(useCase.execute({ uri: 'file:///recording.wav' })).resolves.toEqual(result);
+  await expect(
+    useCase.execute({ uri: 'file:///recording.wav' }),
+  ).resolves.toEqual(result);
   expect(failingClassifier.classify).toHaveBeenCalledTimes(1);
   expect(fallbackClassifier.classify).toHaveBeenCalledTimes(1);
   expect(fallbackClassifier.classify).toHaveBeenCalledWith(
@@ -109,5 +123,8 @@ test('collection and export use cases depend on ports, not RNFS', async () => {
   ).resolves.toEqual(record);
   await expect(exportDataset.execute()).resolves.toBeUndefined();
   expect(repository.save).toHaveBeenCalledTimes(1);
-  expect(share.shareText).toHaveBeenCalledWith('ColdKeep labels', 'header\nrow');
+  expect(share.shareText).toHaveBeenCalledWith(
+    'ColdKeep labels',
+    'header\nrow',
+  );
 });

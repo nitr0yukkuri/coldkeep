@@ -1,4 +1,5 @@
 import shakeModelArtifact from './ml/artifacts/shake_fill_level_pilot.json';
+import shakeIceAmountArtifact from './ml/artifacts/shake_ice_amount_pilot.json';
 import { resamplePcm } from './src/platform/audio/resamplePcm';
 import {
   averagedPrediction,
@@ -11,6 +12,10 @@ import {
   ShakeFillClass,
   unknownShakePrediction,
 } from './src/features/scan/domain/shakeFillLevel';
+import {
+  IceAmountClass,
+  iceAmountClassToPresence,
+} from './src/features/scan/domain/iceAmount';
 import { PublicAudioPrediction } from './publicAudioClassifier';
 
 type ShakeModelArtifact = {
@@ -23,7 +28,18 @@ type ShakeModelArtifact = {
   model: LinearModel | null;
 };
 
+type ShakeIceAmountArtifact = {
+  status: 'trained' | 'experimental' | 'untrained';
+  sampleRate: number;
+  windowSamples: number;
+  hopSamples: number;
+  featureSize: number;
+  classes: IceAmountClass[];
+  model: LinearModel | null;
+};
+
 const artifact = shakeModelArtifact as ShakeModelArtifact;
+const iceArtifact = shakeIceAmountArtifact as ShakeIceAmountArtifact;
 
 function unknownPrediction(): PublicAudioPrediction {
   const prediction = unknownShakePrediction(artifact.status);
@@ -35,6 +51,9 @@ function unknownPrediction(): PublicAudioPrediction {
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',
+    iceAmount: null,
+    iceAmountConfidence: null,
+    iceAmountStatus: iceArtifact.status,
     engine: 'typescript',
     measurementAction: 'shake',
     measurementStatus: prediction.status,
@@ -67,6 +86,22 @@ export function classifyShakeAudio(
   const fillClass = artifact.classes[bestIndex];
   const confidence = probabilities[bestIndex] ?? 0;
   const fillLevel = fillClassToLevel(fillClass);
+  let iceAmount: IceAmountClass | null = null;
+  let iceAmountConfidence: number | null = null;
+  if (
+    iceArtifact.status !== 'untrained' &&
+    iceArtifact.model !== null &&
+    iceArtifact.classes.length === 3 &&
+    iceArtifact.sampleRate === artifact.sampleRate
+  ) {
+    const iceProbabilities = averagedPrediction(features, iceArtifact.model);
+    const iceIndex = iceProbabilities.reduce(
+      (best, value, index) => (value > iceProbabilities[best] ? index : best),
+      0,
+    );
+    iceAmount = iceArtifact.classes[iceIndex] ?? null;
+    iceAmountConfidence = iceProbabilities[iceIndex] ?? null;
+  }
   return {
     // A shake class describes the amount of content, including empty. Water
     // presence is not a separate task here, so it is not presented as a
@@ -75,9 +110,13 @@ export function classifyShakeAudio(
     waterConfidence: confidence,
     fillLevel,
     fillConfidence: confidence,
-    icePresence: null,
-    iceConfidence: null,
-    iceStatus: 'untrained',
+    icePresence:
+      iceAmount !== null ? iceAmountClassToPresence(iceAmount) : null,
+    iceConfidence: iceAmountConfidence,
+    iceStatus: iceArtifact.status === 'trained' ? 'trained' : 'untrained',
+    iceAmount,
+    iceAmountConfidence,
+    iceAmountStatus: iceArtifact.status,
     engine: 'typescript',
     measurementAction: 'shake',
     measurementStatus: artifact.status,

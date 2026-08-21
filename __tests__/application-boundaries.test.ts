@@ -228,6 +228,9 @@ test('scan result normalization enforces the public result contract', () => {
       icePresence: true,
       iceConfidence: 2,
       iceStatus: 'untrained',
+      iceAmount: null,
+      iceAmountConfidence: null,
+      iceAmountStatus: 'untrained',
       engine: 'typescript',
     }),
   ).toEqual({
@@ -238,6 +241,9 @@ test('scan result normalization enforces the public result contract', () => {
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',
+    iceAmount: null,
+    iceAmountConfidence: null,
+    iceAmountStatus: 'untrained',
     engine: 'typescript',
   });
 });
@@ -252,6 +258,9 @@ test('scan result normalization hides untrained or low-confidence ice claims', (
       icePresence: true,
       iceConfidence: 0.9,
       iceStatus: 'untrained',
+      iceAmount: 'many',
+      iceAmountConfidence: 0.9,
+      iceAmountStatus: 'untrained',
       engine: 'typescript',
     }).icePresence,
   ).toBeNull();
@@ -264,6 +273,9 @@ test('scan result normalization hides untrained or low-confidence ice claims', (
       icePresence: true,
       iceConfidence: 0.64,
       iceStatus: 'trained',
+      iceAmount: 'few',
+      iceAmountConfidence: 0.64,
+      iceAmountStatus: 'trained',
       engine: 'typescript',
     }).icePresence,
   ).toBeNull();
@@ -276,6 +288,9 @@ test('scan result normalization hides untrained or low-confidence ice claims', (
       icePresence: false,
       iceConfidence: 0.65,
       iceStatus: 'trained',
+      iceAmount: 'none',
+      iceAmountConfidence: 0.65,
+      iceAmountStatus: 'trained',
       engine: 'typescript',
     }).icePresence,
   ).toBe(false);

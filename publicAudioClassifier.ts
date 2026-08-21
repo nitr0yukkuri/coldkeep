@@ -31,6 +31,9 @@ export type PublicAudioPrediction = {
   icePresence: boolean | null;
   iceConfidence: number | null;
   iceStatus: 'untrained' | 'trained';
+  iceAmount: 'none' | 'few' | 'many' | null;
+  iceAmountConfidence: number | null;
+  iceAmountStatus: 'trained' | 'experimental' | 'untrained';
   engine: 'typescript' | 'rust';
   measurementAction?: 'pour' | 'shake';
   measurementStatus?: 'trained' | 'experimental' | 'untrained';
@@ -106,8 +109,7 @@ function makeMelFilters(): Float64Array[] {
   const maximumMel = hzToMel(7600);
   const edges = Array.from({ length: artifact.melBins + 2 }, (_, index) =>
     melToHz(
-      minimumMel +
-        ((maximumMel - minimumMel) * index) / (artifact.melBins + 1),
+      minimumMel + ((maximumMel - minimumMel) * index) / (artifact.melBins + 1),
     ),
   );
   return Array.from({ length: artifact.melBins }, (_, bin) => {
@@ -142,13 +144,18 @@ export function extractWindowFeatures(input: Float32Array): number[] {
     samples[index] -= mean;
     squared += samples[index] ** 2;
   }
-  const gain = 0.05 / Math.max(Math.sqrt(squared / samples.length + 1e-12), 1e-5);
+  const gain =
+    0.05 / Math.max(Math.sqrt(squared / samples.length + 1e-12), 1e-5);
   for (let index = 0; index < samples.length; index += 1) {
     samples[index] = Math.max(-1, Math.min(1, samples[index] * gain));
   }
 
   const logMel: number[][] = [];
-  for (let start = 0; start + FRAME_SIZE <= samples.length; start += FRAME_HOP) {
+  for (
+    let start = 0;
+    start + FRAME_SIZE <= samples.length;
+    start += FRAME_HOP
+  ) {
     const power = fftPower(samples.subarray(start, start + FRAME_SIZE));
     logMel.push(
       melFilters.map(filter => {
@@ -160,9 +167,9 @@ export function extractWindowFeatures(input: Float32Array): number[] {
       }),
     );
   }
-  const delta = logMel.slice(1).map((row, index) =>
-    row.map((value, bin) => value - logMel[index][bin]),
-  );
+  const delta = logMel
+    .slice(1)
+    .map((row, index) => row.map((value, bin) => value - logMel[index][bin]));
   const summarize = (rows: number[][]) => {
     const means = Array(artifact.melBins).fill(0) as number[];
     const deviations = Array(artifact.melBins).fill(0) as number[];
@@ -199,7 +206,9 @@ export function recordingWindows(samples: Float32Array): Float32Array[] {
   if (starts[starts.length - 1] !== tail) {
     starts.push(tail);
   }
-  return starts.map(start => samples.slice(start, start + artifact.windowSamples));
+  return starts.map(start =>
+    samples.slice(start, start + artifact.windowSamples),
+  );
 }
 
 function predict(features: number[], model: LinearModel): number[] {
@@ -219,7 +228,10 @@ function predict(features: number[], model: LinearModel): number[] {
   return exponentials.map(value => value / total);
 }
 
-export function averagedPrediction(features: number[][], model: LinearModel): number[] {
+export function averagedPrediction(
+  features: number[][],
+  model: LinearModel,
+): number[] {
   const average = model.classes.map(() => 0);
   for (const window of features) {
     predict(window, model).forEach((value, index) => {
@@ -250,6 +262,9 @@ export function classifyPublicAudio(
       icePresence: null,
       iceConfidence: null,
       iceStatus: 'untrained',
+      iceAmount: null,
+      iceAmountConfidence: null,
+      iceAmountStatus: 'untrained',
       engine: 'typescript',
       measurementAction: 'pour',
       measurementStatus: 'trained',
@@ -266,6 +281,9 @@ export function classifyPublicAudio(
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained',
+    iceAmount: null,
+    iceAmountConfidence: null,
+    iceAmountStatus: 'untrained',
     engine: 'typescript',
     measurementAction: 'pour',
     measurementStatus: 'trained',

@@ -46,6 +46,9 @@ class RustAudioClassifierModule(
       putNullableBoolean(result, "icePresence", json)
       putNullableDouble(result, "iceConfidence", json)
       result.putString("iceStatus", json.optString("iceStatus", "untrained"))
+      putNullableString(result, "iceAmount", json)
+      putNullableDouble(result, "iceAmountConfidence", json)
+      result.putString("iceAmountStatus", json.optString("iceAmountStatus", "untrained"))
       result.putString("engine", json.optString("engine", "rust"))
       if (!json.isNull("measurementAction")) {
         result.putString("measurementAction", json.optString("measurementAction"))
@@ -83,6 +86,9 @@ class RustAudioClassifierModule(
       putNullableBoolean(result, "icePresence", json)
       putNullableDouble(result, "iceConfidence", json)
       result.putString("iceStatus", json.optString("iceStatus", "untrained"))
+      putNullableString(result, "iceAmount", json)
+      putNullableDouble(result, "iceAmountConfidence", json)
+      result.putString("iceAmountStatus", json.optString("iceAmountStatus", "untrained"))
       result.putString("engine", json.optString("engine", "rust"))
       result.putString("measurementAction", json.optString("measurementAction", "shake"))
       result.putString("measurementStatus", json.optString("measurementStatus", "untrained"))
@@ -125,6 +131,14 @@ class RustAudioClassifierModule(
     } else {
       map.putDouble(key, json.optDouble(key))
     }
+  }
+
+  private fun putNullableString(
+    map: com.facebook.react.bridge.WritableMap,
+    key: String,
+    json: JSONObject,
+  ) {
+    if (json.isNull(key)) map.putNull(key) else map.putString(key, json.optString(key))
   }
 
   private external fun nativeClassifyWav(path: String): String

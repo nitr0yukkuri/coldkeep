@@ -74,10 +74,17 @@ default session is deliberately a single `corsmal-train` group, so the
 session-held-out trainer remains blocked until a real session map and a
 phone/water-bottle validation set are supplied.
 
-The same rule applies to `train_ice_presence.py`: it requires at least two
-recordings of each binary class across at least two containers and reports a
-container-held-out evaluation. It writes no ice artifact when those groups are
-missing, so training-set accuracy cannot accidentally become a product claim.
+## Shake ice amount pilot
+
+`train_shake_ice_amount.py` uses the exact `ice_count` field only as collection
+ground truth, then maps it to `none` (0), `few` (1--2), or `many` (3+). It
+requires at least two recordings of every band across at least two sessions and
+reports session-held-out metrics. The artifact remains `experimental` below
+the balanced-accuracy gate and is not exposed by the UI as a trained result.
+Exact cube counts and ice mass are never inferred.
+
+The older `train_ice_presence.py` binary task remains available for the legacy
+pour contract, but its artifact is not applied to the shake product path.
 
 ## Public shake-data candidate
 

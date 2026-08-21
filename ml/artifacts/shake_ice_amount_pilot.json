@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "task": "shake_ice_amount",
+  "status": "untrained",
+  "classes": ["none", "few", "many"],
+  "sampleRate": 16000,
+  "windowSamples": 16000,
+  "hopSamples": 8000,
+  "featureSize": 128,
+  "model": null,
+  "trainingGate": {
+    "requiredClasses": ["none", "few", "many"],
+    "minimumRecordingsPerClass": 2,
+    "minimumSessionsPerClass": 2,
+    "activation": "Replace only after phone/water-bottle shake recordings pass held-out session evaluation with balanced accuracy >= 0.67."
+  }
+}

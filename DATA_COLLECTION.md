@@ -91,26 +91,35 @@ request a `shake` recording and will not silently treat it as a pour. Replace
 the checked-in manifest-only artifact only after the report has been reviewed
 and the phone/water-bottle domain gap is addressed.
 
-## Ice binary model
+## Shake ice amount pilot
 
-The app records both `ice_count` and `ice_mass_g` as ground truth. The model
-target is deliberately only `ice_presence = (ice_count > 0)`, so the inference
-result is `PRESENT` or `ABSENT`; it does not estimate grams. The current public
-audio corpus contains no paired ice/no-ice labels, so the scan screen remains
-`UNKNOWN` until enough collected samples exist.
+The app records both `ice_count` and `ice_mass_g` as ground truth. For the
+same `shake` recording used by the fill model, the public target is deliberately
+coarse:
+
+- `none`: `ice_count = 0`
+- `few`: `ice_count = 1--2`
+- `many`: `ice_count >= 3`
+
+The app never claims an exact cube count or ice mass. Collect at least two
+recordings in at least two independent sessions for every band; vary bottles,
+phones, rooms, and operators before treating the result as a product model.
+The checked-in artifact is manifest-only and the scan screen remains
+`未判定` until the session-held-out balanced-accuracy gate passes.
 
 After copying the complete `coldkeep-dataset` directory to a training machine,
 run:
 
 ```powershell
-python ml/train_ice_presence.py `
+python ml/train_shake_ice_amount.py `
   --manifest <path>\coldkeep-dataset\manifest.csv `
-  --audio-root <path>\coldkeep-dataset
+  --audio-root <path>\coldkeep-dataset `
+  --output ml/artifacts/shake_ice_amount_pilot.json
 ```
 
-The command refuses to train when either class is missing, when a class has
-fewer than two recordings, or when a class appears in fewer than two
-containers. It performs container-held-out evaluation before writing
-`ml/artifacts/ice_presence_baseline.json`; rebuilding the Rust library then
-embeds that artifact automatically. Treat the first model as a baseline and
-evaluate on a held-out phone and session before relying on it.
+The command refuses to train when a band is missing, when a band has fewer than
+two recordings, or when a band appears in fewer than two sessions. It performs
+session-held-out evaluation before writing `ml/artifacts/shake_ice_amount_pilot.json`;
+rebuilding the Rust library then embeds that artifact automatically. Treat the
+first model as a pilot and evaluate on a held-out phone and bottle before
+relying on it.
