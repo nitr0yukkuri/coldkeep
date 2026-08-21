@@ -6,6 +6,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "collector": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_MODE": "collector"
+      }
+    },
     "production": {
       "autoIncrement": true
     }

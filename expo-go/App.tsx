@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useAudioStream, setAudioModeAsync } from 'expo-audio';
 
 import ColdKeepScreen from '../App';
+import { CollectionScreen } from '../src/features/collection/ui/CollectionScreen';
+import { isCollectionMode } from '../src/app/runtimeMode';
 import { createExpoAppDependencies } from './src/compositionRoot';
 import { ExpoPcmRecorderAdapter } from './src/audioAdapters';
 
@@ -33,5 +35,9 @@ export default function ExpoGoApp() {
     };
   }, [streamResult.stream]);
 
-  return <ColdKeepScreen app={app} />;
+  return isCollectionMode ? (
+    <CollectionScreen app={app} />
+  ) : (
+    <ColdKeepScreen app={app} />
+  );
 }

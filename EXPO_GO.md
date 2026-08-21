@@ -15,6 +15,26 @@ npx expo start
 表示されたQRコードをExpo Goで読み込みます。Windowsからでも、同じLAN上のiPhoneまたは
 Androidで確認できます。接続できない場合は `npx expo start --tunnel` を使います。
 
+### データ収集画面を開く
+
+個人向け画面とデータ収集画面は分離しています。Expo Goで収集画面を確認する場合は、
+PowerShellで次のように起動します。
+
+```powershell
+$env:EXPO_PUBLIC_APP_MODE='collector'
+npx expo start --clear
+```
+
+通常の個人向け画面へ戻すときは、環境変数を削除してMetroを再起動します。
+
+```powershell
+Remove-Item Env:EXPO_PUBLIC_APP_MODE -ErrorAction SilentlyContinue
+npx expo start --clear
+```
+
+EASでは `collector` プロファイルが同じモードを設定します。通常の提出・配布版には
+データ収集画面への導線を含めません。
+
 ### 「Project is incompatible with this version of Expo Go」と表示された場合
 
 これは録音処理のエラーではなく、端末側のExpo GoがこのコンパニオンアプリのSDKより古い
