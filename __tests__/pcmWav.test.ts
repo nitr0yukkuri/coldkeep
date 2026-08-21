@@ -1,7 +1,10 @@
 import { parsePcm16Wav } from '../audioProcessing';
 import { encodePcm16WavBase64 } from '../src/platform/audio/pcmWav';
 import { resamplePcm } from '../src/platform/audio/resamplePcm';
-import { PcmCaptureAccumulator } from '../src/platform/audio/pcmCapture';
+import {
+  MAX_CAPTURE_SECONDS,
+  PcmCaptureAccumulator,
+} from '../src/platform/audio/pcmCapture';
 
 test('encodes Expo PCM into a WAV that the native reader can parse', () => {
   const audio = {
@@ -21,7 +24,7 @@ test('encodes Expo PCM into a WAV that the native reader can parse', () => {
   ]);
 });
 
-test('resamples in-memory PCM with the same linear interpolation used by inference', () => {
+test('resamples in-memory PCM with the shared linear interpolation contract', () => {
   const samples = new Float32Array([0, 1, 0]);
   const output = resamplePcm(samples, 3, 6);
 
@@ -76,4 +79,20 @@ test('rejects incomplete PCM sample buffers', () => {
     }),
   ).toThrow('incomplete sample');
   accumulator.abort();
+});
+
+test('caps in-memory capture at the safety duration', () => {
+  const accumulator = new PcmCaptureAccumulator();
+  accumulator.start();
+  accumulator.append({
+    data: new Float32Array(16_000 * (MAX_CAPTURE_SECONDS + 1)).buffer,
+    channels: 1,
+    sampleRate: 16_000,
+    encoding: 'float32',
+  });
+
+  const audio = accumulator.finish();
+
+  expect(audio.sampleRate).toBe(16_000);
+  expect(audio.samples.length).toBe(16_000 * MAX_CAPTURE_SECONDS);
 });

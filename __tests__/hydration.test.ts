@@ -9,6 +9,7 @@ import {
 import { HydrationUseCase } from '../src/features/hydration/application/hydrationUseCase';
 import { HydrationRepository } from '../src/features/shared/application/ports';
 import type { HydrationState } from '../src/features/hydration/domain/hydration';
+import { readTextWithRecovery } from '../src/platform/storage/atomicTextFile';
 
 const morning = new Date('2026-08-14T09:00:00+09:00');
 
@@ -187,4 +188,82 @@ test('changing bottle capacity starts a fresh acoustic comparison series', async
 
   expect(state.profile.capacityMl).toBe(750);
   expect(state.observations).toHaveLength(0);
+});
+
+test('serializes concurrent hydration mutations instead of losing an intake', async () => {
+  let stored: HydrationState | null = null;
+  const repository: HydrationRepository = {
+    load: jest.fn(async () => stored),
+    save: jest.fn(
+      state =>
+        new Promise<void>(resolve => {
+          setTimeout(() => {
+            stored = state;
+            resolve();
+          }, 5);
+        }),
+    ),
+  };
+  const useCase = new HydrationUseCase(repository);
+
+  await Promise.all([
+    useCase.addManualIntake(100),
+    useCase.addManualIntake(200),
+  ]);
+
+  expect((await useCase.load()).intakes.map(intake => intake.amountMl)).toEqual(
+    [100, 200],
+  );
+});
+
+test('subtracts already logged intake from an acoustic residual estimate', () => {
+  let state = createDefaultHydrationState();
+  state = recordObservation(
+    state,
+    { remainingMl: 450, fillLevel: 90, confidence: 0.9 },
+    morning,
+  ).state;
+  state = addManualIntake(state, 100, new Date('2026-08-14T10:00:00+09:00'));
+
+  const result = recordObservation(
+    state,
+    { remainingMl: 250, fillLevel: 50, confidence: 0.9 },
+    new Date('2026-08-14T12:00:00+09:00'),
+  );
+
+  expect(result.estimatedConsumedMl).toBe(100);
+  expect(reliableObservationDeltaMl(result.state)).toBe(100);
+});
+
+test('recovers a completed temporary hydration write', async () => {
+  const files = new Map([
+    ['state.json', '{broken'],
+    ['state.json.tmp', '{"ok":true}'],
+  ]);
+  const ops = {
+    exists: async (path: string) => files.has(path),
+    readFile: async (path: string) => files.get(path) ?? '',
+    writeFile: async (path: string, contents: string) => {
+      files.set(path, contents);
+    },
+    moveFile: async (from: string, to: string) => {
+      files.set(to, files.get(from) ?? '');
+      files.delete(from);
+    },
+    unlink: async (path: string) => {
+      files.delete(path);
+    },
+  };
+
+  await expect(
+    readTextWithRecovery('state.json', ops, contents => {
+      try {
+        JSON.parse(contents);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  ).resolves.toBe('{"ok":true}');
+  expect(files.get('state.json')).toBe('{"ok":true}');
 });

@@ -33,8 +33,10 @@ Every WAV is validated as PCM16 and must be at least one second long before it
 is accepted. The JSON sidecar makes an individual recording recoverable even
 if updating the combined CSV is interrupted.
 
-**EXPORT LABEL CSV** shares the text contents of `manifest.csv`; it does not
-include WAV files. Use Android Studio Device Explorer to copy the complete
+**EXPORT DATASET** creates a ZIP containing `manifest.csv`, each metadata JSON
+sidecar, and the corresponding WAV files. This keeps the audio-label
+relationship intact when the archive is copied to a training/evaluation
+environment. Use Android Studio Device Explorer to copy the complete
 `coldkeep-dataset` directory from the application's `files` directory before
 clearing app data or uninstalling the app.
 
