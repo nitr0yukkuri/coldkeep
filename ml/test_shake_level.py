@@ -2,10 +2,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from train_shake_level import Capture, level_index, load_manifest, validate_dataset
+from train_shake_level import (
+    MIN_DEPLOYABLE_BALANCED_ACCURACY,
+    Capture,
+    level_index,
+    load_manifest,
+    validate_dataset,
+)
 
 
 class ShakeLevelTests(unittest.TestCase):
+    def test_deployment_gate_is_explicit(self):
+        self.assertGreaterEqual(MIN_DEPLOYABLE_BALANCED_ACCURACY, 0.5)
+        self.assertLessEqual(MIN_DEPLOYABLE_BALANCED_ACCURACY, 1.0)
+
     def test_transition_bands_are_not_forced_into_a_class(self):
         self.assertEqual(level_index(0.0), 0)
         self.assertEqual(level_index(0.10), 0)

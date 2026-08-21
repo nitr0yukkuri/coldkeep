@@ -29,6 +29,7 @@ from train_baseline import SoftmaxClassifier, metrics
 
 
 LEVEL_NAMES = ("empty", "half", "full")
+MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
 
 
 @dataclass(frozen=True)
@@ -258,9 +259,15 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     x, y, weights = _recording_arrays(captures, feature_cache)
     classifier = SoftmaxClassifier([0, 1, 2], seed=7)
     classifier.fit(x, y, weights)
+    status = (
+        "trained"
+        if evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        else "experimental"
+    )
     artifact = {
         "version": 1,
         "task": "shake_fill_level",
+        "status": status,
         "classes": list(LEVEL_NAMES),
         "sampleRate": TARGET_SAMPLE_RATE,
         "windowSamples": TARGET_SAMPLE_RATE,
@@ -272,6 +279,8 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "warnings": [
             "Pilot only: use a new session for every phone/room/operator change.",
             "Classifies broad fill bands; it does not estimate arbitrary mL.",
+            f"Deployment status is {status}; balanced accuracy gate is "
+            f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}.",
         ],
     }
     if diagnostics:
