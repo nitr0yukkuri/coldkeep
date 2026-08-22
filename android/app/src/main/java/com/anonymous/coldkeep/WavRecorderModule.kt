@@ -29,6 +29,7 @@ class WavRecorderModule(
   }
 
   private val recording = AtomicBoolean(false)
+  private val starting = AtomicBoolean(false)
   private var audioRecord: AudioRecord? = null
   private var outputFile: File? = null
   private var recordingThread: Thread? = null
@@ -38,7 +39,13 @@ class WavRecorderModule(
 
   @ReactMethod
   fun start(promise: Promise) {
+    val acquiredStartSlot = starting.compareAndSet(false, true)
+    if (!acquiredStartSlot) {
+      promise.reject("ALREADY_RECORDING", "A recording is already in progress")
+      return
+    }
     if (recording.get()) {
+      starting.set(false)
       promise.reject("ALREADY_RECORDING", "A recording is already in progress")
       return
     }
@@ -46,16 +53,24 @@ class WavRecorderModule(
       reactContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
         PackageManager.PERMISSION_GRANTED
     ) {
+      starting.set(false)
       promise.reject("PERMISSION_DENIED", "Microphone permission is required")
       return
     }
 
-    val minimumBufferSize = AudioRecord.getMinBufferSize(
-      SAMPLE_RATE,
-      AudioFormat.CHANNEL_IN_MONO,
-      AudioFormat.ENCODING_PCM_16BIT,
-    )
+    val minimumBufferSize = try {
+      AudioRecord.getMinBufferSize(
+        SAMPLE_RATE,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+      )
+    } catch (error: Exception) {
+      starting.set(false)
+      promise.reject("RECORDER_UNAVAILABLE", error.message, error)
+      return
+    }
     if (minimumBufferSize <= 0) {
+      starting.set(false)
       promise.reject("RECORDER_UNAVAILABLE", "Unable to determine an audio buffer size")
       return
     }
@@ -70,6 +85,7 @@ class WavRecorderModule(
       )
       if (recorder.state != AudioRecord.STATE_INITIALIZED) {
         recorder.release()
+        starting.set(false)
         promise.reject("RECORDER_UNAVAILABLE", "Unable to initialize the microphone")
         return
       }
@@ -84,11 +100,13 @@ class WavRecorderModule(
       outputFile = file
       writerFinished = CountDownLatch(1)
       recording.set(true)
+      starting.set(false)
       recorder.startRecording()
       recordingThread = Thread({ writeAudio(recorder, file, minimumBufferSize * 2) }, "ColdKeepRecorder")
         .also { it.start() }
       promise.resolve(Uri.fromFile(file).toString())
     } catch (error: Exception) {
+      starting.set(false)
       outputFile?.delete()
       releaseRecorder()
       promise.reject("RECORDING_START_FAILED", error.message, error)
@@ -175,6 +193,7 @@ class WavRecorderModule(
   }
 
   override fun invalidate() {
+    starting.set(false)
     val file = outputFile
     if (recording.getAndSet(false)) {
       runCatching { audioRecord?.stop() }

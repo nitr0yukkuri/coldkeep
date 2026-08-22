@@ -6,6 +6,7 @@ import React
 final class ColdKeepAudioRecorder: NSObject {
   private var recorder: AVAudioRecorder?
   private var currentURL: URL?
+  private var starting = false
   private let lock = NSLock()
 
   @objc
@@ -31,11 +32,20 @@ final class ColdKeepAudioRecorder: NSObject {
     rejecter reject: @escaping RCTPromiseRejectBlock
   ) {
     lock.lock()
-    let alreadyRecording = recorder?.isRecording == true
+    let alreadyRecording = recorder != nil || starting
+    if !alreadyRecording {
+      starting = true
+    }
     lock.unlock()
     if alreadyRecording {
       reject("ALREADY_RECORDING", "A recording is already in progress", nil)
       return
+    }
+
+    defer {
+      lock.lock()
+      starting = false
+      lock.unlock()
     }
 
     do {
