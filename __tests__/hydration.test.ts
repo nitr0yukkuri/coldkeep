@@ -2,6 +2,8 @@ import {
   addAcousticIntake,
   addManualIntake,
   createDefaultHydrationState,
+  isObservationFromToday,
+  normalizeHydrationState,
   recordObservation,
   reliableObservationDeltaMl,
   todayIntakeMl,
@@ -19,6 +21,21 @@ test('manual intake is added to the local-day hydration total', () => {
   state = addManualIntake(state, 500, new Date('2026-08-14T12:00:00+09:00'));
 
   expect(todayIntakeMl(state, morning)).toBe(750);
+});
+
+test('observation freshness is evaluated by the local calendar day', () => {
+  const state = recordObservation(
+    createDefaultHydrationState(),
+    { remainingMl: 450, fillLevel: 90, confidence: 0.9 },
+    morning,
+  );
+  expect(isObservationFromToday(state.observation, morning)).toBe(true);
+  expect(
+    isObservationFromToday(
+      state.observation,
+      new Date('2026-08-15T09:00:00+09:00'),
+    ),
+  ).toBe(false);
 });
 
 test('acoustic observations expose a decrease as an explicit estimate', () => {
@@ -266,4 +283,45 @@ test('recovers a completed temporary hydration write', async () => {
     }),
   ).resolves.toBe('{"ok":true}');
   expect(files.get('state.json')).toBe('{"ok":true}');
+});
+
+test('semantic-invalid hydration state falls back to a valid temporary write', async () => {
+  const files = new Map([
+    ['state.json', JSON.stringify({ profile: { capacityMl: -1, dailyGoalMl: 1_500 } })],
+    ['state.json.tmp', JSON.stringify({
+      profile: { capacityMl: 750, dailyGoalMl: 2_000 },
+      observations: [],
+      intakes: [],
+    })],
+  ]);
+  const ops = {
+    exists: async (path: string) => files.has(path),
+    readFile: async (path: string) => files.get(path) ?? '',
+    writeFile: async (path: string, contents: string) => {
+      files.set(path, contents);
+    },
+    moveFile: async (from: string, to: string) => {
+      files.set(to, files.get(from) ?? '');
+      files.delete(from);
+    },
+    unlink: async (path: string) => {
+      files.delete(path);
+    },
+  };
+
+  const recovered = await readTextWithRecovery(
+    'state.json',
+    ops,
+    contents => {
+      try {
+        normalizeHydrationState(JSON.parse(contents));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  );
+
+  expect(JSON.parse(recovered ?? '').profile.capacityMl).toBe(750);
+  expect(files.has('state.json.tmp')).toBe(false);
 });

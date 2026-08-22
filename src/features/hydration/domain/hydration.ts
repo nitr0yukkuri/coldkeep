@@ -92,6 +92,13 @@ function sameLocalDay(left: string, right: Date): boolean {
   );
 }
 
+export function isObservationFromToday(
+  observation: HydrationObservation,
+  now = new Date(),
+): boolean {
+  return sameLocalDay(observation.recordedAt, now);
+}
+
 function loggedIntakeBetween(
   state: HydrationState,
   previousRecordedAt: string,

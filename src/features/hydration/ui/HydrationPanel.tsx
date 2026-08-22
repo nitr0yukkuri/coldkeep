@@ -10,6 +10,7 @@ import {
 import {
   HydrationState,
   MIN_ACOUSTIC_CONFIDENCE,
+  isObservationFromToday,
   latestObservation,
   todayIntakeMl,
 } from '../domain/hydration';
@@ -36,6 +37,8 @@ export function HydrationPanel({
 }: HydrationPanelProps) {
   const observation = state ? latestObservation(state) : null;
   const intakeMl = state ? todayIntakeMl(state) : 0;
+  const observationIsToday =
+    observation !== null && isObservationFromToday(observation);
   const observationIsReliable =
     observation?.confidence !== null &&
     observation?.confidence !== undefined &&
@@ -83,7 +86,7 @@ export function HydrationPanel({
         </View>
       </View>
 
-      {observation ? (
+      {observation && (observationIsToday || autoRecordedIntakeMl !== null) ? (
         <View style={styles.observationBox}>
           <Text style={styles.observationText}>
             現在の推定残量: 約{observation.remainingMl} mL

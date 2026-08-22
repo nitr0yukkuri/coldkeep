@@ -298,3 +298,85 @@ test('automatically records a reliable acoustic intake delta', async () => {
   ).toBe(true);
   renderer.unmount();
 });
+
+test('shows the preview shake estimate without recording experimental intake', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1_500 },
+    observations: [],
+    intakes: [],
+  };
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start: jest.fn(async () => ({ uri: 'file:///preview.wav' })),
+      stop: jest.fn(async () => ({ uri: 'file:///preview.wav' })),
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: {
+      execute: jest.fn(async () => ({
+        containsWater: true,
+        waterConfidence: 0.54,
+        fillLevel: 50,
+        fillConfidence: 0.54,
+        icePresence: null,
+        iceConfidence: null,
+        iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
+        engine: 'typescript',
+        measurementAction: 'shake',
+        measurementStatus: 'experimental',
+      })),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+    await Promise.resolve();
+  });
+  const textContent = (value: unknown): string => {
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map(textContent).join('');
+    }
+    return '';
+  };
+  const buttonFor = (label: string) =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => textContent(text.props.children) === label),
+      );
+
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('振って測定する')?.props.onPress();
+  });
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('停止して確認')?.props.onPress();
+  });
+
+  const textValues = renderer.root
+    .findAllByType(Text)
+    .map(text => textContent(text.props.children));
+  expect(textValues).toContain('残量 50%');
+  expect(textValues).toContain('試験推定（自動記録には未使用）');
+  expect(textValues).toContain(
+    '汎用の試験推定を表示しました。実測モデルで検証するまで水分量は自動記録しません',
+  );
+  expect((app as never as { hydration: { addEstimatedIntake: jest.Mock } }).hydration.addEstimatedIntake).not.toHaveBeenCalled();
+  renderer.unmount();
+});

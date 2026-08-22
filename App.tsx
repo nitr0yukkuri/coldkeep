@@ -89,6 +89,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [hydrationState, setHydrationState] = useState<HydrationState | null>(
     null,
   );
+  const [hydrationReady, setHydrationReady] = useState(false);
   const [capacityText, setCapacityText] = useState(
     String(DEFAULT_HYDRATION_PROFILE.capacityMl),
   );
@@ -152,6 +153,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         }
         setHydrationState(state);
         setCapacityText(String(state.profile.capacityMl));
+        setHydrationReady(true);
       })
       .catch(error => {
         if (active) {
@@ -201,7 +203,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 : 'NON-WATER',
         );
         setFillLevel(
-          result.fillLevel === null || !fillIsReliable
+          result.fillLevel === null ||
+          (!fillIsReliable &&
+            !(shakeMode && result.measurementStatus === 'experimental'))
             ? 'N/A'
             : `${result.fillLevel}%`,
         );
@@ -221,6 +225,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         setIceAmount(result.iceAmount);
         setIceAmountStatus(result.iceAmountStatus);
         setIceAmountConfidence(result.iceAmountConfidence);
+        if (shakeMode && result.measurementStatus === 'experimental') {
+          setStatus(
+            '汎用の試験推定を表示しました。実測モデルで検証するまで水分量は自動記録しません',
+          );
+          return;
+        }
         if (
           waterIsReliable &&
           fillIsReliable &&
@@ -235,9 +245,16 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             result.waterConfidence,
             result.fillConfidence,
           ].filter((value): value is number => value !== null);
-          const capacity =
-            hydrationState?.profile.capacityMl ??
-            DEFAULT_HYDRATION_PROFILE.capacityMl;
+          // Do not record against the 500 mL default while the persisted
+          // profile is still loading. A user with another bottle size would
+          // otherwise get a permanently wrong residual/intake event.
+          const currentHydrationState =
+            hydrationState ?? (await app.hydration.load());
+          if (!hydrationState) {
+            setHydrationState(currentHydrationState);
+            setCapacityText(String(currentHydrationState.profile.capacityMl));
+          }
+          const capacity = currentHydrationState.profile.capacityMl;
           const remainingMl = shakeMode
             ? remainingMlFromShake(capacity, {
                 fillClass: levelToFillClass(result.fillLevel as 0 | 50 | 100),
@@ -296,10 +313,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         );
       }
     },
-    [app, hydrationState?.profile.capacityMl],
+    [app, hydrationState],
   );
 
   async function saveHydrationProfile() {
+    if (!hydrationReady) {
+      setStatus('水分設定を読み込み中です。少し待ってから保存してください');
+      return;
+    }
     try {
       const state = await app.hydration.updateProfile({
         capacityMl: Number(capacityText),
@@ -415,9 +436,13 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 : content === 'SHAKE'
                   ? measurementStatus === 'untrained'
                     ? '振り音モデルは未学習のため、まだ残量を判定できません'
-                    : fillLevel === 'N/A'
-                      ? '振り音の信頼度が低いため残量を判定できませんでした'
-                      : '振り音から残量の3段階を判定しました'
+                    : measurementStatus === 'experimental'
+                      ? fillLevel === 'N/A'
+                        ? '試験推定の信頼度が低いため、残量を表示できませんでした'
+                        : '学習前の試験推定です。飲水量の自動記録には使いません'
+                      : fillLevel === 'N/A'
+                        ? '振り音の信頼度が低いため残量を判定できませんでした'
+                        : '振り音から残量の3段階を判定しました'
                   : content === 'UNKNOWN'
                     ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
                     : content === 'WATER'
@@ -434,7 +459,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 <MetricCard
                   title="残量"
                   value={fillLevel}
-                  unit="容量に対する3段階の目安"
+                  unit={
+                    measurementStatus === 'experimental'
+                      ? '試験推定（自動記録には未使用）'
+                      : '容量に対する3段階の目安'
+                  }
                   color="#087ea4"
                 />
               ) : content === 'WATER' && fillLevel !== 'N/A' ? (
@@ -548,7 +577,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   <Text style={styles.inferenceText}>
                     {content === 'SHAKE'
                       ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
-                          measurementStatus === 'trained' ? '学習済み' : '未学習'
+                          measurementStatus === 'trained'
+                            ? '学習済み'
+                            : measurementStatus === 'experimental'
+                              ? '試験推定'
+                              : '未学習'
                         }`
                       : `水判定確率 ${formatProbability(waterConfidence)}${
                           content === 'WATER'
@@ -571,7 +604,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             onChangeCapacity={setCapacityText}
             onSaveProfile={saveHydrationProfile}
             modelActionLabel="振る"
-            disabled={isRecording || isProcessing}
+            disabled={isRecording || isProcessing || !hydrationReady}
           />
 
           <Text style={styles.resultNote}>
