@@ -34,6 +34,8 @@ test('normalization only exposes a trained coarse ice result above the gate', ()
     waterConfidence: 0.9,
     fillLevel: 50 as const,
     fillConfidence: 0.9,
+    measurementAction: 'shake' as const,
+    measurementStatus: 'trained' as const,
     icePresence: null,
     iceConfidence: null,
     iceStatus: 'untrained' as const,
