@@ -35,10 +35,10 @@ class ShakeIceAmountTests(unittest.TestCase):
             (audio_root / "ok.wav").write_bytes(b"not a wav")
             manifest = root / "manifest.csv"
             manifest.write_text(
-                "recording_id,session_id,container_id,device_id,capacity_ml,water_ml,ice_count,ice_mass_g,temperature_c,microphone_distance_cm,action,audio_filename,label_source\n"
-                "outside,s1,bottle,phone,500,250,0,0,20,10,shake,../outside.wav,coldkeep_measured\n"
-                "same,s1,bottle,phone,500,250,1,0,20,10,shake,ok.wav,coldkeep_measured\n"
-                "same,s1,bottle,phone,500,250,1,0,20,10,shake,ok.wav,coldkeep_measured\n",
+                "recording_id,session_id,container_id,device_id,capacity_ml,water_ml,ice_count,ice_mass_g,temperature_c,microphone_distance_cm,action,audio_filename,label_source,room_id,operator_id\n"
+                "outside,s1,bottle,phone,500,250,0,0,20,10,shake,../outside.wav,coldkeep_measured,room-1,operator-1\n"
+                "same,s1,bottle,phone,500,250,1,0,20,10,shake,ok.wav,coldkeep_measured,room-1,operator-1\n"
+                "same,s1,bottle,phone,500,250,1,0,20,10,shake,ok.wav,coldkeep_measured,room-1,operator-1\n",
                 encoding="utf-8",
             )
             captures, diagnostics = load_manifest(manifest, audio_root)
@@ -54,13 +54,27 @@ class ShakeIceAmountTests(unittest.TestCase):
             (audio_root / "external.wav").write_bytes(b"not a wav")
             manifest = root / "manifest.csv"
             manifest.write_text(
-                "recording_id,session_id,container_id,device_id,ice_count,action,audio_filename,label_source\n"
-                "external,s1,bottle,phone,0,shake,external.wav,external_unlabeled\n",
+                "recording_id,session_id,container_id,device_id,ice_count,action,audio_filename,label_source,room_id,operator_id\n"
+                "external,s1,bottle,phone,0,shake,external.wav,external_unlabeled,room-1,operator-1\n",
                 encoding="utf-8",
             )
             captures, diagnostics = load_manifest(manifest, audio_root)
         self.assertEqual(captures, [])
         self.assertTrue(any("label_source must be coldkeep_measured" in item for item in diagnostics))
+
+    def test_manifest_requires_room_and_operator_holdout_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            audio_root = root / "audio"
+            audio_root.mkdir()
+            manifest = root / "manifest.csv"
+            manifest.write_text(
+                "recording_id,session_id,container_id,device_id,ice_count,action,audio_filename,label_source\n"
+                "missing,s1,bottle,phone,0,shake,missing.wav,coldkeep_measured\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing columns:.*operator_id"):
+                load_manifest(manifest, audio_root)
 
 
 if __name__ == "__main__":

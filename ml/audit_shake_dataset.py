@@ -197,7 +197,13 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         "skippedManifestRows": diagnostics,
         "holdouts": {
             field: _holdout_report(captures, field)
-            for field in ("session_id", "container_id", "device_id")
+            for field in (
+                "session_id",
+                "container_id",
+                "device_id",
+                "room_id",
+                "operator_id",
+            )
         },
         "audio": audio_metadata,
     }
@@ -206,7 +212,7 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["warnings"].append("same audio SHA256 appears under multiple recording IDs")
     if hash_label_conflicts:
         report["warnings"].append("identical audio has conflicting ice amount labels")
-    for field in ("session_id", "container_id", "device_id"):
+    for field in ("session_id", "container_id", "device_id", "room_id", "operator_id"):
         field_report = report["holdouts"][field]
         if not field_report["evaluatable"]:
             report["warnings"].append(f"{field} holdout has no complete valid fold")
@@ -248,6 +254,8 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["readyForAblation"]
         and report["holdouts"]["container_id"]["allFoldsEvaluatable"]
         and report["holdouts"]["device_id"]["allFoldsEvaluatable"]
+        and report["holdouts"]["room_id"]["allFoldsEvaluatable"]
+        and report["holdouts"]["operator_id"]["allFoldsEvaluatable"]
         and temporal_holdout_ready
     )
     report["temporalHoldoutReady"] = temporal_holdout_ready
@@ -263,7 +271,7 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["warnings"].append("dataset is not safe for ablation")
     if not report["readyForTraining"]:
         report["warnings"].append(
-            "dataset is not deployable: complete container and device holdouts are required"
+            "dataset is not deployable: complete container, device, room, and operator holdouts are required"
         )
     if not temporal_holdout_ready:
         report["warnings"].append(

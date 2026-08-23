@@ -25,6 +25,8 @@ const labels: CollectionLabels = {
   sessionId: 'session-01',
   containerId: 'bottle-01',
   deviceId: 'test-device',
+  roomId: 'room-01',
+  operatorId: 'operator-01',
   capacityMl: 500,
   waterMl: 250,
   iceCount: 0,

@@ -30,7 +30,13 @@ from train_shake_ice_amount import ICE_AMOUNT_NAMES, Capture, ice_amount_index, 
 
 FEATURE_MODES = ("log_mel", "transient", "combined")
 NORMALIZATION_MODES = ("gain_normalized", "raw")
-GROUP_FIELDS = ("session_id", "container_id", "device_id")
+GROUP_FIELDS = (
+    "session_id",
+    "container_id",
+    "device_id",
+    "room_id",
+    "operator_id",
+)
 
 
 def _recording_features(

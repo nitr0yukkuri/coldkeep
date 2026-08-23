@@ -12,6 +12,8 @@ const validDraft: CollectionDraft = {
   sessionId: 'session-01',
   containerId: 'bottle-A',
   deviceId: 'pixel-7',
+  roomId: 'room-01',
+  operatorId: 'operator-01',
   capacityMl: '500',
   waterMl: '250',
   iceCount: '3',
@@ -26,6 +28,8 @@ test('validates and normalizes collection labels', () => {
     sessionId: 'session-01',
     containerId: 'bottle-A',
     deviceId: 'pixel-7',
+    roomId: 'room-01',
+    operatorId: 'operator-01',
     capacityMl: 500,
     waterMl: 250,
     iceCount: 3,
@@ -66,7 +70,7 @@ test('escapes CSV metadata', () => {
     durationSeconds: 2.3456,
     platform: 'android',
   });
-  expect(COLLECTION_CSV_HEADER.split(',')).toHaveLength(19);
+  expect(COLLECTION_CSV_HEADER.split(',')).toHaveLength(21);
   expect(row).toContain('"phone, primary"');
   expect(row).toContain('2.346');
 });

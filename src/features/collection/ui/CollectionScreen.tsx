@@ -27,6 +27,8 @@ const initialDraft: CollectionDraft = {
   // A platform name is not a device identifier and would create a severe
   // shortcut in held-out evaluation. The operator must enter a stable ID.
   deviceId: 'enter-device-id',
+  roomId: 'room-01',
+  operatorId: 'operator-01',
   capacityMl: '500',
   waterMl: '250',
   iceCount: '0',
@@ -228,6 +230,18 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
               label="端末"
               value={draft.deviceId}
               onChangeText={value => updateField('deviceId', value)}
+              editable={!isRecording}
+            />
+            <LabeledInput
+              label="部屋"
+              value={draft.roomId}
+              onChangeText={value => updateField('roomId', value)}
+              editable={!isRecording}
+            />
+            <LabeledInput
+              label="操作者"
+              value={draft.operatorId}
+              onChangeText={value => updateField('operatorId', value)}
               editable={!isRecording}
             />
             <LabeledInput

@@ -66,7 +66,7 @@ python ml/run_shake_ice_ablation.py `
   --output ml/reports/shake_ice_ablation.json
 ```
 
-It evaluates session-, container-, and device-held-out groups, plus
+It evaluates session-, container-, device-, room-, and operator-held-out groups, plus
 gain-normalised and raw waveform variants. A fold is not silently filled in:
 if its train or test side lacks a class, it is reported as skipped. The audit
 script reports the same issue before fitting.
@@ -123,7 +123,7 @@ negative or amount labels.
 
 This is an intentional `insufficient_data` result, not a zero or fabricated
 accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
-contract, but a model also needs complete container/device holdouts, no
+contract, but a model also needs complete container/device/room/operator holdouts, no
 duplicate-audio label conflicts, and acceptable per-class recall before it can
 move from research to `trained`.
 
@@ -160,11 +160,12 @@ artifact.
 
 `ml/audit_shake_dataset.py` computes SHA256 for every audio file, detects the
 same bytes under multiple recording IDs, records class coverage by session,
-container, device, and timestamp, and enumerates valid/invalid group folds.
+container, device, room, operator, and timestamp, and enumerates valid/invalid group folds.
 Review these warnings before looking at accuracy. In particular, a model that
-loses performance when RMS normalisation is removed, or whose container/device
-holdout collapses while session holdout is high, is likely learning energy,
-bottle, phone, or room identity rather than ice amount.
+loses performance when RMS normalisation is removed, or whose
+container/device/room/operator holdout collapses while session holdout is high,
+is likely learning energy, bottle, phone, operator, or room identity rather than
+ice amount.
 
 The collection protocol therefore keeps all six measured counts across each
 baseline water level and repeats them across independent sessions before any

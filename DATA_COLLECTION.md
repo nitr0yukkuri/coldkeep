@@ -9,6 +9,9 @@ measured before each recording.
 - One container and one phone
 - Enter a stable, operator-chosen device ID (for example `pixel7-lab-a`);
   never use only a platform name such as `android` or `ios`.
+- Enter stable `room_id` and `operator_id` values as well. These are required
+  holdout keys, not optional UI decoration: without them, room or operator can
+  become an accidental proxy for the ice label.
 - Water: 25%, 50%, and 75% of capacity
 - Ice: 0 g, 50 g, and 100 g
 - Temperature: 5 °C, 20 °C, and 50 °C
@@ -131,10 +134,11 @@ python ml/train_shake_ice_amount.py `
 The command refuses to train when a band is missing, when a band has fewer than
 two recordings, when a band appears in fewer than two sessions, when manifest
 rows are malformed/unlabeled, or when audio is duplicated. A `trained` artifact
-also requires every session/container/device fold to contain all classes and
-at least two valid calendar days per class. This prevents a class recorded on a
-single day from becoming a date/room shortcut. Until those gates pass, only an
-`experimental` result is written and the product scan remains untrained.
+also requires every session/container/device/room/operator fold to contain all
+classes and at least two valid calendar days per class. This prevents a class
+recorded on a single day or by one operator in one room from becoming a
+shortcut. Until those gates pass, only an `experimental` result is written and
+the product scan remains untrained.
 
 ## Ice-count matrix for generalisation
 
