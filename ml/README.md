@@ -141,8 +141,9 @@ raw archive or share the derived cache/weights until its terms are checked.
 `train_shake_ice_amount.py` uses the exact `ice_count` field only as collection
 ground truth, then maps it to `none` (0), `few` (1--2), or `many` (3+). It
 requires at least two recordings of every band across at least two sessions and
-reports session-held-out metrics. The artifact remains `experimental` below
-the balanced-accuracy gate and is not exposed by the UI as a trained result.
+reports scored session/container/device/room/operator-held-out metrics. The
+artifact remains `experimental` below the balanced-accuracy gate and is not
+exposed by the UI as a trained result.
 Exact cube counts and ice mass are never inferred.
 
 The older `train_ice_presence.py` binary task remains available for the legacy
@@ -253,7 +254,8 @@ alongside measured-label provenance, complete session/container/device/room/oper
 temporal holdouts, scored physical holdouts (each with balanced accuracy of at
 least `0.67`), the shared feature schema, internally consistent confusion
 metrics, a valid model tensor shape, and session-held-out balanced accuracy of
-at least `0.67`.
+at least `0.67` (with every required physical holdout also meeting the same
+gate).
 All candidates are validated before either target is written, and each target
 is replaced atomically. An `untrained` or `experimental` candidate is rejected
 and the checked-in artifact is left untouched. With the current repository data
