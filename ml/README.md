@@ -165,6 +165,22 @@ reports direct three-class and experimental two-stage (`ice/no-ice` then
 and never writes a production artifact. With no exported ColdKeep recordings,
 the correct result is `status=insufficient_data`.
 
+For transient-only inspection, the checked-in
+`dataset/external/ice-shake-references/manifest.csv` contains ten CC0
+Freesound shake-like previews. Run the guarded probe with an optional
+`miniaudio` research install:
+
+```powershell
+python ml/probe_external_ice_audio.py `
+  --manifest dataset/external/ice-shake-references/manifest.csv `
+  --audio-root dataset/external/ice-shake-references `
+  --output ml/reports/ice_shake_reference_probe.json
+```
+
+The probe requires `production_label_eligible=false` on every external row,
+records decoder/feature diagnostics, and always emits `status=research_only`.
+These previews are not amount labels or ColdKeep accuracy evidence.
+
 The shared transient schema is implemented in NumPy, TypeScript, and Rust and
 is covered by `ml/fixtures/audio_features_golden.json`. The fixture is a
 deterministic PCM impulse vector used to detect runtime drift, not to claim

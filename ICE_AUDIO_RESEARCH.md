@@ -76,6 +76,22 @@ it is not a supervised amount dataset.
   They must be recorded with the same capture pipeline or explicitly kept as
   external-domain negatives.
 
+### Checked-in shake-domain reference pack
+
+The [`ice-shake-references`](dataset/external/ice-shake-references) directory
+contains ten CC0 Freesound previews from the [`creeeeak` ice-cubes pack](https://freesound.org/people/creeeeak/packs/24823/).
+The individual source pages describe ice being rolled, dropped, stirred, or
+shaken in a glass/jar; several mention an SM57/SM58 microphone. None supplies a
+measured cube count, insulated-bottle geometry, or phone recording. Their
+`manifest.csv` stores the source URL, preview URL, description, and SHA256;
+every row is explicitly `production_label_eligible=false`.
+
+The feature-only result is
+[`ml/reports/ice_shake_reference_probe.json`](ml/reports/ice_shake_reference_probe.json).
+All ten previews decoded with zero diagnostics. They are useful for checking
+whether transient detectors behave sensibly on shake-like ice events, but they
+remain presence/domain references and cannot train `none`/`few`/`many`.
+
 ## Domain gap
 
 [CORSMAL's catalogue](https://corsmal.github.io/data.html) describes 1,140

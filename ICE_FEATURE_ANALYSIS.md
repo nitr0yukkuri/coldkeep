@@ -138,6 +138,31 @@ report remained `status=research_only`, with `model=null`,
 failures are intentionally recorded as diagnostics rather than treated as
 negative or amount labels.
 
+### Checked-in shake-domain reference pack
+
+Ten additional CC0 previews from one Freesound author were decoded through the
+same probe. They describe ice rolling, dropping, stirring, or shaking in a
+glass/jar, but do not provide measured cube counts. The mean values below are
+per one-second window and are descriptive only:
+
+| source clip | duration (s) | windows | mean onset count | mean spectral flux | mean centroid (Hz) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| #437324 | 2.000 | 3 | 7.33 | 0.0739 | 1,678 |
+| #437323 | 4.000 | 7 | 5.29 | 0.0722 | 1,723 |
+| #437322 | 1.571 | 3 | 4.00 | 0.0759 | 1,793 |
+| #437321 | 1.286 | 2 | 6.50 | 0.0783 | 1,884 |
+| #436972 | 1.429 | 2 | 5.50 | 0.0666 | 2,748 |
+| #436971 | 2.258 | 4 | 5.00 | 0.0660 | 3,480 |
+| #436970 | 5.321 | 10 | 6.20 | 0.0694 | 2,398 |
+| #436969 | 1.772 | 3 | 5.00 | 0.0616 | 3,721 |
+| #436968 | 23.857 | 47 | 5.19 | 0.0785 | 1,215 |
+| #436967 | 1.661 | 3 | 5.33 | 0.0652 | 2,573 |
+
+The spread in onset density and centroid occurs within one author/pack and is
+not an ice-count signal. The probe report is
+[`ml/reports/ice_shake_reference_probe.json`](ml/reports/ice_shake_reference_probe.json),
+with `status=research_only`, no model, and no production-artifact update.
+
 This is an intentional `insufficient_data` result, not a zero or fabricated
 accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
 contract, but a model also needs complete container/device/room/operator holdouts, no
