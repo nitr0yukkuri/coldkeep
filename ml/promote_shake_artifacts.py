@@ -174,10 +174,23 @@ def _validate_evaluation(value: Any, classes: list[str]) -> None:
     precision = value.get("precision")
     if not isinstance(precision, dict):
         raise ValueError("evaluation.precision is missing")
+    f1_scores: list[float] = []
     for index in range(len(classes)):
         score = _number(precision.get(str(index)), f"evaluation.precision[{index}]")
         if not 0.0 <= score <= 1.0:
             raise ValueError(f"evaluation.precision[{index}] must be between 0 and 1")
+        column_total = sum(confusion[row_index][index] for row_index in range(len(classes)))
+        expected = confusion[index][index] / column_total if column_total else 0.0
+        if abs(expected - score) > 1e-6:
+            raise ValueError(
+                f"evaluation.precision[{index}] disagrees with confusion_matrix"
+            )
+        recall_value = recalls[index]
+        f1_scores.append(
+            2 * expected * recall_value / max(expected + recall_value, 1e-12)
+        )
+    if abs(sum(f1_scores) / len(f1_scores) - metrics["macro_f1"]) > 1e-6:
+        raise ValueError("evaluation.macro_f1 disagrees with confusion_matrix")
 
     if metrics["balanced_accuracy"] < MIN_DEPLOYABLE_BALANCED_ACCURACY:
         raise ValueError(

@@ -129,6 +129,21 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "manifest hash"):
                 validate_candidate(path, "shake_ice_amount", "b" * 64)
 
+    def test_claimed_precision_and_macro_f1_must_match_confusion_matrix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_ice_amount")
+            value["evaluation"]["precision"]["0"] = 0.1
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, r"precision\[0\].*confusion"):
+                validate_candidate(path, "shake_ice_amount")
+
+            value = candidate("shake_ice_amount")
+            value["evaluation"]["macro_f1"] = 0.1
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, r"macro_f1.*confusion"):
+                validate_candidate(path, "shake_ice_amount")
+
 
 if __name__ == "__main__":
     unittest.main()
