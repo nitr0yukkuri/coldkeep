@@ -203,6 +203,35 @@ The report is marked `research_only`, records
 `labelsUsedForProductionTraining=false`, and does not alter the production
 artifact.
 
+### External single-event mixture sanity check (research-only)
+
+`ml/run_external_mixture_experiment.py` uses two CC0 previews whose author
+descriptions mention one cube only as **waveform seeds**. It copies short
+fragments into new two-second signals and labels the number of generated
+copies; the source descriptions are never used as `none`/`few`/`many` labels.
+The run produced 216 synthetic recordings and evaluated A/B/C, raw versus
+gain-normalised input, and an additional source-held-out fold:
+
+| combined + gain-normalized holdout | balanced accuracy | macro F1 |
+| --- | ---: | ---: |
+| session | 0.390 | 0.376 |
+| container | 0.404 | 0.399 |
+| device | 0.449 | 0.450 |
+| room | 0.440 | 0.444 |
+| operator | 0.377 | 0.365 |
+| source seed | 0.431 | 0.428 |
+
+The best balanced accuracy across every configuration and holdout was only
+0.449, so this augmentation does not support a production model. It is useful
+as a negative robustness check: repeating a real ice-like fragment is not a
+valid substitute for measuring separate cubes in a ColdKeep bottle. The
+reproducible report and fitted model are explicitly research-only:
+[`ml/reports/external_mixture_experiment.json`](ml/reports/external_mixture_experiment.json)
+and
+[`ml/artifacts/research_external_mixture_shake_ice_amount.json`](ml/artifacts/research_external_mixture_shake_ice_amount.json).
+Neither file changes
+[`ml/artifacts/shake_ice_amount_pilot.json`](ml/artifacts/shake_ice_amount_pilot.json).
+
 ## Shortcut and leakage audit
 
 `ml/audit_shake_dataset.py` computes SHA256 for every audio file, detects the

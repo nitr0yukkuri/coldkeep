@@ -194,6 +194,22 @@ python ml/probe_external_ice_audio.py `
 Those previews remain external, research-only, and explicitly ineligible for
 `none`/`few`/`many` training.
 
+For a stricter augmentation sanity check, two author-described single-cube
+previews can be used only as waveform seeds:
+
+```powershell
+python ml/run_external_mixture_experiment.py `
+  --manifest dataset/external/ice-count-references/manifest.csv `
+  --audio-root dataset/external/ice-count-references `
+  --output ml/reports/external_mixture_experiment.json `
+  --research-artifact ml/artifacts/research_external_mixture_shake_ice_amount.json
+```
+
+This generates synthetic event-copy labels and always writes `research_only`;
+it never promotes or overwrites the production amount artifact. Decoding the
+MP3 previews requires the optional research dependency in
+`requirements-external-shake.txt`.
+
 The probe requires `production_label_eligible=false` on every external row,
 records decoder/feature diagnostics, and always emits `status=research_only`.
 These previews are not amount labels or ColdKeep accuracy evidence.
