@@ -148,6 +148,42 @@
         0.14878100156784058
       ],
       "logMelFinite": true
+    },
+    {
+      "filename": "bigsoundbank_2125_three_whisky.mp3",
+      "sourceUrl": "https://bigsoundbank.com/ice-cubes-in-a-glass-3-s2125.html",
+      "label": "ice_present_source_description",
+      "license": "CC0",
+      "usage": "feature_and_transient_probe",
+      "authorClaimedCount": "3",
+      "claimText": "3 ice cubes put in a whisky glass",
+      "sha256": "1983BAFCB1351D3F8A735E07F1DA0168CF75A448EA67797136E6A14AFFF964BD",
+      "durationSeconds": 0.4955,
+      "windows": 1,
+      "transientMean": [
+        2.0,
+        2.0,
+        0.05999999865889549,
+        0.0,
+        0.04714199900627136,
+        0.5300920009613037,
+        2.0,
+        1422.6895751953125,
+        1513.260986328125,
+        0.40922901034355164,
+        1977.3597412109375,
+        0.1751060038805008,
+        0.1864040046930313,
+        2.9067890644073486,
+        2.2992029190063477,
+        0.024880999699234962,
+        0.044335998594760895,
+        0.17104999721050262,
+        29.807756423950195,
+        0.25,
+        0.23000000417232513
+      ],
+      "logMelFinite": true
     }
   ],
   "diagnostics": [],
