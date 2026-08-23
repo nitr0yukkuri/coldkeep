@@ -687,10 +687,7 @@ fn extract_transient_features(input: &[f64], sample_rate: u32, gain_normalize: b
         .iter()
         .enumerate()
         .map(|(index, frame)| {
-            let peak = frame
-                .iter()
-                .map(|sample| sample.abs())
-                .fold(0.0, f64::max);
+            let peak = frame.iter().map(|sample| sample.abs()).fold(0.0, f64::max);
             peak / rms[index].max(1e-5)
         })
         .collect();
@@ -728,9 +725,12 @@ fn extract_transient_features(input: &[f64], sample_rate: u32, gain_normalize: b
         }
         decay.push((end - onset) as f64 * FRAME_HOP as f64 / sample_rate as f64);
     }
-    let max_abs = samples.iter().map(|sample| sample.abs()).fold(0.0, f64::max);
-    let duration = (samples.len() as f64 / sample_rate as f64)
-        .max(FRAME_SIZE as f64 / sample_rate as f64);
+    let max_abs = samples
+        .iter()
+        .map(|sample| sample.abs())
+        .fold(0.0, f64::max);
+    let duration =
+        (samples.len() as f64 / sample_rate as f64).max(FRAME_SIZE as f64 / sample_rate as f64);
     let values = vec![
         onsets.len() as f64,
         onsets.len() as f64 / duration,
@@ -1053,38 +1053,33 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         _ => return Err("shake model class must be 0, 1, or 2".to_string()),
     };
     let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
-    let (ice_amount, ice_amount_confidence) =
-        if ice_status == "trained"
-            && shake_ice.model.is_some()
-            && shake_ice.classes.len() == 3
-            && shake_ice.sample_rate == Some(baseline.sample_rate)
-            && shake_ice.window_samples == Some(baseline.window_samples)
-            && shake_ice.hop_samples == Some(baseline.hop_samples)
-            && shake_ice.feature_size == Some(baseline.feature_size)
-            && shake_ice
-                .feature_schema
-                .as_ref()
-                .map_or(false, |schema| {
-                    schema.name == "log_mel_summary_v1" && schema.version == 1
-                })
-        {
-            let ice_model = shake_ice.model.as_ref().expect("checked above");
-            let ice_probabilities = averaged_prediction(&features, ice_model);
-            let ice_index = ice_probabilities
-                .iter()
-                .enumerate()
-                .max_by(|(_, left), (_, right)| left.total_cmp(right))
-                .map(|(index, _)| index)
-                .unwrap_or(0);
-            let ice_class = shake_ice
-                .classes
-                .get(ice_index)
-                .and_then(|class| shake_ice_class(class))
-                .ok_or("shake ice model class must be none, few, or many")?;
-            (Some(ice_class), ice_probabilities.get(ice_index).copied())
-        } else {
-            (None, None)
-        };
+    let (ice_amount, ice_amount_confidence) = if ice_status == "trained"
+        && shake_ice.model.is_some()
+        && shake_ice.classes.len() == 3
+        && shake_ice.sample_rate == Some(baseline.sample_rate)
+        && shake_ice.window_samples == Some(baseline.window_samples)
+        && shake_ice.hop_samples == Some(baseline.hop_samples)
+        && shake_ice.feature_size == Some(baseline.feature_size)
+        && shake_ice.feature_schema.as_ref().map_or(false, |schema| {
+            schema.name == "log_mel_summary_v1" && schema.version == 1
+        }) {
+        let ice_model = shake_ice.model.as_ref().expect("checked above");
+        let ice_probabilities = averaged_prediction(&features, ice_model);
+        let ice_index = ice_probabilities
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        let ice_class = shake_ice
+            .classes
+            .get(ice_index)
+            .and_then(|class| shake_ice_class(class))
+            .ok_or("shake ice model class must be none, few, or many")?;
+        (Some(ice_class), ice_probabilities.get(ice_index).copied())
+    } else {
+        (None, None)
+    };
     Ok(Prediction {
         contains_water: true,
         water_confidence: confidence,
