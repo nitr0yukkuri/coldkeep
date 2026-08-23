@@ -112,6 +112,15 @@ TypeScript. Their SHA256 values and source/license records are in
 feature extraction and the shortcut warning only; it does not change
 `shake_ice_amount_pilot.json` and cannot satisfy the ColdKeep deployment gate.
 
+The reproducible command was also run against the checked-out
+`dataset/external/ice-references/manifest.csv` using the optional `miniaudio`
+decoder. It produced 17 finite feature records and 5 decoder diagnostics (the
+five Google OGG previews were not decodable by that optional backend). The
+report remained `status=research_only`, with `model=null`,
+`labelsUsedForTraining=false`, and `productionArtifactUpdated=false`. Decoder
+failures are intentionally recorded as diagnostics rather than treated as
+negative or amount labels.
+
 This is an intentional `insufficient_data` result, not a zero or fabricated
 accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
 contract, but a model also needs complete container/device holdouts, no
