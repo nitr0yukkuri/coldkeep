@@ -158,6 +158,20 @@ download step. We therefore record it as a hard-negative lead only. No
 EPIC-SOUNDS audio or annotation is used as a ColdKeep amount label, and no
 file is copied into the training manifest.
 
+### Count-adjacent datasets checked in the latest pass
+
+Two additional leads were checked because they expose an object-count field or
+an event-density annotation, but neither is a ColdKeep audio corpus:
+
+| lead | what is actually labelled | decision |
+| --- | --- | --- |
+| [FoleySet](https://www.researchgate.net/publication/408047005_FoleySet_A_Multi-Level_Human-Annotated_Foley_Sound_Dataset) | A 10,000-clip CC0 Freesound-derived Foley collection with `one-shot`/`multi-shot`, `IceCube`, and other material-interaction categories. It does not measure how many cubes are inside a container, and many clips are studio effects. | Useful for event-density and hard-negative feature review only; never a `none/few/many` target. |
+| [Laser Vibrations](https://huggingface.co/datasets/eturok-weizmann/laser-vibrations) | 551 cardboard-box vibration samples expose `n_objects`, but the signal is reconstructed from a 10×10 laser-speckle array while loudspeakers excite the box. | Count-adjacent pretraining/reference only; the sensor, box, excitation, and object domain are not phone microphone plus ice in a bottle. |
+
+These datasets strengthen the feature-design hypothesis but do not remove the
+missing-data blocker: no searched source provides measured `ice_count` from the
+ColdKeep capture protocol.
+
 ## Domain gap
 
 [CORSMAL's catalogue](https://corsmal.github.io/data.html) describes 1,140

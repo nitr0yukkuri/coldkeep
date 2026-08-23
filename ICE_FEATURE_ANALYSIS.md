@@ -207,6 +207,12 @@ The report is marked `research_only`, records
 `labelsUsedForProductionTraining=false`, and does not alter the production
 artifact.
 
+The same run is also materialized as a transient-only preview artifact at
+[`ml/artifacts/research_synthetic_transient_shake_ice_amount.json`](ml/artifacts/research_synthetic_transient_shake_ice_amount.json), with its full report in
+[`ml/reports/synthetic_transient_ice_experiment.json`](ml/reports/synthetic_transient_ice_experiment.json).
+This artifact is for explicit UX/inference-path testing only; its score is not
+used as a production gate.
+
 ### External single-event mixture sanity check (research-only)
 
 `ml/run_external_mixture_experiment.py` uses two CC0 previews whose author
@@ -269,12 +275,14 @@ step rather than an unreported claim.
 
 ## Research-only runtime preview
 
-The external-mixture artifact can be exercised end to end through the
+The synthetic transient artifact can be exercised end to end through the
 TypeScript path by setting `EXPO_PUBLIC_ML_PREVIEW=research`. This is an
 explicit opt-in: the normal build keeps the measured ice artifact untrained and
-shows `未判定`. The preview uses the 149-dimensional `log-mel + transient`
-schema, caps its confidence below the production threshold, and marks the
-result `iceAmountStatus=experimental`.
+shows `未判定`. The preview uses the 21-dimensional transient schema, caps its
+confidence below the production threshold, and marks the result
+`iceAmountStatus=experimental`. The external-mixture artifact remains checked
+in as a comparison experiment and is not silently treated as a production
+label source.
 
 The UI labels this value as a research preview and the hydration use case never
 consumes it. The flag does not change

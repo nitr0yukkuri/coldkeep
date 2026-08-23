@@ -241,11 +241,14 @@ The generator uses exact synthetic counts and nuisance factors only to test
 whether collision-density features are learnable in principle. Its output is
 `status=research_only`; it never updates
 `ml/artifacts/shake_ice_amount_pilot.json`, and its scores are not evidence for
-phone/water-bottle generalization. The optional research artifact uses a
-separate 149-feature schema and is never
-loaded by the app. The checked-in report is intentionally negative (all
-holdout balanced accuracies are below 0.67), so the honest next step remains
-measured ColdKeep collection.
+phone/water-bottle generalization. The default optional research artifact uses
+the combined 149-feature schema. A transient-only preview can be regenerated
+with `--research-feature-mode transient`; its 21-feature artifact is the
+explicit opt-in preview loaded by the TypeScript research runtime. In the
+checked-in run, transient-only reaches 0.674 session balanced accuracy but
+only 0.640/0.657/0.651/0.651 on container/device/room/operator holdouts, so it
+still cannot be promoted. The honest next step remains measured ColdKeep
+collection.
 
 ## Public shake-data candidate
 
