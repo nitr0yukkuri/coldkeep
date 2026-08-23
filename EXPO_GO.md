@@ -49,12 +49,12 @@ App StoreまたはAndroidのPlay StoreでExpo Goを最新版へ更新してか�
 - `expo-audio` の `useAudioStream` で16-bit PCMをメモリに受け取る
 - モノラル化・リサンプリングを行い、ネイティブ経路と同じ16 kHz `PcmAudio`に正規化する
 - 既存の `ScanBottleUseCase` と `publicAudioClassifier.ts`（TypeScript経路）へ渡す
-- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、共有時は音声込みZIPを作る
+- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、`expo-sharing`で音声込みZIPを共有する
 - 個人向け画面では水筒容量・音響残量観測・音響由来の自動飲水量をDocument directoryへ保存する
 
 Expo GoにはこのリポジトリのRust/TFLiteカスタムネイティブモジュールは含まれないため、
-Expo経路の推論エンジン表示はTypeScriptになります。氷モデルは現時点で未学習なので、
-振り音の氷量は引き続き `未判定` です。
+Expo経路の推論エンジン表示はTypeScriptになります。振り音の残量モデルは未学習ですが、
+汎用の低信頼度ヒューリスティックを`experimental`として表示します。飲水量の自動記録には使いません。
 
 水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。信頼度を満たす
 音響差分だけを、確認ボタンなしで飲水量へ自動保存します。
@@ -62,7 +62,7 @@ Expo経路の推論エンジン表示はTypeScriptになります。氷モデル
 ## 入力動作の注意
 
 個人向けのSCANとデータ収集は **shake（振る）** に固定しています。1秒以上、一定の強さで
-水筒を振ってください。振り音モデルが未学習または信頼度不足の場合は `未判定` となり、
+水筒を振ってください。振り音モデルの試験推定が信頼度不足の場合は `未判定` となり、
 注ぐ音モデルへ自動フォールバックしません。`pour`（注ぐ）と`still`（静置）は比較データの
 互換ラベルとしてのみ残しています。
 

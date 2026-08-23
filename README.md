@@ -9,7 +9,8 @@ ColdKeep は、スマートフォンのマイクで水筒を振った音を解�
 現在の提出版が持つ判定契約は次の範囲です。
 
 - 振り音の残量クラス: `0%` / `50%` / `100%`
-- 信頼度が閾値未満、または学習済み振り音アーティファクトがない場合: `未判定`
+- 通常画面では学習済みモデルがない場合も、composition rootで明示的にopt-inした汎用の試験推定を表示できる。試験推定は飲水量の自動記録には使わない
+- 信頼度が閾値未満、または振り音アーティファクトがない場合: `未判定`
 - 振り音の氷量: 学習済みなら `なし` / `少ない` / `多い` の3段階。未学習・低信頼度は `未判定`
 
 残量判定の確率が0.65未満の場合は、画面を `未判定` に戻して
@@ -42,7 +43,11 @@ ColdKeep は、スマートフォンのマイクで水筒を振った音を解�
 
 既存の公開ベースラインはACM-S2の注ぐ音（pouring）で学習・評価した研究用アーティファクトです。
 個人向け画面は`shake`（振る）を入力動作に固定し、注ぐモデルを振り音へ流用しません。
-`ml/artifacts/shake_fill_level_pilot.json`が未学習の間は、画面は安全に`未判定`へ退避します。
+`ml/artifacts/shake_fill_level_pilot.json`は現在`untrained`です。アプリのcomposition rootでは
+`allowExperimentalPreview`を明示的に有効化しているため、汎用の低信頼度ヒューリスティックを
+`experimental`として表示できます。ただし飲水量の自動記録には使いません。
+phone/water-bottleデータでセッションホールドアウト評価を通過したモデルへ置き換えた場合だけ、
+`trained`として残量差分を自動記録します。
 データ収集画面の動作は`shake`（振る）に固定しています。`still`（静置）と
 `pour`（注ぐ）は、過去CSVや比較用データを壊さないため内部の互換ラベルとして残しています。
 
@@ -136,3 +141,15 @@ npx expo start
 ## U-22提出物
 
 提出版の仕様、締切、必要な証拠は [U22_SUBMISSION_PLAN.md](U22_SUBMISSION_PLAN.md) に固定しています。ProtoPedia限定共有ページ、3分以内の説明動画、ソース一式、実行手順、評価結果、制約説明を同じ版番号で凍結して提出します。
+
+## VORN Challenge提出物
+
+VORN Challengeを本命にする場合は、AI・社会課題・新しい市場価値が一続きで伝わる提出版にします。公式フォームの入力欄・文字数・ファイル形式は、[VORN Challenge公式募集要項](https://vorn-challenge.com/)とGoogleフォームを優先してください。
+
+- [VORN_SUBMISSION_PLAN.md](VORN_SUBMISSION_PLAN.md): 公式要件、提出物、実演手順、受け入れ条件
+- [VORN_APPLICATION_DRAFT.md](VORN_APPLICATION_DRAFT.md): 応募フォーム下書き
+- [VORN_VIDEO_SCRIPT.md](VORN_VIDEO_SCRIPT.md): 実演動画の台本
+- [VORN_ARCHITECTURE.md](VORN_ARCHITECTURE.md): 技術構成とVORN評価項目の対応
+- [VORN_SUBMISSION_README.md](VORN_SUBMISSION_README.md): 提出パッケージの同梱・除外ルール
+
+ColdKeepのVORN向け主張は「振るだけで水筒の残量と飲水量を見える化する音響AI」です。正確なml、温度、氷の重量、熱中症の診断・予防は主張せず、低信頼度や未学習時に`未判定`へ退避する安全設計を中心に説明します。学習済みモデルへ置き換えた提出版では、容量だけの設定で飲水量を自動記録できます。
