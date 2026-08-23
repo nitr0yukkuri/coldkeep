@@ -24,7 +24,7 @@ from audio_features import (
     resample,
     segment_audio,
 )
-from train_baseline import SoftmaxClassifier, metrics
+from train_baseline import SoftmaxClassifier, class_balanced_weights, metrics
 from train_shake_ice_amount import ICE_AMOUNT_NAMES, Capture, ice_amount_index, load_manifest
 
 
@@ -80,7 +80,7 @@ def _arrays(
             for capture in captures
         ]
     )
-    return features, labels, weights
+    return features, labels, class_balanced_weights(labels, weights)
 
 
 def _folds(captures: list[Capture], field: str) -> list[dict]:
@@ -262,7 +262,11 @@ def run_ablation(captures: list[Capture], epochs: int = 1_000) -> dict:
         },
         "normalization": list(NORMALIZATION_MODES),
         "holdoutGroups": list(GROUP_FIELDS),
-        "training": {"classifier": "weighted linear softmax", "epochs": epochs},
+        "training": {
+            "classifier": "weighted linear softmax",
+            "epochs": epochs,
+            "weighting": "equal class mass after equal recording mass",
+        },
         "results": {},
     }
     for mode in FEATURE_MODES:

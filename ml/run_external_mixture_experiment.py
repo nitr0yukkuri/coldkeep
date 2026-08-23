@@ -30,7 +30,7 @@ from audio_features import (
     mel_filterbank,
     segment_audio,
 )
-from train_baseline import SoftmaxClassifier, metrics
+from train_baseline import SoftmaxClassifier, class_balanced_weights, metrics
 
 
 SAMPLE_RATE = TARGET_SAMPLE_RATE
@@ -342,7 +342,7 @@ def _arrays(
             for item in captures
         ]
     )
-    return features, labels, weights
+    return features, labels, class_balanced_weights(labels, weights)
 
 
 def _metric_for_group(
@@ -428,7 +428,11 @@ def run_experiment(
         },
         "normalization": list(NORMALIZATION_MODES),
         "holdoutGroups": list(GROUP_FIELDS),
-        "training": {"classifier": "weighted linear softmax", "epochs": epochs},
+        "training": {
+            "classifier": "weighted linear softmax",
+            "epochs": epochs,
+            "weighting": "equal class mass after equal recording mass",
+        },
         "results": {},
     }
     for mode in FEATURE_MODES:

@@ -33,6 +33,10 @@ class ExternalMixtureExperimentTests(unittest.TestCase):
         self.assertFalse(report["labelsUsedForProductionTraining"])
         self.assertFalse(report["productionArtifactUpdated"])
         self.assertEqual(report["labelSource"], "synthetic_external_single_event_mixture")
+        self.assertEqual(
+            report["training"]["weighting"],
+            "equal class mass after equal recording mass",
+        )
         self.assertIn("source_id", report["holdoutGroups"])
         artifact = research_artifact(report)
         self.assertEqual(artifact["status"], "research_only")

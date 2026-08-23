@@ -2,6 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+
+from train_baseline import class_balanced_weights
 from train_shake_ice_amount import (
     Capture,
     ICE_AMOUNT_NAMES,
@@ -15,6 +18,20 @@ from train_shake_ice_amount import (
 
 
 class ShakeIceAmountTests(unittest.TestCase):
+    def test_class_balanced_weights_equalize_observed_band_mass(self):
+        labels = np.asarray([0, 1, 1, 2, 2, 2], dtype=np.int64)
+        weights = np.asarray([1.0, 0.5, 0.5, 1 / 3, 1 / 3, 1 / 3])
+
+        balanced = class_balanced_weights(labels, weights)
+
+        self.assertTrue(
+            np.allclose(
+                [balanced[labels == label].sum() for label in (0, 1, 2)],
+                [1.0, 1.0, 1.0],
+            )
+        )
+        np.testing.assert_allclose(weights, [1.0, 0.5, 0.5, 1 / 3, 1 / 3, 1 / 3])
+
     def test_public_bands_are_coarse_and_stable(self):
         self.assertEqual([ice_amount_index(value) for value in (0, 1, 2, 3, 99)], [0, 1, 1, 2, 2])
         self.assertEqual(ICE_AMOUNT_NAMES, ("none", "few", "many"))

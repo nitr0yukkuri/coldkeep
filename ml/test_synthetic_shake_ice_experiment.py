@@ -41,6 +41,10 @@ class SyntheticShakeIceExperimentTests(unittest.TestCase):
         self.assertEqual(report["holdoutGroups"], list(GROUP_FIELDS))
         self.assertFalse(report["labelsUsedForProductionTraining"])
         self.assertFalse(report["productionArtifactUpdated"])
+        self.assertEqual(
+            report["training"]["weighting"],
+            "equal class mass after equal recording mass",
+        )
         self.assertEqual(set(report["results"]), {
             f"{mode}:{normalization}"
             for mode in ("log_mel", "transient", "combined")

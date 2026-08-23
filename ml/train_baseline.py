@@ -127,6 +127,38 @@ class SoftmaxClassifier:
         }
 
 
+def class_balanced_weights(
+    labels: np.ndarray, sample_weights: np.ndarray
+) -> np.ndarray:
+    """Equalize total training mass across the labels that are present.
+
+    ``recording_arrays`` first gives every recording the same mass so long
+    recordings cannot dominate.  The ice-count bands can still have different
+    numbers of recordings (for example, six exact counts collapse to 1/2/3
+    recordings for none/few/many), which would bias a softmax model toward the
+    largest band.  Reweighting the already recording-balanced rows makes each
+    observed class contribute the same total mass without changing any feature
+    values or inventing samples.
+    """
+    labels = np.asarray(labels)
+    weights = np.asarray(sample_weights, dtype=np.float64)
+    if labels.ndim != 1 or weights.ndim != 1 or len(labels) != len(weights):
+        raise ValueError("labels and sample_weights must be aligned vectors")
+    if len(labels) == 0:
+        raise ValueError("cannot balance an empty label vector")
+    if np.any(~np.isfinite(weights)) or np.any(weights < 0):
+        raise ValueError("sample_weights must be finite and non-negative")
+
+    balanced = weights.copy()
+    for label in np.unique(labels):
+        mask = labels == label
+        class_mass = float(balanced[mask].sum())
+        if class_mass <= 0:
+            raise ValueError(f"class {label!r} has no positive sample weight")
+        balanced[mask] /= class_mass
+    return balanced
+
+
 def load_recordings(data_directory: Path) -> list[Recording]:
     annotations_path = data_directory / "acm_s2_annotations.json"
     with annotations_path.open(encoding="utf-8") as stream:

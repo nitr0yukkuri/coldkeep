@@ -28,7 +28,7 @@ from audio_features import (
     resample,
     segment_audio,
 )
-from train_baseline import SoftmaxClassifier, metrics
+from train_baseline import SoftmaxClassifier, class_balanced_weights, metrics
 
 
 ICE_AMOUNT_NAMES = ("none", "few", "many")
@@ -310,7 +310,7 @@ def recording_arrays(
             for item in captures
         ]
     )
-    return features, labels, weights
+    return features, labels, class_balanced_weights(labels, weights)
 
 
 def evaluate(
@@ -463,6 +463,10 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
             "version": 1,
             "description": "32 normalized log-mel bands plus mean/std and first differences",
             "gainNormalization": "per-window RMS target 0.05, clip [-1,1]",
+        },
+        "training": {
+            "classifier": "weighted linear softmax",
+            "weighting": "equal class mass after equal recording mass",
         },
         "model": classifier.serializable("shake_ice_amount"),
         "dataset": report,
