@@ -142,8 +142,10 @@ raw archive or share the derived cache/weights until its terms are checked.
 ground truth, then maps it to `none` (0), `few` (1--2), or `many` (3+). It
 requires at least two recordings of every band across at least two sessions and
 reports scored session/container/device/room/operator-held-out metrics. The
-artifact remains `experimental` below the balanced-accuracy gate and is not
-exposed by the UI as a trained result.
+training weights first equalize each recording and then equalize the observed
+class mass, preventing an imbalanced 0--5 collection matrix from teaching a
+majority-band shortcut. The artifact remains `experimental` below the
+balanced-accuracy gate and is not exposed by the UI as a trained result.
 Exact cube counts and ice mass are never inferred.
 
 The older `train_ice_presence.py` binary task remains available for the legacy

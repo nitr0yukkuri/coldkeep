@@ -51,8 +51,11 @@ artifact:
 | B | transient/onset descriptors | 21 |
 | C | A concatenated with B | 149 |
 
-All candidates use the same recording-level fold list and equal total weight
-per recording (overlapping windows are never split across a fold). Each result
+All candidates use the same recording-level fold list. Overlapping windows are
+never split across a fold. Training first gives each recording equal total
+weight, then equalizes the total weight of the observed `none`/`few`/`many`
+classes so the exact-count design's 1:2:3 band imbalance cannot become a
+majority-class shortcut. Each result
 contains accuracy, balanced accuracy, macro F1, class recall/precision, and a
 confusion matrix. The report also compares direct 3-class classification with
 the experimental two-stage `ice/no-ice` → `few/many` design.
@@ -186,18 +189,19 @@ holdout factor, two repetitions, and 350 optimizer epochs:
 
 | features | normalization | session BA | container BA | device BA | room BA | operator BA |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| log-mel | gain-normalized | 0.568 | 0.486 | 0.562 | 0.559 | 0.574 |
-| log-mel | raw | 0.549 | 0.508 | 0.548 | 0.552 | 0.577 |
-| transient | gain-normalized | 0.568 | 0.557 | 0.545 | 0.562 | 0.562 |
-| transient | raw | 0.588 | 0.542 | 0.509 | 0.560 | 0.551 |
-| log-mel + transient | gain-normalized | 0.566 | 0.511 | 0.566 | 0.537 | 0.565 |
-| log-mel + transient | raw | 0.573 | 0.494 | 0.549 | 0.549 | 0.562 |
+| log-mel | gain-normalized | 0.619 | 0.569 | 0.608 | 0.602 | 0.606 |
+| log-mel | raw | 0.617 | 0.560 | 0.597 | 0.627 | 0.628 |
+| transient | gain-normalized | 0.674 | 0.640 | 0.657 | 0.651 | 0.651 |
+| transient | raw | 0.657 | 0.651 | 0.664 | 0.670 | 0.656 |
+| log-mel + transient | gain-normalized | 0.613 | 0.551 | 0.614 | 0.608 | 0.636 |
+| log-mel + transient | raw | 0.616 | 0.571 | 0.642 | 0.611 | 0.628 |
 
-No synthetic configuration reached the 0.67 deployability gate. That is a
-useful negative result: even a controlled collision-density hypothesis is
-fragile once nuisance response and missed/bounced impacts are introduced. It
-does not prove that real bottles are impossible to classify, and it must not be
-reported as ColdKeep accuracy. The complete reproducible output is
+Class balancing improves the transient-only sanity check, with session and
+room folds reaching the threshold, but no configuration passes all five
+holdouts. That is still a useful negative result: even a controlled
+collision-density hypothesis is fragile once nuisance response and
+missed/bounced impacts are introduced. It does not prove that real bottles are
+impossible to classify, and it must not be reported as ColdKeep accuracy. The complete reproducible output is
 [`ml/reports/synthetic_shake_ice_experiment.json`](ml/reports/synthetic_shake_ice_experiment.json).
 The report is marked `research_only`, records
 `labelsUsedForProductionTraining=false`, and does not alter the production
@@ -211,6 +215,11 @@ fragments into new two-second signals and labels the number of generated
 copies; the source descriptions are never used as `none`/`few`/`many` labels.
 The run produced 216 synthetic recordings and evaluated A/B/C, raw versus
 gain-normalised input, and an additional source-held-out fold:
+
+As in the synthetic sanity check, the classifier uses equal class mass after
+equal recording mass. This removes the generated 1:2:3 band imbalance from the
+training objective; it does not add labels or make the source descriptions
+ground truth.
 
 | combined + gain-normalized holdout | balanced accuracy | macro F1 |
 | --- | ---: | ---: |
