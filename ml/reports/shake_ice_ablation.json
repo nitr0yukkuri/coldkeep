@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "task": "shake_ice_amount",
+  "status": "insufficient_data",
+  "error": "manifest is missing columns: action, audio_filename, container_id, device_id, ice_count, label_source, operator_id, recording_id, room_id, session_id",
+  "results": {}
+}
