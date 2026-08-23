@@ -1083,7 +1083,8 @@
       "session_id",
       "container_id",
       "device_id",
-      "room_id"
+      "room_id",
+      "operator_id"
     ],
     "results": {
       "combined:gain_normalized": {
@@ -1721,6 +1722,164 @@
                 }
               }
             }
+          },
+          "operator_id": {
+            "recordings": 216,
+            "correct": 134,
+            "accuracy": 0.6203703703703703,
+            "accuracy_wilson_95": [
+              0.5540822484868394,
+              0.682451844213173
+            ],
+            "majority_baseline_accuracy": 0.5,
+            "balanced_accuracy": 0.5648148148148148,
+            "macro_f1": 0.5695883730171208,
+            "confusion_matrix": [
+              [
+                17,
+                17,
+                2
+              ],
+              [
+                12,
+                30,
+                30
+              ],
+              [
+                2,
+                19,
+                87
+              ]
+            ],
+            "recall": {
+              "0": 0.4722222222222222,
+              "1": 0.4166666666666667,
+              "2": 0.8055555555555556
+            },
+            "precision": {
+              "0": 0.5483870967741935,
+              "1": 0.45454545454545453,
+              "2": 0.7310924369747899
+            },
+            "folds": {
+              "operator-0": {
+                "recordings": 72,
+                "correct": 45,
+                "accuracy": 0.625,
+                "accuracy_wilson_95": [
+                  0.5095289902692696,
+                  0.7278082165816159
+                ],
+                "majority_baseline_accuracy": 0.5,
+                "balanced_accuracy": 0.5648148148148148,
+                "macro_f1": 0.5726043503821282,
+                "confusion_matrix": [
+                  [
+                    6,
+                    5,
+                    1
+                  ],
+                  [
+                    3,
+                    8,
+                    13
+                  ],
+                  [
+                    0,
+                    5,
+                    31
+                  ]
+                ],
+                "recall": {
+                  "0": 0.5,
+                  "1": 0.3333333333333333,
+                  "2": 0.8611111111111112
+                },
+                "precision": {
+                  "0": 0.6666666666666666,
+                  "1": 0.4444444444444444,
+                  "2": 0.6888888888888889
+                }
+              },
+              "operator-1": {
+                "recordings": 72,
+                "correct": 46,
+                "accuracy": 0.6388888888888888,
+                "accuracy_wilson_95": [
+                  0.5235248046738358,
+                  0.7401832029382592
+                ],
+                "majority_baseline_accuracy": 0.5,
+                "balanced_accuracy": 0.5694444444444445,
+                "macro_f1": 0.5665365424401568,
+                "confusion_matrix": [
+                  [
+                    6,
+                    5,
+                    1
+                  ],
+                  [
+                    4,
+                    7,
+                    13
+                  ],
+                  [
+                    0,
+                    3,
+                    33
+                  ]
+                ],
+                "recall": {
+                  "0": 0.5,
+                  "1": 0.2916666666666667,
+                  "2": 0.9166666666666666
+                },
+                "precision": {
+                  "0": 0.6,
+                  "1": 0.4666666666666667,
+                  "2": 0.7021276595744681
+                }
+              },
+              "operator-2": {
+                "recordings": 72,
+                "correct": 43,
+                "accuracy": 0.5972222222222222,
+                "accuracy_wilson_95": [
+                  0.48180671684951565,
+                  0.7027888884789509
+                ],
+                "majority_baseline_accuracy": 0.5,
+                "balanced_accuracy": 0.5601851851851852,
+                "macro_f1": 0.5577137287663603,
+                "confusion_matrix": [
+                  [
+                    5,
+                    7,
+                    0
+                  ],
+                  [
+                    5,
+                    15,
+                    4
+                  ],
+                  [
+                    2,
+                    11,
+                    23
+                  ]
+                ],
+                "recall": {
+                  "0": 0.4166666666666667,
+                  "1": 0.625,
+                  "2": 0.6388888888888888
+                },
+                "precision": {
+                  "0": 0.4166666666666667,
+                  "1": 0.45454545454545453,
+                  "2": 0.8518518518518519
+                }
+              }
+            }
           }
         }
       }
@@ -1728,7 +1887,7 @@
   },
   "provenance": {
     "source": "ml/run_synthetic_shake_ice_experiment.py",
-    "syntheticVersion": "synthetic_physics_v2",
+    "syntheticVersion": "synthetic_physics_v3",
     "labelSource": "synthetic_physics_exact_count",
     "labelsUsedForProductionTraining": false,
     "productionArtifactUpdated": false

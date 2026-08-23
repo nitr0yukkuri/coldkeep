@@ -3,7 +3,7 @@
 This script is deliberately not a substitute for ColdKeep recordings.  It
 generates damped collision events from an exact synthetic ``ice_count`` and
 tests whether the proposed features can recover the count bands under
-independent container/device/room response changes.  The generated labels are
+independent container/device/room/operator holdout assignments.  The generated labels are
 not external audio labels and the resulting model is never written to the
 production ``shake_ice_amount_pilot.json`` artifact.
 
@@ -31,13 +31,19 @@ from audio_features import (
 from train_baseline import SoftmaxClassifier, metrics
 
 
-SYNTHETIC_VERSION = "synthetic_physics_v2"
+SYNTHETIC_VERSION = "synthetic_physics_v3"
 SAMPLE_RATE = TARGET_SAMPLE_RATE
 DURATION_SECONDS = 2.0
 CLASS_NAMES = ("none", "few", "many")
 FEATURE_MODES = ("log_mel", "transient", "combined")
 NORMALIZATION_MODES = ("gain_normalized", "raw")
-GROUP_FIELDS = ("session_id", "container_id", "device_id", "room_id")
+GROUP_FIELDS = (
+    "session_id",
+    "container_id",
+    "device_id",
+    "room_id",
+    "operator_id",
+)
 NUISANCE_SEED_TAG = 0x4E554953  # "NUIS"
 IMPACT_SEED_TAG = 0x494D5041  # "IMPA"
 RESEARCH_ARTIFACT_SCHEMA = "synthetic_log_mel_transient_v1"
@@ -51,6 +57,7 @@ class SyntheticRecording:
     container_id: str
     device_id: str
     room_id: str
+    operator_id: str
     samples: np.ndarray
 
 
@@ -105,6 +112,7 @@ def _generate_recording(
     container_index: int,
     device_index: int,
     room_index: int,
+    operator_index: int,
     seed: int,
 ) -> SyntheticRecording:
     # Keep the nuisance realization independent of the target label.  The
@@ -171,12 +179,13 @@ def _generate_recording(
         reverberated *= 0.95 / peak
 
     return SyntheticRecording(
-        recording_id=f"synthetic-{session_index}-{container_index}-{device_index}-{room_index}-ice-{ice_count}-{seed}",
+        recording_id=f"synthetic-{session_index}-{container_index}-{device_index}-{room_index}-{operator_index}-ice-{ice_count}-{seed}",
         ice_count=ice_count,
         session_id=f"session-{session_index}",
         container_id=f"container-{container_index}",
         device_id=f"device-{device_index}",
         room_id=f"room-{room_index}",
+        operator_id=f"operator-{operator_index}",
         samples=reverberated.astype(np.float32),
     )
 
@@ -192,7 +201,7 @@ def generate_recordings(
         raise ValueError("groups must be >= 2 and repetitions must be >= 1")
     recordings: list[SyntheticRecording] = []
     # A sparse crossed design keeps the experiment small while ensuring each
-    # session/container/device/room group contains every amount class.  The
+    # session/container/device/room/operator group contains every amount class.  The
     # second design pass changes device/room assignment so one nuisance group
     # is not perfectly determined by another.
     conditions = [
@@ -206,6 +215,9 @@ def generate_recordings(
     ):
         device_index = (session_index + container_index + design_index) % groups
         room_index = (session_index + 2 * container_index + 2 * design_index) % groups
+        operator_index = (
+            2 * session_index + container_index + 3 * design_index
+        ) % groups
         for ice_count in range(6):
             for repetition in range(repetitions):
                 value = (
@@ -224,6 +236,7 @@ def generate_recordings(
                         container_index,
                         device_index,
                         room_index,
+                        operator_index,
                         value,
                     )
                 )

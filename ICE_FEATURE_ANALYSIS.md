@@ -119,13 +119,15 @@ feature extraction and the shortcut warning only; it does not change
 
 ### Checked-in exact-count preview probe
 
-Four additional CC0 Freesound previews are now stored under
+Five additional CC0 previews are now stored under
 `dataset/external/ice-count-references/`. Their descriptions claim one (soft),
-one (loud), three, and four cubes respectively. The reproducible probe output
+one (loud), three, four, and three cubes respectively (the last is the
+BigSoundBank whisky-glass reference). The reproducible probe output
 is [`ml/reports/exact_count_ice_feature_probe.json`](ml/reports/exact_count_ice_feature_probe.json).
-All four decoded successfully with zero diagnostics, but the mean onset counts
-were 4.60, 5.00, 4.45, and 5.33 per one-second window. The four-cube clip is
-not more event-dense than the one-cube clips, so even explicit author-count
+All five decoded successfully with zero diagnostics, but the mean onset counts
+were 4.60, 5.00, 4.45, 5.33, and 2.00 per one-second window. The four-cube
+clip is not more event-dense than the one-cube clips, and the three-cube
+BigSoundBank clip has only one short window, so even explicit author-count
 descriptions do not justify a `none/few/many` classifier. The report remains
 `research_only` with no model and no production-artifact update.
 
@@ -166,7 +168,7 @@ not an ice-count signal. The probe report is
 with `status=research_only`, no model, and no production-artifact update.
 
 This is an intentional `insufficient_data` result, not a zero or fabricated
-accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
+accuracy. The 0.67 balanced-accuracy gate remains the minimum public
 contract. The trainer now scores every session/container/device/room/operator
 holdout independently; all five balanced accuracies must reach 0.67 alongside
 complete folds, no duplicate-audio label conflicts, and acceptable per-class
@@ -178,18 +180,18 @@ Because no measured ColdKeep recordings are available, the feature hypothesis
 was also tested with `ml/run_synthetic_shake_ice_experiment.py`. It generates
 two-second mono signals from exact synthetic counts 0--5 using damped collision
 responses, matched class-independent background/rattle/gain realizations, and
-independent container/device/room response factors. The labels are generated parameters,
+independent container/device/room/operator holdout assignments. The labels are generated parameters,
 not external audio annotations. The run used 216 recordings, three groups per
 holdout factor, two repetitions, and 350 optimizer epochs:
 
-| features | normalization | session BA | container BA | device BA | room BA |
-| --- | --- | ---: | ---: | ---: | ---: |
-| log-mel | gain-normalized | 0.568 | 0.486 | 0.562 | 0.559 |
-| log-mel | raw | 0.549 | 0.508 | 0.548 | 0.552 |
-| transient | gain-normalized | 0.568 | 0.557 | 0.545 | 0.562 |
-| transient | raw | 0.588 | 0.542 | 0.509 | 0.560 |
-| log-mel + transient | gain-normalized | 0.566 | 0.511 | 0.566 | 0.537 |
-| log-mel + transient | raw | 0.573 | 0.494 | 0.549 | 0.549 |
+| features | normalization | session BA | container BA | device BA | room BA | operator BA |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| log-mel | gain-normalized | 0.568 | 0.486 | 0.562 | 0.559 | 0.574 |
+| log-mel | raw | 0.549 | 0.508 | 0.548 | 0.552 | 0.577 |
+| transient | gain-normalized | 0.568 | 0.557 | 0.545 | 0.562 | 0.562 |
+| transient | raw | 0.588 | 0.542 | 0.509 | 0.560 | 0.551 |
+| log-mel + transient | gain-normalized | 0.566 | 0.511 | 0.566 | 0.537 | 0.565 |
+| log-mel + transient | raw | 0.573 | 0.494 | 0.549 | 0.549 | 0.562 |
 
 No synthetic configuration reached the 0.67 deployability gate. That is a
 useful negative result: even a controlled collision-density hypothesis is

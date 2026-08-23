@@ -38,6 +38,7 @@ class SyntheticShakeIceExperimentTests(unittest.TestCase):
     def test_experiment_is_explicitly_research_only(self):
         report = run_experiment(groups=2, repetitions=1, epochs=12, seed=456)
         self.assertEqual(report["status"], "research_only")
+        self.assertEqual(report["holdoutGroups"], list(GROUP_FIELDS))
         self.assertFalse(report["labelsUsedForProductionTraining"])
         self.assertFalse(report["productionArtifactUpdated"])
         self.assertEqual(set(report["results"]), {
