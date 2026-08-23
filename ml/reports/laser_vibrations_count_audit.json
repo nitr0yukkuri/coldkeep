@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "status": "ok",
+  "task": "count_adjacent_metadata_audit",
+  "productionLabelEligible": false,
+  "labelsUsedForProductionTraining": false,
+  "productionArtifactUpdated": false,
+  "dataset": {
+    "name": "Laser Vibrations",
+    "sourceUrl": "https://huggingface.co/datasets/eturok-weizmann/laser-vibrations",
+    "license": "dataset card (verify before redistribution)",
+    "metadataPath": "laser_vibrations_metadata.jsonl",
+    "labelField": "n_objects",
+    "idField": "experiment_id",
+    "audioField": "speckle_shifts_ifft_audio_file_name"
+  },
+  "rows": 551,
+  "invalidRows": [],
+  "missingLabelRows": 0,
+  "labelDistribution": {
+    "0": 4,
+    "1": 527,
+    "2": 20
+  },
+  "numericLabelValues": [
+    0,
+    1,
+    2
+  ],
+  "objectDistribution": {
+    "cube": 547,
+    "empty": 4
+  },
+  "materialDistribution": {
+    "cardboard": 551
+  },
+  "sensorDistribution": {
+    "0001": 137,
+    "0010": 138,
+    "0100": 137,
+    "1000": 139
+  },
+  "duplicateIds": {},
+  "duplicateAudioReferences": {},
+  "warnings": [
+    "The numeric count is not an ice_count measured with a ColdKeep phone and bottle.",
+    "Do not map this field to none/few/many or add rows to the ColdKeep training manifest.",
+    "Use only for feature development, auxiliary pretraining, or domain-gap analysis."
+  ]
+}
