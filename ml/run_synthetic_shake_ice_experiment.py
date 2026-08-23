@@ -46,7 +46,14 @@ GROUP_FIELDS = (
 )
 NUISANCE_SEED_TAG = 0x4E554953  # "NUIS"
 IMPACT_SEED_TAG = 0x494D5041  # "IMPA"
-RESEARCH_ARTIFACT_SCHEMA = "synthetic_log_mel_transient_v1"
+RESEARCH_FEATURE_CONFIG = {
+    "log_mel": {"size": 128, "schema": "synthetic_log_mel_v1"},
+    "transient": {"size": 21, "schema": "synthetic_transient_v1"},
+    "combined": {
+        "size": 149,
+        "schema": "synthetic_log_mel_transient_v1",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -325,7 +332,12 @@ def run_experiment(
     repetitions: int = 2,
     epochs: int = 350,
     seed: int = 20260823,
+    research_feature_mode: str = "combined",
 ) -> dict:
+    if research_feature_mode not in FEATURE_MODES:
+        raise ValueError(
+            "research_feature_mode must be one of: " + ", ".join(FEATURE_MODES)
+        )
     recordings = generate_recordings(groups=groups, repetitions=repetitions, seed=seed)
     filters = mel_filterbank(SAMPLE_RATE)
     report: dict = {
@@ -363,6 +375,7 @@ def run_experiment(
             "epochs": epochs,
             "weighting": "equal class mass after equal recording mass",
         },
+        "researchFeatureMode": research_feature_mode,
         "results": {},
     }
     for mode in FEATURE_MODES:
@@ -388,14 +401,18 @@ def run_experiment(
 
     # Keep one fitted research model in the report so feature dimensions and
     # serialization are exercised, but never point production loaders at it.
-    combined_cache = {
-        item.recording_id: _recording_features(item, "combined", True, filters)
+    research_cache = {
+        item.recording_id: _recording_features(
+            item, research_feature_mode, True, filters
+        )
         for item in recordings
     }
-    x, y, weights = _arrays(recordings, combined_cache)
+    x, y, weights = _arrays(recordings, research_cache)
     model = SoftmaxClassifier([0, 1, 2], seed=7)
     model.fit(x, y, weights, epochs=epochs)
-    report["researchModel"] = model.serializable("synthetic_shake_ice_combined")
+    report["researchModel"] = model.serializable(
+        f"synthetic_shake_ice_{research_feature_mode}"
+    )
     return report
 
 
@@ -404,15 +421,22 @@ def research_artifact(report: dict) -> dict:
 
     Keeping this separate from ``shake_ice_amount_pilot.json`` makes it
     possible to inspect and replay the fitted weights without accidentally
-    presenting synthetic scores as phone/bottle evidence. The feature size is
-    149 (log-mel plus transient), so the production 128-dimensional loader
-    rejects it even if a file is copied manually.
+    presenting synthetic scores as phone/bottle evidence. Research feature
+    schemas are intentionally distinct from the production 128-dimensional
+    loader, so a copied artifact cannot be promoted accidentally.
     """
     model = report.get("researchModel")
     if not isinstance(model, dict):
         raise ValueError("research report does not contain a fitted model")
-    if len(model.get("featureMean", [])) != 149:
-        raise ValueError("synthetic research model must have 149 features")
+    feature_mode = report.get("researchFeatureMode", "combined")
+    config = RESEARCH_FEATURE_CONFIG.get(feature_mode)
+    if config is None:
+        raise ValueError(f"unsupported synthetic research feature mode: {feature_mode}")
+    if len(model.get("featureMean", [])) != config["size"]:
+        raise ValueError(
+            "synthetic research model feature size does not match "
+            f"{feature_mode}: expected {config['size']}"
+        )
     return {
         "version": 1,
         "task": "shake_ice_amount",
@@ -421,19 +445,23 @@ def research_artifact(report: dict) -> dict:
         "sampleRate": SAMPLE_RATE,
         "windowSamples": SAMPLE_RATE,
         "hopSamples": SAMPLE_RATE // 2,
-        "featureSize": 149,
+        "featureSize": config["size"],
         "featureSchema": {
-            "name": RESEARCH_ARTIFACT_SCHEMA,
+            "name": config["schema"],
             "version": 1,
-            "description": "synthetic physics model: log-mel summary plus transient descriptors",
+            "description": (
+                "synthetic physics model: "
+                f"{feature_mode.replace('_', ' ')} features"
+            ),
         },
+        "featureMode": feature_mode,
         "model": model,
         "evaluation": {
             "holdoutGroups": report["holdoutGroups"],
             "results": {
                 key: value
                 for key, value in report["results"].items()
-                if key == "combined:gain_normalized"
+                if key == f"{feature_mode}:gain_normalized"
             },
         },
         "provenance": {
@@ -454,6 +482,12 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=350)
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument(
+        "--research-feature-mode",
+        choices=FEATURE_MODES,
+        default="combined",
+        help="feature set used for the optional research-only model artifact",
+    )
+    parser.add_argument(
         "--research-artifact",
         type=Path,
         help="optional research_only model output; never a production artifact",
@@ -464,6 +498,7 @@ def main() -> None:
         repetitions=args.repetitions,
         epochs=args.epochs,
         seed=args.seed,
+        research_feature_mode=args.research_feature_mode,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

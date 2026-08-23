@@ -65,6 +65,26 @@ class SyntheticShakeIceExperimentTests(unittest.TestCase):
         self.assertFalse(artifact["provenance"]["labelsUsedForProductionTraining"])
         self.assertFalse(artifact["provenance"]["productionArtifactUpdated"])
 
+    def test_transient_research_artifact_has_cross_runtime_schema(self):
+        report = run_experiment(
+            groups=2,
+            repetitions=1,
+            epochs=4,
+            seed=790,
+            research_feature_mode="transient",
+        )
+        artifact = research_artifact(report)
+        self.assertEqual(artifact["featureMode"], "transient")
+        self.assertEqual(artifact["featureSize"], 21)
+        self.assertEqual(
+            artifact["featureSchema"]["name"], "synthetic_transient_v1"
+        )
+        self.assertEqual(
+            set(artifact["evaluation"]["results"]), {"transient:gain_normalized"}
+        )
+        self.assertEqual(len(artifact["model"]["featureMean"]), 21)
+        self.assertFalse(artifact["provenance"]["labelsUsedForProductionTraining"])
+
 
 if __name__ == "__main__":
     unittest.main()

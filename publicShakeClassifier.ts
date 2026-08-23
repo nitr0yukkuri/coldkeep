@@ -1,6 +1,6 @@
 import shakeModelArtifact from './ml/artifacts/shake_fill_level_pilot.json';
 import shakeIceAmountArtifact from './ml/artifacts/shake_ice_amount_pilot.json';
-import researchIceAmountArtifact from './ml/artifacts/research_external_mixture_shake_ice_amount.json';
+import researchIceAmountArtifact from './ml/artifacts/research_synthetic_transient_shake_ice_amount.json';
 import { resamplePcm } from './src/platform/audio/resamplePcm';
 import {
   averagedPrediction,
@@ -45,10 +45,12 @@ type ShakeIceAmountArtifact = {
 };
 
 /**
- * A deliberately non-production artifact generated from synthetic waveform
- * mixtures.  It is kept separate from the measured ColdKeep artifact so an
- * experimental demo can exercise the end-to-end path without changing the
- * production label contract.
+ * A deliberately non-production artifact generated from a physics-inspired
+ * synthetic waveform process. It is kept separate from the measured ColdKeep
+ * artifact so an experimental demo can exercise the end-to-end path without
+ * changing the production label contract. The selected preview uses the
+ * transient-only candidate because it is the strongest research ablation;
+ * that score still does not establish phone/bottle generalisation.
  */
 type ResearchIceAmountArtifact = {
   status: 'research_only';
@@ -62,6 +64,7 @@ type ResearchIceAmountArtifact = {
   };
   classes: string[];
   model: LinearModel | null;
+  featureMode?: 'transient' | 'combined';
   provenance?: {
     labelsUsedForProductionTraining?: boolean;
     productionArtifactUpdated?: boolean;
@@ -71,7 +74,7 @@ type ResearchIceAmountArtifact = {
 export type ShakeClassifierOptions = {
   /** Enable the non-production acoustic preview explicitly for UX demos. */
   allowExperimentalPreview?: boolean;
-  /** Enable the research-only 149-feature ice preview explicitly. */
+  /** Enable the research-only transient-feature ice preview explicitly. */
   allowExperimentalIcePreview?: boolean;
 };
 
@@ -195,12 +198,13 @@ function isValidResearchIceArtifact(
     value.sampleRate === 16_000 &&
     value.windowSamples === 16_000 &&
     value.hopSamples === 8_000 &&
-    value.featureSize === 149 &&
+    value.featureSize === 21 &&
     value.classes.length === 3 &&
     value.classes[0] === 'none' &&
     value.classes[1] === 'few' &&
     value.classes[2] === 'many' &&
-    value.featureSchema?.name === 'external_single_event_mixture_v1' &&
+    value.featureMode === 'transient' &&
+    value.featureSchema?.name === 'synthetic_transient_v1' &&
     value.featureSchema?.version === 1 &&
     value.provenance?.labelsUsedForProductionTraining === false &&
     value.provenance?.productionArtifactUpdated === false &&
@@ -442,13 +446,9 @@ export function classifyShakeAudio(
     iceAmount = iceArtifact.classes[iceIndex] ?? null;
     iceAmountConfidence = iceProbabilities[iceIndex] ?? null;
   } else if (researchIcePreviewEnabled && researchIceArtifact.model !== null) {
-    const researchFeatures = features.map((featureVector, index) => [
-      ...featureVector,
-      ...extractTransientFeatures(
-        windows[index],
-        researchIceArtifact.sampleRate,
-      ),
-    ]);
+    const researchFeatures = windows.map(window =>
+      extractTransientFeatures(window, researchIceArtifact.sampleRate, true),
+    );
     const researchProbabilities = averagedPrediction(
       researchFeatures,
       researchIceArtifact.model,
