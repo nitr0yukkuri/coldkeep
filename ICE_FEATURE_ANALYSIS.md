@@ -81,6 +81,11 @@ checked-in amount artifact is `untrained`. Consequently:
 - no shortcut conclusion can be drawn;
 - no production model is generated.
 
+The checked-in reproduction of that gate is
+[`ml/reports/shake_ice_ablation.json`](ml/reports/shake_ice_ablation.json);
+it records `status=insufficient_data` because the legacy manifest has no
+measured shake schema.
+
 ### External descriptive-audio feature probe (not an amount experiment)
 
 For feature-development only, the shared transient extractor was run on seven
