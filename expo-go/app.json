@@ -4,7 +4,10 @@
     "slug": "coldkeep-go",
     "version": "0.1.0",
     "orientation": "portrait",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "userInterfaceStyle": "light",
     "plugins": [
       [
@@ -12,10 +15,13 @@
         {
           "microphonePermission": "ColdKeep uses the microphone to check bottle audio and collect labeled samples."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "android": {
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     }
   }
 }

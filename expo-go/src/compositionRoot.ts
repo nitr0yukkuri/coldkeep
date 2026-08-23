@@ -6,7 +6,7 @@ import { HydrationUseCase } from '../../src/features/hydration/application/hydra
 import { COLLECTION_ACTIONS } from '../../src/features/collection/domain/collection';
 import type { AppDependencies } from '../../src/app/types';
 import { TypeScriptClassifierAdapter } from '../../src/platform/ml/typescriptClassifier';
-import { ReactNativeShareGateway } from '../../src/platform/sharing/reactNativeShareGateway';
+import { ExpoShareGateway } from './shareGateway';
 import {
   ExpoAudioReader,
   ExpoMicrophonePermission,
@@ -26,13 +26,15 @@ export function createExpoAppDependencies(
     recording: new RecordingUseCase(new ExpoMicrophonePermission(), recorder),
     scan: new ScanBottleUseCase(
       reader,
-      [new TypeScriptClassifierAdapter()],
+      [
+        new TypeScriptClassifierAdapter({ allowExperimentalPreview: true }),
+      ],
       MODEL_RECORDING_ACTION,
     ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(
       repository,
-      new ReactNativeShareGateway(),
+      new ExpoShareGateway(),
     ),
     hydration: new HydrationUseCase(new ExpoHydrationRepository()),
   };

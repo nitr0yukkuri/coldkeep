@@ -149,6 +149,7 @@ gradle.taskGraph.whenReady { graph ->
 
 dependencies {
     implementation("com.facebook.react:react-android")
+    implementation("androidx.core:core:1.13.1")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

@@ -21,6 +21,7 @@ class MainApplication : Application(), ReactApplication {
         val packages = PackageList(this).packages
         packages.add(WavRecorderPackage())
         packages.add(RustAudioClassifierPackage())
+        packages.add(FileSharePackage())
         return packages
       }
 
