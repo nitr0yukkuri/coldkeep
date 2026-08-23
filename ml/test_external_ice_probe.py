@@ -29,7 +29,15 @@ class ExternalIceProbeTests(unittest.TestCase):
         with manifest.open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(
                 stream,
-                fieldnames=["filename", "source_url", "label", "license", "usage", "sha256"],
+                fieldnames=[
+                    "filename",
+                    "source_url",
+                    "label",
+                    "license",
+                    "usage",
+                    "production_label_eligible",
+                    "sha256",
+                ],
             )
             writer.writeheader()
             writer.writerow(
@@ -39,6 +47,7 @@ class ExternalIceProbeTests(unittest.TestCase):
                     "label": label,
                     "license": "CC0",
                     "usage": "feature_probe_only",
+                    "production_label_eligible": "false",
                     "sha256": hashlib.sha256(audio.read_bytes()).hexdigest(),
                 }
             )
@@ -66,16 +75,31 @@ class ExternalIceProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = self._write_manifest(root, "ice_present")
-            text = manifest.read_text(encoding="utf-8")
-            text = text.replace(
-                "filename,source_url,label,license,usage,sha256",
-                "filename,source_url,label,license,usage,production_label_eligible,sha256",
-            ).replace(
-                "ice.wav,https://example.invalid/ice,ice_present,CC0,feature_probe_only,",
-                "ice.wav,https://example.invalid/ice,ice_present,CC0,feature_probe_only,true,",
-            )
-            manifest.write_text(text, encoding="utf-8")
+            with manifest.open(encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            rows[0]["production_label_eligible"] = "true"
+            with manifest.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
             with self.assertRaisesRegex(ValueError, "production_label_eligible=false"):
+                probe(manifest, root)
+
+    def test_probe_rejects_manifest_without_external_production_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = self._write_manifest(root, "ice_present")
+            rows = manifest.read_text(encoding="utf-8").splitlines()
+            header = rows[0].split(",")
+            guard_index = header.index("production_label_eligible")
+            rows[0] = ",".join(
+                value for index, value in enumerate(header) if index != guard_index
+            )
+            rows[1] = ",".join(
+                value for index, value in enumerate(rows[1].split(",")) if index != guard_index
+            )
+            manifest.write_text("\n".join(rows) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "production_label_eligible"):
                 probe(manifest, root)
 
     def test_probe_reports_decoder_failures_without_crashing(self):
@@ -86,7 +110,14 @@ class ExternalIceProbeTests(unittest.TestCase):
             with manifest.open("w", encoding="utf-8", newline="") as stream:
                 writer = csv.DictWriter(
                     stream,
-                    fieldnames=["filename", "source_url", "label", "license", "usage"],
+                    fieldnames=[
+                        "filename",
+                        "source_url",
+                        "label",
+                        "license",
+                        "usage",
+                        "production_label_eligible",
+                    ],
                 )
                 writer.writeheader()
                 writer.writerow(
@@ -96,6 +127,7 @@ class ExternalIceProbeTests(unittest.TestCase):
                         "label": "ice_present",
                         "license": "CC0",
                         "usage": "feature_probe_only",
+                        "production_label_eligible": "false",
                     }
                 )
             fake_miniaudio = types.SimpleNamespace(

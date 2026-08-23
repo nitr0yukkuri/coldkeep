@@ -41,7 +41,17 @@ except ImportError:  # Support direct execution from the ml directory.
 
 
 FORBIDDEN_AMOUNT_LABELS = {"none", "few", "many"}
-REQUIRED_COLUMNS = {"filename", "source_url", "label", "license", "usage"}
+REQUIRED_COLUMNS = {
+    "filename",
+    "source_url",
+    "label",
+    "license",
+    "usage",
+    # Make the safety boundary explicit in every external manifest.  An
+    # omitted opt-out must not be interpreted as permission to reuse a source
+    # description as a production amount label.
+    "production_label_eligible",
+}
 PRODUCTION_GUARD_COLUMN = "production_label_eligible"
 
 
@@ -104,13 +114,12 @@ def probe(manifest: Path, audio_root: Path) -> dict:
                     f"manifest line {line} contains forbidden amount label {label!r}; "
                     "external audio must not train none/few/many"
                 )
-            if PRODUCTION_GUARD_COLUMN in fieldnames:
-                guard = (row.get(PRODUCTION_GUARD_COLUMN) or "").strip().lower()
-                if guard != "false":
-                    raise ValueError(
-                        f"manifest line {line} must set "
-                        f"{PRODUCTION_GUARD_COLUMN}=false for external audio"
-                    )
+            guard = (row.get(PRODUCTION_GUARD_COLUMN) or "").strip().lower()
+            if guard != "false":
+                raise ValueError(
+                    f"manifest line {line} must set "
+                    f"{PRODUCTION_GUARD_COLUMN}=false for external audio"
+                )
             filename = (row.get("filename") or "").strip()
             if not filename:
                 diagnostics.append(f"line {line}: missing filename")
