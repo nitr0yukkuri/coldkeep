@@ -105,6 +105,29 @@ recordings with measured ColdKeep `ice_count`:
 | [Chen, Snyder & Ramadge, tactile vibration signatures](https://www.researchwithnj.com/en/publications/learning-to-identify-container-contents-through-tactile-vibration-2/) | Human/object-count study reports binary and approximate 1--10 object enumeration from tactile vibration. | The raw dataset was not found as a redistributable phone-audio corpus; the sensor, objects, and container action differ from ColdKeep. |
 | [AudioSet: Rattle](https://research.google.com/audioset/dataset/rattle.html) | 1,072 weakly labelled clips of hard items moving in containers. | Event ontology has no ice count and source media are not a controlled, redistributable training set. |
 
+The closest count-labelled audio reference found in the latest search is
+[Jonetzko et al., *Multimodal Object Analysis with Auditory and Tactile Sensing
+using Recurrent Neural Networks*](https://tams.informatik.uni-hamburg.de/people/jonetzko/publications/jonetzko2020multimodal.pdf).
+The paper reports 768 robot shaking movements across eight visually identical
+PLA medicine containers, four pill-amount conditions, two angular velocities,
+and metadata for pill class, amount, motion, and velocity.  It is a useful
+methodology reference for event-density features and for designing a
+container-held-out split.  It is not an ice-count corpus: the container,
+contents, robot motion, external microphone, and laboratory noise differ from
+ColdKeep, and the paper/profile did not expose a redistributable raw-audio
+archive or a data license.  The reported audio accuracy is therefore not
+ColdKeep evidence and no row is imported into the trainer.
+
+One additional qualitative lead is [Freesound #328416, “Shaking
+Pills”](https://freesound.org/people/Rikus246/sounds/328416/).  The author
+describes a small plastic container with seven pills and lists an
+Attribution-NonCommercial 3.0 license.  It is a single author-described file,
+not a multi-count dataset; the description is not measured ColdKeep ground
+truth, and its capture device/container are different.  It may be inspected
+for transient robustness only, subject to retaining the attribution and
+non-commercial restriction.  It must not be mapped to `few`/`many` or copied
+into the production manifest.
+
 These references support testing onset density, decay, spectral flux, and
 open-set hard negatives. They are not accuracy evidence and must not change the
 `coldkeep_measured_only` trainer gate.
