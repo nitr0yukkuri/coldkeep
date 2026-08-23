@@ -67,9 +67,12 @@ def _decode_audio(path: Path) -> np.ndarray:
             "or convert the file to PCM16 WAV before probing"
         ) from error
 
-    decoded = miniaudio.decode_file(
-        str(path), nchannels=1, sample_rate=TARGET_SAMPLE_RATE
-    )
+    try:
+        decoded = miniaudio.decode_file(
+            str(path), nchannels=1, sample_rate=TARGET_SAMPLE_RATE
+        )
+    except Exception as error:  # Decoder-specific errors vary by optional backend.
+        raise ValueError(f"{path.name}: audio decoder failed: {error}") from error
     return (
         np.frombuffer(decoded.samples, dtype=np.int16).astype(np.float32) / 32768.0
     )

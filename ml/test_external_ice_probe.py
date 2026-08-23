@@ -1,9 +1,12 @@
 import csv
 import hashlib
+import sys
 import tempfile
+import types
 import unittest
 import wave
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -58,6 +61,38 @@ class ExternalIceProbeTests(unittest.TestCase):
             manifest = self._write_manifest(root, "few")
             with self.assertRaisesRegex(ValueError, "forbidden amount label"):
                 probe(manifest, root)
+
+    def test_probe_reports_decoder_failures_without_crashing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "broken.mp3").write_bytes(b"not an audio file")
+            manifest = root / "manifest.csv"
+            with manifest.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(
+                    stream,
+                    fieldnames=["filename", "source_url", "label", "license", "usage"],
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "filename": "broken.mp3",
+                        "source_url": "https://example.invalid/broken",
+                        "label": "ice_present",
+                        "license": "CC0",
+                        "usage": "feature_probe_only",
+                    }
+                )
+            fake_miniaudio = types.SimpleNamespace(
+                decode_file=lambda *args, **kwargs: (_ for _ in ()).throw(
+                    RuntimeError("synthetic decoder failure")
+                )
+            )
+            with patch.dict(sys.modules, {"miniaudio": fake_miniaudio}):
+                report = probe(manifest, root)
+        self.assertEqual(report["status"], "research_only")
+        self.assertEqual(report["records"], [])
+        self.assertEqual(len(report["diagnostics"]), 1)
+        self.assertIn("decoder failed", report["diagnostics"][0])
 
 
 if __name__ == "__main__":
