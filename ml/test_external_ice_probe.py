@@ -62,6 +62,22 @@ class ExternalIceProbeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "forbidden amount label"):
                 probe(manifest, root)
 
+    def test_probe_requires_explicit_external_production_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = self._write_manifest(root, "ice_present")
+            text = manifest.read_text(encoding="utf-8")
+            text = text.replace(
+                "filename,source_url,label,license,usage,sha256",
+                "filename,source_url,label,license,usage,production_label_eligible,sha256",
+            ).replace(
+                "ice.wav,https://example.invalid/ice,ice_present,CC0,feature_probe_only,",
+                "ice.wav,https://example.invalid/ice,ice_present,CC0,feature_probe_only,true,",
+            )
+            manifest.write_text(text, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "production_label_eligible=false"):
+                probe(manifest, root)
+
     def test_probe_reports_decoder_failures_without_crashing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
