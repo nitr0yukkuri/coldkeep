@@ -127,6 +127,35 @@ contract, but a model also needs complete container/device holdouts, no
 duplicate-audio label conflicts, and acceptable per-class recall before it can
 move from research to `trained`.
 
+### Synthetic physics sanity check (research-only)
+
+Because no measured ColdKeep recordings are available, the feature hypothesis
+was also tested with `ml/run_synthetic_shake_ice_experiment.py`. It generates
+two-second mono signals from exact synthetic counts 0--5 using damped collision
+responses, class-independent background rattles, random gain, and independent
+container/device/room response factors. The labels are generated parameters,
+not external audio annotations. The run used 216 recordings, three groups per
+holdout factor, two repetitions, and 350 optimizer epochs:
+
+| features | normalization | session BA | container BA | device BA | room BA |
+| --- | --- | ---: | ---: | ---: | ---: |
+| log-mel | gain-normalized | 0.580 | 0.585 | 0.576 | 0.605 |
+| log-mel | raw | 0.603 | 0.560 | 0.549 | 0.599 |
+| transient | gain-normalized | 0.603 | 0.593 | 0.600 | 0.603 |
+| transient | raw | 0.617 | 0.585 | 0.605 | 0.599 |
+| log-mel + transient | gain-normalized | 0.616 | 0.617 | 0.591 | 0.616 |
+| log-mel + transient | raw | 0.613 | 0.559 | 0.582 | 0.630 |
+
+No synthetic configuration reached the 0.67 deployability gate. That is a
+useful negative result: even a controlled collision-density hypothesis is
+fragile once nuisance response and missed/bounced impacts are introduced. It
+does not prove that real bottles are impossible to classify, and it must not be
+reported as ColdKeep accuracy. The complete reproducible output is
+[`ml/reports/synthetic_shake_ice_experiment.json`](ml/reports/synthetic_shake_ice_experiment.json).
+The report is marked `research_only`, records
+`labelsUsedForProductionTraining=false`, and does not alter the production
+artifact.
+
 ## Shortcut and leakage audit
 
 `ml/audit_shake_dataset.py` computes SHA256 for every audio file, detects the

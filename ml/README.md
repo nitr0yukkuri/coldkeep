@@ -171,6 +171,28 @@ deterministic PCM impulse vector used to detect runtime drift, not to claim
 model accuracy. Rust parity still needs to be run on a machine with Cargo and
 the Android/Rust toolchain available.
 
+### Synthetic feature sanity check (never production training)
+
+When a measured ColdKeep corpus is absent, run the physics-inspired research
+experiment to test the feature hypothesis without assigning labels to public
+effect sounds:
+
+```powershell
+python ml/run_synthetic_shake_ice_experiment.py `
+  --output ml/reports/synthetic_shake_ice_experiment.json `
+  --groups 3 `
+  --repetitions 2 `
+  --epochs 350
+```
+
+The generator uses exact synthetic counts and nuisance factors only to test
+whether collision-density features are learnable in principle. Its output is
+`status=research_only`; it never updates
+`ml/artifacts/shake_ice_amount_pilot.json`, and its scores are not evidence for
+phone/water-bottle generalization. The checked-in report is intentionally
+negative (all holdout balanced accuracies are below 0.67), so the honest next
+step remains measured ColdKeep collection.
+
 ## Public shake-data candidate
 
 The official [CORSMAL data catalogue](https://corsmal.github.io/data.html) and
