@@ -53,6 +53,14 @@ that a louder or denser event means `many`. The only labels accepted by
 `ml/train_shake_ice_amount.py` remain rows with
 `label_source=coldkeep_measured` and an exact measured `ice_count`.
 
+Four CC0 previews that were obtainable without the original-download login are
+checked in separately under
+[`dataset/external/ice-count-references`](dataset/external/ice-count-references).
+Their `manifest.csv` records the author wording, preview URL, SHA256, and an
+explicit `production_label_eligible=false` guard. The feature-only output is
+[`ml/reports/exact_count_ice_feature_probe.json`](ml/reports/exact_count_ice_feature_probe.json);
+it is not a supervised amount dataset.
+
 - The Udkam history/tree also contains `ecfike-ice-crack-9-hq.ogg`,
   `giwake-ice-breaking-1-hq.ogg`, and `ledas-luzta-4.ogg`. They are candidate
   hard/event references, but the checked-in audio manifest does not provide the

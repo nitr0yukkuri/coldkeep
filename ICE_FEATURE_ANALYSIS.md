@@ -117,6 +117,18 @@ TypeScript. Their SHA256 values and source/license records are in
 feature extraction and the shortcut warning only; it does not change
 `shake_ice_amount_pilot.json` and cannot satisfy the ColdKeep deployment gate.
 
+### Checked-in exact-count preview probe
+
+Four additional CC0 Freesound previews are now stored under
+`dataset/external/ice-count-references/`. Their descriptions claim one (soft),
+one (loud), three, and four cubes respectively. The reproducible probe output
+is [`ml/reports/exact_count_ice_feature_probe.json`](ml/reports/exact_count_ice_feature_probe.json).
+All four decoded successfully with zero diagnostics, but the mean onset counts
+were 4.60, 5.00, 4.45, and 5.33 per one-second window. The four-cube clip is
+not more event-dense than the one-cube clips, so even explicit author-count
+descriptions do not justify a `none/few/many` classifier. The report remains
+`research_only` with no model and no production-artifact update.
+
 The reproducible command was also run against the checked-out
 `dataset/external/ice-references/manifest.csv` using the optional `miniaudio`
 decoder. It produced 17 finite feature records and 5 decoder diagnostics (the
