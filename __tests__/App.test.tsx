@@ -45,9 +45,13 @@ import App from '../src/app/NativeApp';
 import ColdKeepScreen from '../App';
 
 test('renders correctly', async () => {
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    ReactTestRenderer.create(<App />);
+    renderer = ReactTestRenderer.create(<App />);
     await Promise.resolve();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer.unmount();
   });
 });
 
