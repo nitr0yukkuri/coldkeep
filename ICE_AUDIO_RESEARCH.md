@@ -83,6 +83,15 @@ that separates “this studio glass effect” from “that other effect” has l
 recording provenance, not ColdKeep ice amount. Product evidence must come from
 measured ColdKeep recordings and group-held-out evaluation.
 
+Recent psychophysics work is relevant to the feasibility argument: Frissen,
+Sagou, and Overvliet report auditory-only and auditory-haptic enumeration of
+1--8 beads in handheld boxes across 96 trials per participant in
+[`The role of auditory and haptic cues in object enumeration within containers`](https://pubmed.ncbi.nlm.nih.gov/41575581/).
+The paper is a human-perception study rather than a released phone/container
+audio corpus; no raw recording package with `ice_count`-equivalent labels was
+identified during this search. It supports the collision-tracking hypothesis,
+not ColdKeep model training or accuracy claims.
+
 ## Reproducibility
 
 The fixture hashes and file metadata are documented above. The actual
