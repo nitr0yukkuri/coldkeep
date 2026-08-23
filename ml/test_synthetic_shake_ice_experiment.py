@@ -6,6 +6,7 @@ from run_synthetic_shake_ice_experiment import (
     CLASS_NAMES,
     GROUP_FIELDS,
     generate_recordings,
+    research_artifact,
     run_experiment,
 )
 
@@ -45,6 +46,19 @@ class SyntheticShakeIceExperimentTests(unittest.TestCase):
             for normalization in ("gain_normalized", "raw")
         })
         self.assertEqual(len(report["researchModel"]["featureMean"]), 149)
+
+    def test_research_artifact_is_explicitly_separate_from_production(self):
+        artifact = research_artifact(
+            run_experiment(groups=2, repetitions=1, epochs=4, seed=789)
+        )
+        self.assertEqual(artifact["status"], "research_only")
+        self.assertEqual(artifact["featureSize"], 149)
+        self.assertEqual(
+            artifact["featureSchema"]["name"],
+            "synthetic_log_mel_transient_v1",
+        )
+        self.assertFalse(artifact["provenance"]["labelsUsedForProductionTraining"])
+        self.assertFalse(artifact["provenance"]["productionArtifactUpdated"])
 
 
 if __name__ == "__main__":

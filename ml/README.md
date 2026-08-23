@@ -180,6 +180,7 @@ effect sounds:
 ```powershell
 python ml/run_synthetic_shake_ice_experiment.py `
   --output ml/reports/synthetic_shake_ice_experiment.json `
+  --research-artifact ml/artifacts/research_synthetic_shake_ice_amount.json `
   --groups 3 `
   --repetitions 2 `
   --epochs 350
@@ -190,7 +191,9 @@ whether collision-density features are learnable in principle. Its output is
 `status=research_only`; it never updates
 `ml/artifacts/shake_ice_amount_pilot.json`, and its scores are not evidence for
 phone/water-bottle generalization. The checked-in report is intentionally
-negative (all holdout balanced accuracies are below 0.67), so the honest next
+phone/water-bottle generalization. The optional research artifact uses a
+separate 149-feature schema and is never loaded by the app. The checked-in
+report is intentionally negative (all holdout balanced accuracies are below 0.67), so the honest next
 step remains measured ColdKeep collection.
 
 ## Public shake-data candidate

@@ -40,6 +40,7 @@ NORMALIZATION_MODES = ("gain_normalized", "raw")
 GROUP_FIELDS = ("session_id", "container_id", "device_id", "room_id")
 NUISANCE_SEED_TAG = 0x4E554953  # "NUIS"
 IMPACT_SEED_TAG = 0x494D5041  # "IMPA"
+RESEARCH_ARTIFACT_SCHEMA = "synthetic_log_mel_transient_v1"
 
 
 @dataclass(frozen=True)
@@ -381,6 +382,53 @@ def run_experiment(
     return report
 
 
+def research_artifact(report: dict) -> dict:
+    """Build a deliberately non-deployable artifact from one research run.
+
+    Keeping this separate from ``shake_ice_amount_pilot.json`` makes it
+    possible to inspect and replay the fitted weights without accidentally
+    presenting synthetic scores as phone/bottle evidence. The feature size is
+    149 (log-mel plus transient), so the production 128-dimensional loader
+    rejects it even if a file is copied manually.
+    """
+    model = report.get("researchModel")
+    if not isinstance(model, dict):
+        raise ValueError("research report does not contain a fitted model")
+    if len(model.get("featureMean", [])) != 149:
+        raise ValueError("synthetic research model must have 149 features")
+    return {
+        "version": 1,
+        "task": "shake_ice_amount",
+        "status": "research_only",
+        "classes": list(CLASS_NAMES),
+        "sampleRate": SAMPLE_RATE,
+        "windowSamples": SAMPLE_RATE,
+        "hopSamples": SAMPLE_RATE // 2,
+        "featureSize": 149,
+        "featureSchema": {
+            "name": RESEARCH_ARTIFACT_SCHEMA,
+            "version": 1,
+            "description": "synthetic physics model: log-mel summary plus transient descriptors",
+        },
+        "model": model,
+        "evaluation": {
+            "holdoutGroups": report["holdoutGroups"],
+            "results": {
+                key: value
+                for key, value in report["results"].items()
+                if key == "combined:gain_normalized"
+            },
+        },
+        "provenance": {
+            "source": "ml/run_synthetic_shake_ice_experiment.py",
+            "syntheticVersion": report["syntheticVersion"],
+            "labelSource": report["labelSource"],
+            "labelsUsedForProductionTraining": False,
+            "productionArtifactUpdated": False,
+        },
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
@@ -388,6 +436,11 @@ def main() -> None:
     parser.add_argument("--repetitions", type=int, default=2)
     parser.add_argument("--epochs", type=int, default=350)
     parser.add_argument("--seed", type=int, default=20260823)
+    parser.add_argument(
+        "--research-artifact",
+        type=Path,
+        help="optional research_only model output; never a production artifact",
+    )
     args = parser.parse_args()
     report = run_experiment(
         groups=args.groups,
@@ -397,12 +450,19 @@ def main() -> None:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if args.research_artifact:
+        args.research_artifact.parent.mkdir(parents=True, exist_ok=True)
+        args.research_artifact.write_text(
+            json.dumps(research_artifact(report), indent=2), encoding="utf-8"
+        )
     print(
         "synthetic shake ice experiment: "
         f"recordings={report['generation']['recordings']}, "
         f"status={report['status']}"
     )
     print(f"wrote {args.output}")
+    if args.research_artifact:
+        print(f"wrote research-only artifact {args.research_artifact}")
 
 
 if __name__ == "__main__":
