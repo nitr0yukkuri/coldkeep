@@ -54,6 +54,22 @@ that a louder or denser event means `many`. The only labels accepted by
 `ml/train_shake_ice_amount.py` remain rows with
 `label_source=coldkeep_measured` and an exact measured `ice_count`.
 
+### Additional public-data leads checked in the second search pass
+
+The search was extended beyond GitHub effect-file mirrors to academic
+repositories, open dataset catalogs, and audio-question-answer benchmarks:
+
+| lead | what was actually available | decision |
+| --- | --- | --- |
+| [Frissen, Sagou & Overvliet (2026)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12830427/) | An open human-perception study of beads in handheld cardboard boxes. It reports auditory-only and auditory-haptic enumeration, but the public article exposes study results and procedure rather than a redistributable phone-recorded raw-audio corpus with per-file object counts. | Use as a feature/design hypothesis only. It supports collision-density reasoning, not ColdKeep training or accuracy evidence. |
+| [GLDKWY/Water-Filling-Level](https://github.com/GLDKWY/Water-Filling-Level) (ATVfle) | 1,140 audio-visual recordings for empty/50%/90% containers holding water, rice, or pasta. The repository documents a jaw-mounted BOYA microphone and provides annotations/model links, but no ice recordings or `ice_count`; the data are a pouring/filling-level domain with different hardware. | Candidate for future liquid-level/domain pretraining only. It cannot supply `none/few/many` ice labels. |
+| [AV-Phys Bench example C1-1-43](https://zijuncui.com/AV-Phys/videos/C1-1-43/) | A generated video prompt/example describes a clear bottle with water and “several ice cubes” being shaken. It has no measured cube count and uses generated/proprietary or benchmark media rather than a controlled recording corpus. | Qualitative multimodal sanity reference only; not imported or used for labels. |
+| [MMAU-Pro](https://huggingface.co/datasets/gamma-lab-umd/MMAU-Pro) | Wild audio paired with expert QA under CC BY-NC 4.0. Ice-related questions can test general audio reasoning, but the benchmark is not a controlled bottle dataset and its license is unsuitable for the product artifact without a separate review. | Evaluation/domain-gap lead only; no ColdKeep amount labels or production weights. |
+
+These leads do not change the data contract. In particular, “several ice
+cubes”, a benchmark answer, or an author-written effect description is not
+treated as measured `ice_count` for the ColdKeep trainer.
+
 Four CC0 previews that were obtainable without the original-download login are
 checked in separately under
 [`dataset/external/ice-count-references`](dataset/external/ice-count-references).
