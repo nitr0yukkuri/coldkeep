@@ -32,8 +32,12 @@ export class RustClassifierAdapter implements AudioClassifier {
       );
       // The native path intentionally has no heuristic preview. Let the
       // configured TypeScript adapter provide the generic experimental
-      // estimate when the checked-in shake artifact is still untrained.
-      if (result.measurementStatus === 'untrained') {
+      // estimate when the fill artifact is still untrained, unless the
+      // independently trained ice artifact already produced a useful result.
+      if (
+        result.measurementStatus === 'untrained' &&
+        result.iceAmountStatus !== 'trained'
+      ) {
         throw new Error('Rust shake model is untrained; use experimental fallback');
       }
       return result;

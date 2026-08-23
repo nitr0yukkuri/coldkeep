@@ -17,7 +17,7 @@
 3. `water/fill/iceAmount` を同じJSON契約で返す。
 4. `libcoldkeep_ml.so` が未ビルドの開発環境では、アプリが既存TypeScript推論へフォールバックする。
 
-`iceAmountStatus` は、モデル未生成時は `untrained`、`ml/artifacts/shake_ice_amount_pilot.json` の評価ゲートを通ったRustビルド時だけ `trained` になる。Rust化後も氷量モデルが未検証なら製品判定とは扱わない。
+`iceAmountStatus` は、モデル未生成時は `untrained`、`ml/artifacts/shake_ice_amount_pilot.json` の評価ゲートを通ったRustビルド時だけ `trained` になる。氷量artifactは残量artifactとは独立に検証・推論し、残量モデルが未学習でも氷量だけを返せる。ただし、残量の自動記録は引き続き残量モデルが`trained`になるまで行わない。Rust化後も氷量モデルが未検証なら製品判定とは扱わない。
 
 ## 受け入れ条件
 

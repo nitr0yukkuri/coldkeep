@@ -4,7 +4,6 @@ import { resamplePcm } from './src/platform/audio/resamplePcm';
 import {
   averagedPrediction,
   extractWindowFeatures,
-  recordingWindows,
   LinearModel,
 } from './publicAudioClassifier';
 import {
@@ -113,6 +112,9 @@ function isValidShakeArtifact(value: ShakeModelArtifact): boolean {
     return false;
   }
   return (
+    (value.status === 'trained' ||
+      value.status === 'experimental' ||
+      value.status === 'untrained') &&
     Array.isArray(value.classes) &&
     value.sampleRate === 16_000 &&
     value.windowSamples === 16_000 &&
@@ -127,25 +129,37 @@ function isValidShakeArtifact(value: ShakeModelArtifact): boolean {
   );
 }
 
+function isValidIceArtifact(value: ShakeIceAmountArtifact): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return (
+    (value.status === 'trained' ||
+      value.status === 'experimental' ||
+      value.status === 'untrained') &&
+    Array.isArray(value.classes) &&
+    value.sampleRate === 16_000 &&
+    value.windowSamples === 16_000 &&
+    value.hopSamples === 8_000 &&
+    value.featureSize === 128 &&
+    value.classes.length === 3 &&
+    value.classes[0] === 'none' &&
+    value.classes[1] === 'few' &&
+    value.classes[2] === 'many' &&
+    value.featureSchema?.name === 'log_mel_summary_v1' &&
+    value.featureSchema?.version === 1 &&
+    (value.model === null ||
+      isValidLinearModel(value.model, value.featureSize, value.classes.length))
+  );
+}
+
 function effectiveIceStatus(): ShakeIceAmountArtifact['status'] {
-  if (!iceArtifact || typeof iceArtifact !== 'object') {
+  if (!isValidIceArtifact(iceArtifact)) {
     return 'untrained';
   }
-  const validShape =
-    Array.isArray(iceArtifact.classes) &&
-    iceArtifact.sampleRate === 16_000 &&
-    iceArtifact.windowSamples === 16_000 &&
-    iceArtifact.hopSamples === 8_000 &&
-    iceArtifact.featureSize === 128 &&
-    iceArtifact.classes.length === 3 &&
-    iceArtifact.classes[0] === 'none' &&
-    iceArtifact.classes[1] === 'few' &&
-    iceArtifact.classes[2] === 'many' &&
-    iceArtifact.featureSchema?.name === 'log_mel_summary_v1' &&
-    iceArtifact.featureSchema?.version === 1;
   if (
     iceArtifact.status === 'trained' &&
-    (!validShape ||
+    (iceArtifact.model === null ||
       !isValidLinearModel(
         iceArtifact.model,
         iceArtifact.featureSize,
@@ -155,6 +169,31 @@ function effectiveIceStatus(): ShakeIceAmountArtifact['status'] {
     return 'untrained';
   }
   return iceArtifact.status;
+}
+
+function recordingWindowsFor(
+  samples: Float32Array,
+  windowSamples: number,
+  hopSamples: number,
+): Float32Array[] {
+  if (samples.length <= windowSamples) {
+    const padded = new Float32Array(windowSamples);
+    padded.set(samples);
+    return [padded];
+  }
+  const starts: number[] = [];
+  for (
+    let start = 0;
+    start + windowSamples <= samples.length;
+    start += hopSamples
+  ) {
+    starts.push(start);
+  }
+  const tail = samples.length - windowSamples;
+  if (starts[starts.length - 1] !== tail) {
+    starts.push(tail);
+  }
+  return starts.map(start => samples.slice(start, start + windowSamples));
 }
 
 function unknownPrediction(): PublicAudioPrediction {
@@ -203,7 +242,11 @@ export function estimateExperimentalShake(
   sourceRate: number,
 ): ExperimentalShakeEstimate {
   const samples = resamplePcm(input, sourceRate, artifact.sampleRate);
-  const windows = recordingWindows(samples);
+  const windows = recordingWindowsFor(
+    samples,
+    artifact.windowSamples,
+    artifact.hopSamples,
+  );
   const profiles = windows.map(window => {
     const features = extractWindowFeatures(window);
     const melMeans = features.slice(0, 32);
@@ -242,69 +285,75 @@ export function classifyShakeAudio(
   sourceRate: number,
   options: ShakeClassifierOptions = {},
 ): PublicAudioPrediction {
-  if (
-    !isValidShakeArtifact(artifact) ||
-    (effectiveStatus(artifact.status, artifact.model) !== 'trained' &&
-      !options.allowExperimentalPreview)
-  ) {
-    return unknownPrediction();
-  }
-  const samples = resamplePcm(input, sourceRate, artifact.sampleRate);
-  const features = recordingWindows(samples).map(extractWindowFeatures);
-  if (
-    artifact.model === null &&
-    artifact.heuristic === 'energy-profile-v1' &&
-    options.allowExperimentalPreview === true
-  ) {
-    const estimate = estimateExperimentalShake(input, sourceRate);
-    return {
-      containsWater: true,
-      waterConfidence: estimate.confidence,
-      fillLevel: estimate.fillLevel,
-      fillConfidence: estimate.confidence,
-      icePresence: null,
-      iceConfidence: null,
-      iceStatus: 'untrained',
-      iceAmount: null,
-      iceAmountConfidence: null,
-      iceAmountStatus: effectiveIceStatus(),
-      engine: 'typescript',
-      measurementAction: 'shake',
-      measurementStatus: 'experimental',
-    };
-  }
-  if (
-    artifact.model === null ||
-    !isValidLinearModel(artifact.model, artifact.featureSize, artifact.classes.length)
-  ) {
-    return unknownPrediction();
-  }
-  const probabilities = averagedPrediction(features, artifact.model);
-  const bestIndex = probabilities.reduce(
-    (best, value, index) => (value > probabilities[best] ? index : best),
-    0,
-  );
-  const fillClass = artifact.classes[bestIndex];
-  const confidence = probabilities[bestIndex] ?? 0;
-  const fillLevel = fillClassToLevel(fillClass);
+  const fillArtifactValid = isValidShakeArtifact(artifact);
+  const fillStatus = fillArtifactValid
+    ? effectiveStatus(artifact.status, artifact.model)
+    : 'untrained';
   const iceStatus = effectiveIceStatus();
-  let iceAmount: IceAmountClass | null = null;
-  let iceAmountConfidence: number | null = null;
-  if (
-    iceStatus !== 'untrained' &&
+  const iceReady =
+    iceStatus === 'trained' &&
+    isValidIceArtifact(iceArtifact) &&
     iceArtifact.model !== null &&
-    iceArtifact.classes.length === 3 &&
-    iceArtifact.sampleRate === artifact.sampleRate &&
-    iceArtifact.windowSamples === artifact.windowSamples &&
-    iceArtifact.hopSamples === artifact.hopSamples &&
-    iceArtifact.featureSize === artifact.featureSize &&
-    iceArtifact.featureSchema?.name === 'log_mel_summary_v1' &&
-    iceArtifact.featureSchema?.version === 1 &&
     isValidLinearModel(
       iceArtifact.model,
       iceArtifact.featureSize,
       iceArtifact.classes.length,
-    )
+    );
+  const fillReady =
+    fillStatus === 'trained' &&
+    fillArtifactValid &&
+    artifact.model !== null &&
+    isValidLinearModel(artifact.model, artifact.featureSize, artifact.classes.length);
+  const fillPreviewEnabled =
+    options.allowExperimentalPreview === true &&
+    fillArtifactValid &&
+    ((artifact.model === null && artifact.heuristic === 'energy-profile-v1') ||
+      (artifact.model !== null && fillStatus === 'experimental'));
+
+  // The ice amount artifact is a separate task. It must remain usable when
+  // the fill-level artifact has not been trained yet; otherwise promoting an
+  // ice model alone would silently leave the user-facing ice result untrained.
+  if (!fillReady && !fillPreviewEnabled && !iceReady) {
+    return unknownPrediction();
+  }
+
+  const analysisArtifact = fillArtifactValid ? artifact : iceArtifact;
+  const samples = resamplePcm(input, sourceRate, analysisArtifact.sampleRate);
+  const features = recordingWindowsFor(
+    samples,
+    analysisArtifact.windowSamples,
+    analysisArtifact.hopSamples,
+  ).map(extractWindowFeatures);
+
+  let fillClass: ShakeFillClass | null = null;
+  let fillLevel: 0 | 50 | 100 | null = null;
+  let fillConfidence: number | null = null;
+  let measurementStatus: ShakeModelArtifact['status'] = 'untrained';
+  let containsWater = false;
+  if (fillPreviewEnabled && artifact.model === null) {
+    const estimate = estimateExperimentalShake(input, sourceRate);
+    fillClass = estimate.fillClass;
+    fillLevel = estimate.fillLevel;
+    fillConfidence = estimate.confidence;
+    measurementStatus = 'experimental';
+    containsWater = true;
+  } else if (fillReady || fillPreviewEnabled) {
+    const probabilities = averagedPrediction(features, artifact.model!);
+    const bestIndex = probabilities.reduce(
+      (best, value, index) => (value > probabilities[best] ? index : best),
+      0,
+    );
+    fillClass = artifact.classes[bestIndex];
+    fillConfidence = probabilities[bestIndex] ?? 0;
+    fillLevel = fillClassToLevel(fillClass);
+    measurementStatus = fillReady ? 'trained' : 'experimental';
+    containsWater = true;
+  }
+  let iceAmount: IceAmountClass | null = null;
+  let iceAmountConfidence: number | null = null;
+  if (
+    iceReady &&
+    iceArtifact.model !== null
   ) {
     const iceProbabilities = averagedPrediction(features, iceArtifact.model);
     const iceIndex = iceProbabilities.reduce(
@@ -318,10 +367,10 @@ export function classifyShakeAudio(
     // A shake class describes the amount of content, including empty. Water
     // presence is not a separate task here, so it is not presented as a
     // positive/negative material claim by the UI.
-    containsWater: true,
-    waterConfidence: confidence,
+    containsWater,
+    waterConfidence: fillConfidence ?? 0,
     fillLevel,
-    fillConfidence: confidence,
+    fillConfidence,
     icePresence:
       iceAmount !== null ? iceAmountClassToPresence(iceAmount) : null,
     iceConfidence: iceAmountConfidence,
@@ -331,6 +380,6 @@ export function classifyShakeAudio(
     iceAmountStatus: iceStatus,
     engine: 'typescript',
     measurementAction: 'shake',
-    measurementStatus: artifact.status,
+    measurementStatus,
   };
 }

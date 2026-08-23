@@ -1089,7 +1089,7 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         shake_ice_status(&shake_ice.status)
     };
     let shake_ready = status == "trained" && valid_shake_artifact(&shake);
-    if !shake_ready {
+    if !shake_ready && !ice_ready {
         return parse_wav(bytes).map(|_| Prediction {
             contains_water: false,
             water_confidence: 0.0,
@@ -1109,10 +1109,6 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             measurement_status: Some("untrained"),
         });
     }
-    let shake_model = shake
-        .model
-        .as_ref()
-        .expect("valid shake artifact has a model");
     let (samples, source_rate) = parse_wav(bytes)?;
     let samples = resample(&samples, source_rate, baseline.sample_rate);
     let windows = recording_windows(&samples, baseline.window_samples, baseline.hop_samples);
@@ -1120,21 +1116,33 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         .iter()
         .map(|window| extract_features(window, &baseline))
         .collect::<Vec<_>>();
-    let probabilities = averaged_prediction(&features, shake_model);
-    let best_index = probabilities
-        .iter()
-        .enumerate()
-        .max_by(|(_, left), (_, right)| left.total_cmp(right))
-        .map(|(index, _)| index)
-        .unwrap_or(0);
-    let fill_class = shake_model.classes.get(best_index).copied().unwrap_or(0);
-    let fill_level = match fill_class {
-        0 => 0,
-        1 => 50,
-        2 => 100,
-        _ => return Err("shake model class must be 0, 1, or 2".to_string()),
-    };
-    let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
+    let (contains_water, water_confidence, fill_level, fill_confidence, measurement_status) =
+        if shake_ready {
+            let shake_model = shake
+                .model
+                .as_ref()
+                .ok_or("valid shake artifact has no model")?;
+            let probabilities = averaged_prediction(&features, shake_model);
+            let best_index = probabilities
+                .iter()
+                .enumerate()
+                .max_by(|(_, left), (_, right)| left.total_cmp(right))
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+            let fill_class = shake_model.classes.get(best_index).copied().unwrap_or(0);
+            let fill_level = match fill_class {
+                0 => 0,
+                1 => 50,
+                2 => 100,
+                _ => return Err("shake model class must be 0, 1, or 2".to_string()),
+            };
+            let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
+            (true, confidence, Some(fill_level), Some(confidence), status)
+        } else {
+            // An ice artifact is independently deployable.  Keep the fill
+            // result unknown until the separate shake fill model is trained.
+            (false, 0.0, None, None, "untrained")
+        };
     let (ice_amount, ice_amount_confidence) = if ice_ready {
         let ice_model = shake_ice.model.as_ref().expect("checked above");
         let ice_probabilities = averaged_prediction(&features, ice_model);
@@ -1154,10 +1162,10 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         (None, None)
     };
     Ok(Prediction {
-        contains_water: true,
-        water_confidence: confidence,
-        fill_level: Some(fill_level),
-        fill_confidence: Some(confidence),
+        contains_water,
+        water_confidence,
+        fill_level,
+        fill_confidence,
         // Keep the native payload aligned with the TypeScript fallback: a
         // trained coarse amount also supplies the derived ice/no-ice signal.
         ice_presence: ice_presence_from_amount(ice_amount),
@@ -1173,7 +1181,7 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         engine: "rust",
         model_version: 1,
         measurement_action: Some("shake"),
-        measurement_status: Some(status),
+        measurement_status: Some(measurement_status),
     })
 }
 

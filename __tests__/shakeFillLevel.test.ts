@@ -79,3 +79,60 @@ test('the app adapter enables the generic experimental shake preview', async () 
   expect(result.fillLevel).not.toBeNull();
   expect(result.iceAmount).toBeNull();
 });
+
+test('a trained ice artifact is usable while the fill artifact is untrained', () => {
+  const model = {
+    classes: [0, 1, 2],
+    featureMean: Array(128).fill(0),
+    featureScale: Array(128).fill(1),
+    weights: Array.from({ length: 128 }, () => [0, 0, 0]),
+    bias: [0, 0, 5],
+  };
+  jest.resetModules();
+  jest.doMock('../ml/artifacts/shake_fill_level_pilot.json', () => ({
+    __esModule: true,
+    default: {
+      version: 1,
+      task: 'shake_fill_level',
+      status: 'untrained',
+      classes: ['empty', 'half', 'full'],
+      sampleRate: 16_000,
+      windowSamples: 16_000,
+      hopSamples: 8_000,
+      featureSize: 128,
+      model: null,
+    },
+  }));
+  jest.doMock('../ml/artifacts/shake_ice_amount_pilot.json', () => ({
+    __esModule: true,
+    default: {
+      version: 1,
+      task: 'shake_ice_amount',
+      status: 'trained',
+      classes: ['none', 'few', 'many'],
+      sampleRate: 16_000,
+      windowSamples: 16_000,
+      hopSamples: 8_000,
+      featureSize: 128,
+      featureSchema: { name: 'log_mel_summary_v1', version: 1 },
+      model,
+    },
+  }));
+
+  let classify!: typeof classifyShakeAudio;
+  jest.isolateModules(() => {
+    classify = require('../publicShakeClassifier').classifyShakeAudio;
+  });
+  const input = new Float32Array(16_000);
+  input[400] = 0.2;
+  const result = classify(input, 16_000);
+
+  expect(result.measurementStatus).toBe('untrained');
+  expect(result.fillLevel).toBeNull();
+  expect(result.iceAmountStatus).toBe('trained');
+  expect(result.iceAmount).toBe('many');
+  expect(result.iceAmountConfidence).toBeGreaterThan(0.9);
+  jest.dontMock('../ml/artifacts/shake_fill_level_pilot.json');
+  jest.dontMock('../ml/artifacts/shake_ice_amount_pilot.json');
+  jest.resetModules();
+});
