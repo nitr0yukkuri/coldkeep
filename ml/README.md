@@ -181,6 +181,19 @@ python ml/probe_external_ice_audio.py `
   --output ml/reports/ice_shake_reference_probe.json
 ```
 
+The same feature-only probe can be run on the close-domain water-bottle hard
+negatives:
+
+```powershell
+python ml/probe_external_ice_audio.py `
+  --manifest dataset/external/hard-negative-references/manifest.csv `
+  --audio-root dataset/external/hard-negative-references `
+  --output ml/reports/hard_negative_water_bottle_probe.json
+```
+
+Those previews remain external, research-only, and explicitly ineligible for
+`none`/`few`/`many` training.
+
 The probe requires `production_label_eligible=false` on every external row,
 records decoder/feature diagnostics, and always emits `status=research_only`.
 These previews are not amount labels or ColdKeep accuracy evidence.

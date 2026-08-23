@@ -93,6 +93,24 @@ All ten previews decoded with zero diagnostics. They are useful for checking
 whether transient detectors behave sensibly on shake-like ice events, but they
 remain presence/domain references and cannot train `none`/`few`/`many`.
 
+### Water-bottle shake hard negatives
+
+The [`hard-negative-references`](dataset/external/hard-negative-references)
+directory adds four CC0 Freesound previews that are closer to the ColdKeep
+action domain but describe liquid-only or unspecified bottle shaking rather than
+ice. The sources include a Zoom H2 recording of bottles with liquid
+([qubodup #184287](https://freesound.org/people/qubodup/sounds/184287/)), a
+contact-microphone bottle shake ([bushi3593 #219371](https://freesound.org/people/bushi3593/sounds/219371/)), a short water-bottle shake
+([florian_reinke #63527](https://freesound.org/people/florian_reinke/sounds/63527/)),
+and a condenser-mic plastic bottle recording
+([dylanperitz #452364](https://freesound.org/people/dylanperitz/sounds/452364/)).
+The local manifest stores preview SHA256 values and sets
+`production_label_eligible=false` for every row. The feature probe decoded all
+four previews with zero diagnostics; its output is
+[`ml/reports/hard_negative_water_bottle_probe.json`](ml/reports/hard_negative_water_bottle_probe.json).
+They can test bottle-domain false positives and augmentation plumbing only;
+they cannot supply an ice-count label or production accuracy evidence.
+
 ### EPIC-SOUNDS hard-negative metadata (not imported)
 
 The public [EPIC-SOUNDS annotation repository](https://github.com/epic-kitchens/epic-sounds-annotations)
