@@ -114,7 +114,8 @@ The app never claims an exact cube count or ice mass. Collect at least two
 recordings in at least two independent sessions for every band; vary bottles,
 phones, rooms, and operators before treating the result as a product model.
 The checked-in artifact is manifest-only and the scan screen remains
-`未判定` until the session-held-out balanced-accuracy gate passes.
+`未判定` until the scored session/container/device/room/operator holdout gate
+passes.
 
 Every supervised row must carry `label_source=coldkeep_measured`. External
 CORSMAL/Freesound rows use `label_source=external_unlabeled` and leave
@@ -182,7 +183,8 @@ python ml/run_shake_ice_ablation.py `
 ```
 
 The ablation report evaluates the same recordings under session-, container-,
-and device-held-out folds, with and without gain normalisation. It does not
-write a model artifact. Only after the report has been reviewed and the
-balanced-accuracy/recall/shortcut gates pass may the existing trainer be run
-to produce a `trained` artifact.
+device-, room-, and operator-held-out folds, with and without gain
+normalisation. It does not write a model artifact. Only after the report has
+been reviewed and the balanced-accuracy/recall/shortcut gates pass for all
+five holdout groups may the existing trainer be run to produce a `trained`
+artifact.
