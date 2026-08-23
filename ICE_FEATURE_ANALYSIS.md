@@ -81,6 +81,37 @@ checked-in amount artifact is `untrained`. Consequently:
 - no shortcut conclusion can be drawn;
 - no production model is generated.
 
+### External descriptive-audio feature probe (not an amount experiment)
+
+For feature-development only, the shared transient extractor was run on seven
+public clips whose descriptions mention one, two, or three cubes. The clips
+were decoded to mono 16 kHz before the normal 1-second windows were created.
+The claimed counts below are provenance metadata, **not ColdKeep labels**.
+
+| clip | claimed count | windows | mean onset count | mean spectral flux | mean centroid (Hz) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Freesound #555043 (one cube falling) | 1 | 3 | 4.67 | 0.0570 | 1,515 |
+| Freesound #682741 (one cube, soft) | 1 | 5 | 4.60 | 0.0872 | 1,064 |
+| Freesound #784069 (three cubes, mic in glass) | 3 | 85 | 4.45 | 0.0745 | 3,137 |
+| BigSoundBank #2124 | 3 | 1 | 4.00 | 0.0432 | 1,226 |
+| BigSoundBank #2125 | 3 | 1 | 2.00 | 0.0471 | 1,423 |
+| BigSoundBank #2128 | 3 | 1 | 5.00 | 0.0541 | 1,729 |
+| SoundBible `ice_cubes_glass_2182.wav` | 2 | 3 | 5.33 | 0.0820 | 2,369 |
+
+This small probe is intentionally not an accuracy result. It demonstrates two
+important failure modes: the two-cube clip has more detected onsets than every
+three-cube BigSoundBank take except #2128, and three recordings all described
+as three cubes vary from 2 to 5 onsets per second. Studio microphone,
+container, action (drop versus shake), duration, and room dominate these
+statistics. A model trained on these files would learn source/action identity,
+not ColdKeep ice amount.
+
+All seven vectors were finite and used the same 21-feature order as Rust and
+TypeScript. Their SHA256 values and source/license records are in
+[`ICE_AUDIO_RESEARCH.md`](ICE_AUDIO_RESEARCH.md). The probe therefore validates
+feature extraction and the shortcut warning only; it does not change
+`shake_ice_amount_pilot.json` and cannot satisfy the ColdKeep deployment gate.
+
 This is an intentional `insufficient_data` result, not a zero or fabricated
 accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
 contract, but a model also needs complete container/device holdouts, no
