@@ -257,3 +257,19 @@ the Python/Jest/Rust tests use the same deterministic PCM impulse fixture.
 The TypeScript and Python tests pass in this checkout; Cargo is not installed
 in this Windows environment, so Rust execution remains a required CI/device
 step rather than an unreported claim.
+
+## Research-only runtime preview
+
+The external-mixture artifact can be exercised end to end through the
+TypeScript path by setting `EXPO_PUBLIC_ML_PREVIEW=research`. This is an
+explicit opt-in: the normal build keeps the measured ice artifact untrained and
+shows `未判定`. The preview uses the 149-dimensional `log-mel + transient`
+schema, caps its confidence below the production threshold, and marks the
+result `iceAmountStatus=experimental`.
+
+The UI labels this value as a research preview and the hydration use case never
+consumes it. The flag does not change
+`ml/artifacts/shake_ice_amount_pilot.json`, does not add external audio to
+supervised ColdKeep training, and does not establish phone/water-bottle
+accuracy. It exists only to verify model loading, feature extraction, and the
+presentation boundary before measured recordings are available.

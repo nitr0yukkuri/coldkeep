@@ -6,6 +6,7 @@ import {
 import { hasUsableScanSignal } from '../domain/audioQuality';
 import {
   normalizeScanResult,
+  ScanResultNormalizationOptions,
   ScanAction,
   ScanResult,
 } from '../domain/scanResult';
@@ -15,6 +16,7 @@ export class ScanBottleUseCase {
     private readonly reader: AudioReader,
     private readonly classifiers: readonly AudioClassifier[],
     private readonly action: ScanAction = 'pour',
+    private readonly normalizationOptions: ScanResultNormalizationOptions = {},
   ) {}
 
   async execute(recording: RecordingRef): Promise<ScanResult> {
@@ -44,6 +46,7 @@ export class ScanBottleUseCase {
         return normalizeScanResult(
           await classifier.classify({ recording, audio, action: this.action }),
           this.action,
+          this.normalizationOptions,
         );
       } catch (error) {
         lastError = error;

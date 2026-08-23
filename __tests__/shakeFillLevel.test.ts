@@ -49,6 +49,23 @@ test('the production shake path stays untrained without a model', () => {
   expect(result.fillLevel).toBeNull();
 });
 
+test('the research ice preview requires explicit opt-in and stays experimental', () => {
+  const input = new Float32Array(16_000);
+  input[400] = 0.2;
+
+  const disabled = classifyShakeAudio(input, 16_000);
+  expect(disabled.iceAmount).toBeNull();
+  expect(disabled.iceAmountStatus).toBe('untrained');
+
+  const preview = classifyShakeAudio(input, 16_000, {
+    allowExperimentalIcePreview: true,
+  });
+  expect(preview.iceAmount).toMatch(/^(none|few|many)$/);
+  expect(preview.iceAmountStatus).toBe('experimental');
+  expect(preview.iceAmountConfidence).toBeLessThan(0.65);
+  expect(preview.measurementAction).toBe('shake');
+});
+
 test('the preview shake estimate requires an explicit opt-in', () => {
   const input = new Float32Array(16_000);
   for (let index = 0; index < input.length; index += 1) {

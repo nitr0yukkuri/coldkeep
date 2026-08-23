@@ -1,9 +1,11 @@
 import shakeModelArtifact from './ml/artifacts/shake_fill_level_pilot.json';
 import shakeIceAmountArtifact from './ml/artifacts/shake_ice_amount_pilot.json';
+import researchIceAmountArtifact from './ml/artifacts/research_external_mixture_shake_ice_amount.json';
 import { resamplePcm } from './src/platform/audio/resamplePcm';
 import {
   averagedPrediction,
   extractWindowFeatures,
+  extractTransientFeatures,
   LinearModel,
 } from './publicAudioClassifier';
 import {
@@ -42,13 +44,41 @@ type ShakeIceAmountArtifact = {
   model: LinearModel | null;
 };
 
+/**
+ * A deliberately non-production artifact generated from synthetic waveform
+ * mixtures.  It is kept separate from the measured ColdKeep artifact so an
+ * experimental demo can exercise the end-to-end path without changing the
+ * production label contract.
+ */
+type ResearchIceAmountArtifact = {
+  status: 'research_only';
+  sampleRate: number;
+  windowSamples: number;
+  hopSamples: number;
+  featureSize: number;
+  featureSchema?: {
+    name: string;
+    version: number;
+  };
+  classes: string[];
+  model: LinearModel | null;
+  provenance?: {
+    labelsUsedForProductionTraining?: boolean;
+    productionArtifactUpdated?: boolean;
+  };
+};
+
 export type ShakeClassifierOptions = {
   /** Enable the non-production acoustic preview explicitly for UX demos. */
   allowExperimentalPreview?: boolean;
+  /** Enable the research-only 149-feature ice preview explicitly. */
+  allowExperimentalIcePreview?: boolean;
 };
 
 const artifact = shakeModelArtifact as ShakeModelArtifact;
 const iceArtifact = shakeIceAmountArtifact as ShakeIceAmountArtifact;
+const researchIceArtifact =
+  researchIceAmountArtifact as ResearchIceAmountArtifact;
 
 function effectiveStatus(
   status: ShakeModelArtifact['status'],
@@ -150,6 +180,32 @@ function isValidIceArtifact(value: ShakeIceAmountArtifact): boolean {
     value.featureSchema?.version === 1 &&
     (value.model === null ||
       isValidLinearModel(value.model, value.featureSize, value.classes.length))
+  );
+}
+
+function isValidResearchIceArtifact(
+  value: ResearchIceAmountArtifact,
+): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return (
+    value.status === 'research_only' &&
+    Array.isArray(value.classes) &&
+    value.sampleRate === 16_000 &&
+    value.windowSamples === 16_000 &&
+    value.hopSamples === 8_000 &&
+    value.featureSize === 149 &&
+    value.classes.length === 3 &&
+    value.classes[0] === 'none' &&
+    value.classes[1] === 'few' &&
+    value.classes[2] === 'many' &&
+    value.featureSchema?.name === 'external_single_event_mixture_v1' &&
+    value.featureSchema?.version === 1 &&
+    value.provenance?.labelsUsedForProductionTraining === false &&
+    value.provenance?.productionArtifactUpdated === false &&
+    value.model !== null &&
+    isValidLinearModel(value.model, value.featureSize, value.classes.length)
   );
 }
 
@@ -309,21 +365,44 @@ export function classifyShakeAudio(
     fillArtifactValid &&
     ((artifact.model === null && artifact.heuristic === 'energy-profile-v1') ||
       (artifact.model !== null && fillStatus === 'experimental'));
+  const researchIcePreviewEnabled =
+    options.allowExperimentalIcePreview === true &&
+    isValidResearchIceArtifact(researchIceArtifact);
 
   // The ice amount artifact is a separate task. It must remain usable when
   // the fill-level artifact has not been trained yet; otherwise promoting an
   // ice model alone would silently leave the user-facing ice result untrained.
-  if (!fillReady && !fillPreviewEnabled && !iceReady) {
+  if (
+    !fillReady &&
+    !fillPreviewEnabled &&
+    !iceReady &&
+    !researchIcePreviewEnabled
+  ) {
     return unknownPrediction();
   }
 
-  const analysisArtifact = fillArtifactValid ? artifact : iceArtifact;
-  const samples = resamplePcm(input, sourceRate, analysisArtifact.sampleRate);
-  const features = recordingWindowsFor(
+  const analysisSampleRate = fillArtifactValid
+    ? artifact.sampleRate
+    : iceReady
+      ? iceArtifact.sampleRate
+      : researchIceArtifact.sampleRate;
+  const analysisWindowSamples = fillArtifactValid
+    ? artifact.windowSamples
+    : iceReady
+      ? iceArtifact.windowSamples
+      : researchIceArtifact.windowSamples;
+  const analysisHopSamples = fillArtifactValid
+    ? artifact.hopSamples
+    : iceReady
+      ? iceArtifact.hopSamples
+      : researchIceArtifact.hopSamples;
+  const samples = resamplePcm(input, sourceRate, analysisSampleRate);
+  const windows = recordingWindowsFor(
     samples,
-    analysisArtifact.windowSamples,
-    analysisArtifact.hopSamples,
-  ).map(extractWindowFeatures);
+    analysisWindowSamples,
+    analysisHopSamples,
+  );
+  const features = windows.map(extractWindowFeatures);
 
   let fillClass: ShakeFillClass | null = null;
   let fillLevel: 0 | 50 | 100 | null = null;
@@ -362,7 +441,38 @@ export function classifyShakeAudio(
     );
     iceAmount = iceArtifact.classes[iceIndex] ?? null;
     iceAmountConfidence = iceProbabilities[iceIndex] ?? null;
+  } else if (researchIcePreviewEnabled && researchIceArtifact.model !== null) {
+    const researchFeatures = features.map((featureVector, index) => [
+      ...featureVector,
+      ...extractTransientFeatures(
+        windows[index],
+        researchIceArtifact.sampleRate,
+      ),
+    ]);
+    const researchProbabilities = averagedPrediction(
+      researchFeatures,
+      researchIceArtifact.model,
+    );
+    const researchIndex = researchProbabilities.reduce(
+      (best, value, index) =>
+        value > researchProbabilities[best] ? index : best,
+      0,
+    );
+    iceAmount = (researchIceArtifact.classes[researchIndex] ?? null) as
+      | IceAmountClass
+      | null;
+    // Research scores are intentionally capped below the production trust
+    // threshold.  They are for pipeline/UX validation, never hydration math.
+    iceAmountConfidence = Math.min(
+      0.59,
+      researchProbabilities[researchIndex] ?? 0,
+    );
   }
+  const exposedIceAmountStatus = iceReady
+    ? 'trained'
+    : researchIcePreviewEnabled
+      ? 'experimental'
+      : iceStatus;
   return {
     // A shake class describes the amount of content, including empty. Water
     // presence is not a separate task here, so it is not presented as a
@@ -377,7 +487,7 @@ export function classifyShakeAudio(
     iceStatus: iceStatus === 'trained' ? 'trained' : 'untrained',
     iceAmount,
     iceAmountConfidence,
-    iceAmountStatus: iceStatus,
+    iceAmountStatus: exposedIceAmountStatus,
     engine: 'typescript',
     measurementAction: 'shake',
     measurementStatus,
