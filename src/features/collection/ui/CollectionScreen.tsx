@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -25,7 +24,9 @@ import { MAX_CAPTURE_SECONDS } from '../../../platform/audio/pcmCapture';
 const initialDraft: CollectionDraft = {
   sessionId: 'session-01',
   containerId: 'bottle-01',
-  deviceId: Platform.OS,
+  // A platform name is not a device identifier and would create a severe
+  // shortcut in held-out evaluation. The operator must enter a stable ID.
+  deviceId: 'enter-device-id',
   capacityMl: '500',
   waterMl: '250',
   iceCount: '0',

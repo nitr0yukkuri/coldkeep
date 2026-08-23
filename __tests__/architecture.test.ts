@@ -102,6 +102,7 @@ test('collection and export use cases depend on ports, not RNFS', async () => {
   const record = {
     ...labels,
     recordingId: 'recording-1',
+    labelSource: 'coldkeep_measured' as const,
     recordedAt: '2026-08-09T00:00:00.000Z',
     audioFilename: 'audio/recording-1.wav',
     sampleRateHz: 16_000,
