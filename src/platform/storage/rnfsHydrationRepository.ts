@@ -26,15 +26,8 @@ export class RnfsHydrationRepository implements HydrationRepository {
       },
       rawContents => {
         try {
-          const value = JSON.parse(rawContents) as {
-            profile?: { capacityMl?: unknown; dailyGoalMl?: unknown };
-          } | null;
-          return Boolean(
-            value &&
-              value.profile &&
-              Number.isFinite(Number(value.profile.capacityMl)) &&
-              Number.isFinite(Number(value.profile.dailyGoalMl)),
-          );
+          normalizeHydrationState(JSON.parse(rawContents));
+          return true;
         } catch {
           return false;
         }
