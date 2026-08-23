@@ -146,9 +146,10 @@ fn valid_linear_model(model: &LinearModel, feature_size: usize, class_count: usi
             .iter()
             .all(|value| value.is_finite() && *value > 0.0)
         && model.bias.iter().all(|value| value.is_finite())
-        && model.weights.iter().all(|row| {
-            row.len() == class_count && row.iter().all(|value| value.is_finite())
-        })
+        && model
+            .weights
+            .iter()
+            .all(|row| row.len() == class_count && row.iter().all(|value| value.is_finite()))
 }
 
 fn valid_shake_artifact(artifact: &ShakeModelArtifact) -> bool {
@@ -175,9 +176,10 @@ fn valid_shake_ice_artifact(artifact: &ShakeIceAmountArtifact) -> bool {
         && artifact.window_samples == Some(16_000)
         && artifact.hop_samples == Some(8_000)
         && artifact.feature_size == Some(128)
-        && artifact.feature_schema.as_ref().is_some_and(|schema| {
-            schema.name == "log_mel_summary_v1" && schema.version == 1
-        })
+        && artifact
+            .feature_schema
+            .as_ref()
+            .is_some_and(|schema| schema.name == "log_mel_summary_v1" && schema.version == 1)
         && artifact
             .model
             .as_ref()
