@@ -70,6 +70,25 @@ These leads do not change the data contract. In particular, “several ice
 cubes”, a benchmark answer, or an author-written effect description is not
 treated as measured `ice_count` for the ColdKeep trainer.
 
+### Additional search pass: bottle, rattle, and count-adjacent audio
+
+The third search pass also checked public sound indexes and audio benchmarks
+for a closer recording setup or an explicit count. The results still do not
+provide a ColdKeep-compatible supervised corpus:
+
+| lead | what is available | decision |
+| --- | --- | --- |
+| [Freesound #463291](https://freesound.org/people/eirelgeux/sounds/463291/) | The author page lists “Dropping ice cubes into my metal water bottle”. It is the closest public container description found, but the page does not expose an auditable cube count, phone capture metadata, or a checked-in raw file/license record. | Bottle-domain qualitative lead only; do not download into the training manifest or assign an amount class. |
+| [Freesound #432351](https://freesound.org/s/432351/) | CC0 recording of multiple ice cubes dropped into a metallic tumbler; the description gives no exact count and uses a Tascam microphone. | Metal-container transient and hard-negative probe only; no `none/few/many` label. |
+| [Freesound #706046](https://freesound.org/people/o_charlyv/sounds/706046/) | CC0 recording of liquid and ice cubes in a metal thermos; the action is filling/pouring, not shaking, and no count is given. | Thermos/domain-gap reference only; not a shake or count example. |
+| [AudioSet `Rattle`](https://research.google.com/audioset/dataset/rattle.html) | The ontology has 1,072 noisy “small hard items loose inside a container” clips, but labels are weak event tags, not ice presence or cube count, and source videos are not redistributed raw audio. | Hard-negative/open-set pretraining lead only; no production labels or weights. |
+| [Acoustics.org ice-presence study](https://acoustics.org/tag/ice/) | A separate marine study reports audio classification of whether ice is present in water, not how many cubes are in a bottle; the sensor/domain is unrelated. | Feasibility/feature-design reference only. |
+
+This pass increases the negative/reference coverage, but it does not change the
+conclusion: there is still no public raw dataset with phone + insulated bottle
+recordings and measured `ice_count` across nuisance holdouts. The production
+trainer must therefore continue to reject all of these leads.
+
 Four CC0 previews that were obtainable without the original-download login are
 checked in separately under
 [`dataset/external/ice-count-references`](dataset/external/ice-count-references).
