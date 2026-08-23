@@ -190,11 +190,11 @@ The generator uses exact synthetic counts and nuisance factors only to test
 whether collision-density features are learnable in principle. Its output is
 `status=research_only`; it never updates
 `ml/artifacts/shake_ice_amount_pilot.json`, and its scores are not evidence for
-phone/water-bottle generalization. The checked-in report is intentionally
 phone/water-bottle generalization. The optional research artifact uses a
-separate 149-feature schema and is never loaded by the app. The checked-in
-report is intentionally negative (all holdout balanced accuracies are below 0.67), so the honest next
-step remains measured ColdKeep collection.
+separate 149-feature schema and is never
+loaded by the app. The checked-in report is intentionally negative (all
+holdout balanced accuracies are below 0.67), so the honest next step remains
+measured ColdKeep collection.
 
 ## Public shake-data candidate
 
