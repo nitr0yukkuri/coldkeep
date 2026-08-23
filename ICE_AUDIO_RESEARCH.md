@@ -26,6 +26,26 @@ terms.
 
 ## Other candidates found
 
+### Descriptive exact-count references (research-only)
+
+These sources are unusually useful because the author describes an exact
+number of cubes. They still do **not** satisfy the ColdKeep production-label
+contract: they were not recorded through the ColdKeep bottle/phone protocol,
+and the descriptions are not independently measured metadata. Keep them out
+of `dataset/manifest.csv` and never map them to `none`/`few`/`many` in the
+production trainer.
+
+| source | auditable description | license / local provenance | allowed use |
+| --- | --- | --- | --- |
+| [`ice_cubes_glass_2182.wav`](dataset/external/soundbible/ice_cubes_glass_2182.wav) | SoundBible entry is recorded in the local manifest as “two ice cubes into glass” | CC BY 3.0; local WAV is stereo 44.1 kHz/16-bit, 1.566 s, SHA256 `1F32DB6A439493120AD6E97B9D292443F2018EAA8710FB70F7A9143F6ACE7EF6` | onset/transient sanity check and qualitative feature inspection; attribution required for redistribution |
+| [Freesound #682741](https://freesound.org/people/thomasanthony321/sounds/682741/) | author description: “One ice cube being poured into a glass softly”; WAV, mono, 48 kHz, 24-bit, 2.620 s | CC0 is shown on the source page; download requires Freesound login, so no local bytes/SHA256 are claimed here | candidate for a separately tracked research probe after download; never production labels |
+| [Freesound #784069](https://freesound.org/people/nifigasebesharik/sounds/784069/) | author description: “Three ice cubes in a red wine glass”; AIFF, mono, 96 kHz, 24-bit, 42.642 s | CC0 is shown on the source page; download requires Freesound login, so no local bytes/SHA256 are claimed here | candidate for transient/decay inspection only; glass-internal microphone is a major domain gap |
+
+The one- and three-cube pages provide provenance leads, not a license to infer
+that a louder or denser event means `many`. The only labels accepted by
+`ml/train_shake_ice_amount.py` remain rows with
+`label_source=coldkeep_measured` and an exact measured `ice_count`.
+
 - The Udkam history/tree also contains `ecfike-ice-crack-9-hq.ogg`,
   `giwake-ice-breaking-1-hq.ogg`, and `ledas-luzta-4.ogg`. They are candidate
   hard/event references, but the checked-in audio manifest does not provide the
