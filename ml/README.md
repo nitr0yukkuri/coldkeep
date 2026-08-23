@@ -186,8 +186,8 @@ These previews are not amount labels or ColdKeep accuracy evidence.
 The shared transient schema is implemented in NumPy, TypeScript, and Rust and
 is covered by `ml/fixtures/audio_features_golden.json`. The fixture is a
 deterministic PCM impulse vector used to detect runtime drift, not to claim
-model accuracy. Rust parity still needs to be run on a machine with Cargo and
-the Android/Rust toolchain available.
+model accuracy. The Rust parity test runs in the repository's Rust CI; a local
+Cargo/Android toolchain is only needed when reproducing that check manually.
 
 ### Synthetic feature sanity check (never production training)
 
