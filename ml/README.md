@@ -213,3 +213,23 @@ its microphone geometry differs from a phone, and the CCM test split must not
 be used for training. If it is added later, only the annotated training split
 will be converted into the manifest format above, with container/session
 holdouts and a separate phone-recorded validation set.
+
+### Promotion gate
+
+Training never implicitly makes a model production-ready. After a measured
+ColdKeep run produces a candidate with `status=trained`, promote it through
+the same gate used by release automation:
+
+```powershell
+python ml/promote_shake_artifacts.py `
+  --fill-candidate C:\tmp\shake_fill_level.json `
+  --ice-candidate C:\tmp\shake_ice_amount.json
+```
+
+Promotion requires measured-label provenance, complete session/container/
+device and temporal holdouts, the shared feature schema, a valid model tensor
+shape, and balanced accuracy of at least `0.67`. It writes each target
+atomically. An `untrained` or `experimental` candidate is rejected and the
+checked-in artifact is left untouched. With the current repository data the
+command is expected to reject because the production candidates are still
+untrained; that is a data-availability result, not a model score.

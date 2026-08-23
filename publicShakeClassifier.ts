@@ -55,17 +55,116 @@ function effectiveStatus(
   status: ShakeModelArtifact['status'],
   model: LinearModel | null,
 ): ShakeModelArtifact['status'] {
-  if (status === 'trained' && model === null) {
+  if (
+    status === 'trained' &&
+    !isValidLinearModel(model, artifact.featureSize, artifact.classes.length)
+  ) {
     return 'untrained';
   }
   return status;
 }
 
-function unknownPrediction(): PublicAudioPrediction {
-  const prediction = unknownShakePrediction(
-    effectiveStatus(artifact.status, artifact.model),
+/**
+ * Treat an artifact as untrained when its numeric shape is not safe for the
+ * on-device linear predictor.  A checked-in JSON file is an input boundary;
+ * silently indexing a short weight row would otherwise produce NaN
+ * probabilities and a false confident class.
+ */
+function isValidLinearModel(
+  model: LinearModel | null,
+  featureSize: number,
+  classCount: number,
+): model is LinearModel {
+  if (model === null || !Number.isInteger(featureSize) || featureSize <= 0) {
+    return false;
+  }
+  if (
+    !Array.isArray(model.classes) ||
+    model.classes.length !== classCount ||
+    !Array.isArray(model.featureMean) ||
+    model.featureMean.length !== featureSize ||
+    !Array.isArray(model.featureScale) ||
+    model.featureScale.length !== featureSize ||
+    !Array.isArray(model.weights) ||
+    model.weights.length !== featureSize ||
+    !Array.isArray(model.bias) ||
+    model.bias.length !== classCount
+  ) {
+    return false;
+  }
+  if (
+    !model.classes.every((value, index) => value === index) ||
+    !model.featureMean.every(Number.isFinite) ||
+    !model.featureScale.every(value => Number.isFinite(value) && value > 0) ||
+    !model.bias.every(Number.isFinite)
+  ) {
+    return false;
+  }
+  return model.weights.every(
+    row =>
+      Array.isArray(row) &&
+      row.length === classCount &&
+      row.every(Number.isFinite),
   );
-  const iceStatus = effectiveStatus(iceArtifact.status, iceArtifact.model);
+}
+
+function isValidShakeArtifact(value: ShakeModelArtifact): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return (
+    Array.isArray(value.classes) &&
+    value.sampleRate === 16_000 &&
+    value.windowSamples === 16_000 &&
+    value.hopSamples === 8_000 &&
+    value.featureSize === 128 &&
+    value.classes.length === 3 &&
+    value.classes[0] === 'empty' &&
+    value.classes[1] === 'half' &&
+    value.classes[2] === 'full' &&
+    (value.model === null ||
+      isValidLinearModel(value.model, value.featureSize, value.classes.length))
+  );
+}
+
+function effectiveIceStatus(): ShakeIceAmountArtifact['status'] {
+  if (!iceArtifact || typeof iceArtifact !== 'object') {
+    return 'untrained';
+  }
+  const validShape =
+    Array.isArray(iceArtifact.classes) &&
+    iceArtifact.sampleRate === 16_000 &&
+    iceArtifact.windowSamples === 16_000 &&
+    iceArtifact.hopSamples === 8_000 &&
+    iceArtifact.featureSize === 128 &&
+    iceArtifact.classes.length === 3 &&
+    iceArtifact.classes[0] === 'none' &&
+    iceArtifact.classes[1] === 'few' &&
+    iceArtifact.classes[2] === 'many' &&
+    iceArtifact.featureSchema?.name === 'log_mel_summary_v1' &&
+    iceArtifact.featureSchema?.version === 1;
+  if (
+    iceArtifact.status === 'trained' &&
+    (!validShape ||
+      !isValidLinearModel(
+        iceArtifact.model,
+        iceArtifact.featureSize,
+        iceArtifact.classes.length,
+      ))
+  ) {
+    return 'untrained';
+  }
+  return iceArtifact.status;
+}
+
+function unknownPrediction(): PublicAudioPrediction {
+  const artifactStatus = isValidShakeArtifact(artifact)
+    ? effectiveStatus(artifact.status, artifact.model)
+    : 'untrained';
+  const prediction = unknownShakePrediction(
+    artifactStatus,
+  );
+  const iceStatus = effectiveIceStatus();
   return {
     containsWater: false,
     waterConfidence: 0,
@@ -144,7 +243,7 @@ export function classifyShakeAudio(
   options: ShakeClassifierOptions = {},
 ): PublicAudioPrediction {
   if (
-    artifact.classes.length !== 3 ||
+    !isValidShakeArtifact(artifact) ||
     (effectiveStatus(artifact.status, artifact.model) !== 'trained' &&
       !options.allowExperimentalPreview)
   ) {
@@ -168,13 +267,16 @@ export function classifyShakeAudio(
       iceStatus: 'untrained',
       iceAmount: null,
       iceAmountConfidence: null,
-      iceAmountStatus: effectiveStatus(iceArtifact.status, iceArtifact.model),
+      iceAmountStatus: effectiveIceStatus(),
       engine: 'typescript',
       measurementAction: 'shake',
       measurementStatus: 'experimental',
     };
   }
-  if (artifact.model === null) {
+  if (
+    artifact.model === null ||
+    !isValidLinearModel(artifact.model, artifact.featureSize, artifact.classes.length)
+  ) {
     return unknownPrediction();
   }
   const probabilities = averagedPrediction(features, artifact.model);
@@ -185,7 +287,7 @@ export function classifyShakeAudio(
   const fillClass = artifact.classes[bestIndex];
   const confidence = probabilities[bestIndex] ?? 0;
   const fillLevel = fillClassToLevel(fillClass);
-  const iceStatus = effectiveStatus(iceArtifact.status, iceArtifact.model);
+  const iceStatus = effectiveIceStatus();
   let iceAmount: IceAmountClass | null = null;
   let iceAmountConfidence: number | null = null;
   if (
@@ -197,7 +299,12 @@ export function classifyShakeAudio(
     iceArtifact.hopSamples === artifact.hopSamples &&
     iceArtifact.featureSize === artifact.featureSize &&
     iceArtifact.featureSchema?.name === 'log_mel_summary_v1' &&
-    iceArtifact.featureSchema?.version === 1
+    iceArtifact.featureSchema?.version === 1 &&
+    isValidLinearModel(
+      iceArtifact.model,
+      iceArtifact.featureSize,
+      iceArtifact.classes.length,
+    )
   ) {
     const iceProbabilities = averagedPrediction(features, iceArtifact.model);
     const iceIndex = iceProbabilities.reduce(

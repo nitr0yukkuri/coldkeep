@@ -307,6 +307,10 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     from audit_shake_dataset import audit
 
     audit_report = audit(captures, diagnostics)
+    # Keep provenance in the candidate itself so the promotion command cannot
+    # accidentally accept a model whose labels were inferred from public
+    # effects or another task.
+    audit_report["labelSource"] = "coldkeep_measured_only"
     if audit_report["fileErrors"]:
         raise ValueError(
             "audio audit failed; refusing to train: "

@@ -70,6 +70,14 @@ pub struct Prediction {
 struct ShakeModelArtifact {
     status: String,
     classes: Vec<String>,
+    #[serde(rename = "sampleRate")]
+    sample_rate: Option<u32>,
+    #[serde(rename = "windowSamples")]
+    window_samples: Option<usize>,
+    #[serde(rename = "hopSamples")]
+    hop_samples: Option<usize>,
+    #[serde(rename = "featureSize")]
+    feature_size: Option<usize>,
     model: Option<LinearModel>,
 }
 
@@ -121,12 +129,59 @@ fn shake_ice_status(status: &str) -> &'static str {
     }
 }
 
-fn effective_shake_ice_status(status: &str, has_model: bool) -> &'static str {
-    if status == "trained" && !has_model {
-        "untrained"
-    } else {
-        shake_ice_status(status)
-    }
+fn valid_linear_model(model: &LinearModel, feature_size: usize, class_count: usize) -> bool {
+    model.classes.len() == class_count
+        && model
+            .classes
+            .iter()
+            .enumerate()
+            .all(|(index, class)| *class == index as i32)
+        && model.feature_mean.len() == feature_size
+        && model.feature_scale.len() == feature_size
+        && model.weights.len() == feature_size
+        && model.bias.len() == class_count
+        && model.feature_mean.iter().all(|value| value.is_finite())
+        && model
+            .feature_scale
+            .iter()
+            .all(|value| value.is_finite() && *value > 0.0)
+        && model.bias.iter().all(|value| value.is_finite())
+        && model.weights.iter().all(|row| {
+            row.len() == class_count && row.iter().all(|value| value.is_finite())
+        })
+}
+
+fn valid_shake_artifact(artifact: &ShakeModelArtifact) -> bool {
+    artifact.classes.len() == 3
+        && artifact.classes[0] == "empty"
+        && artifact.classes[1] == "half"
+        && artifact.classes[2] == "full"
+        && artifact.sample_rate == Some(16_000)
+        && artifact.window_samples == Some(16_000)
+        && artifact.hop_samples == Some(8_000)
+        && artifact.feature_size == Some(128)
+        && artifact
+            .model
+            .as_ref()
+            .is_some_and(|model| valid_linear_model(model, 128, 3))
+}
+
+fn valid_shake_ice_artifact(artifact: &ShakeIceAmountArtifact) -> bool {
+    artifact.classes.len() == 3
+        && artifact.classes[0] == "none"
+        && artifact.classes[1] == "few"
+        && artifact.classes[2] == "many"
+        && artifact.sample_rate == Some(16_000)
+        && artifact.window_samples == Some(16_000)
+        && artifact.hop_samples == Some(8_000)
+        && artifact.feature_size == Some(128)
+        && artifact.feature_schema.as_ref().is_some_and(|schema| {
+            schema.name == "log_mel_summary_v1" && schema.version == 1
+        })
+        && artifact
+            .model
+            .as_ref()
+            .is_some_and(|model| valid_linear_model(model, 128, 3))
 }
 
 fn shake_ice_class(class: &str) -> Option<&'static str> {
@@ -973,6 +1028,18 @@ mod tests {
         assert_eq!(ice_presence_from_amount(Some("many")), Some(true));
         assert_eq!(ice_presence_from_amount(None), None);
     }
+
+    #[test]
+    fn malformed_linear_model_is_not_deployable() {
+        let model = LinearModel {
+            classes: vec![0, 1, 2],
+            feature_mean: vec![0.0; 127],
+            feature_scale: vec![1.0; 127],
+            weights: vec![],
+            bias: vec![0.0; 3],
+        };
+        assert!(!valid_linear_model(&model, 128, 3));
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -997,11 +1064,30 @@ pub extern "system" fn Java_com_anonymous_coldkeep_RustAudioClassifierModule_nat
 /// manifest-only, so this returns a safe untrained prediction until the
 /// phone/water-bottle training gate has produced a real model.
 pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
+    let baseline = artifact()?;
+    if baseline.sample_rate != 16_000
+        || baseline.window_samples != 16_000
+        || baseline.hop_samples != 8_000
+        || baseline.feature_size != 128
+    {
+        return Err("baseline feature contract is incompatible with shake inference".to_string());
+    }
     let shake = shake_artifact()?;
     let status = shake_status(&shake.status);
     let shake_ice = shake_ice_artifact()?;
-    let ice_status = effective_shake_ice_status(&shake_ice.status, shake_ice.model.is_some());
-    let Some(shake_model) = shake.model.as_ref() else {
+    let ice_ready = shake_ice.status == "trained"
+        && valid_shake_ice_artifact(&shake_ice)
+        && shake_ice.sample_rate == Some(baseline.sample_rate)
+        && shake_ice.window_samples == Some(baseline.window_samples)
+        && shake_ice.hop_samples == Some(baseline.hop_samples)
+        && shake_ice.feature_size == Some(baseline.feature_size);
+    let ice_status = if shake_ice.status == "trained" && !ice_ready {
+        "untrained"
+    } else {
+        shake_ice_status(&shake_ice.status)
+    };
+    let shake_ready = status == "trained" && valid_shake_artifact(&shake);
+    if !shake_ready {
         return parse_wav(bytes).map(|_| Prediction {
             contains_water: false,
             water_confidence: 0.0,
@@ -1020,29 +1106,11 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             // native production fallback aligned with TypeScript.
             measurement_status: Some("untrained"),
         });
-    };
-    if status != "trained" {
-        return parse_wav(bytes).map(|_| Prediction {
-            contains_water: false,
-            water_confidence: 0.0,
-            fill_level: None,
-            fill_confidence: None,
-            ice_presence: None,
-            ice_confidence: None,
-            ice_status: "untrained",
-            ice_amount: None,
-            ice_amount_confidence: None,
-            ice_amount_status: Some(ice_status),
-            engine: "rust",
-            model_version: 1,
-            measurement_action: Some("shake"),
-            measurement_status: Some("untrained"),
-        });
     }
-    if shake.classes.len() != 3 {
-        return Err("shake model must contain empty/half/full classes".to_string());
-    }
-    let baseline = artifact()?;
+    let shake_model = shake
+        .model
+        .as_ref()
+        .expect("valid shake artifact has a model");
     let (samples, source_rate) = parse_wav(bytes)?;
     let samples = resample(&samples, source_rate, baseline.sample_rate);
     let windows = recording_windows(&samples, baseline.window_samples, baseline.hop_samples);
@@ -1065,16 +1133,7 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         _ => return Err("shake model class must be 0, 1, or 2".to_string()),
     };
     let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
-    let (ice_amount, ice_amount_confidence) = if ice_status == "trained"
-        && shake_ice.model.is_some()
-        && shake_ice.classes.len() == 3
-        && shake_ice.sample_rate == Some(baseline.sample_rate)
-        && shake_ice.window_samples == Some(baseline.window_samples)
-        && shake_ice.hop_samples == Some(baseline.hop_samples)
-        && shake_ice.feature_size == Some(baseline.feature_size)
-        && shake_ice.feature_schema.as_ref().map_or(false, |schema| {
-            schema.name == "log_mel_summary_v1" && schema.version == 1
-        }) {
+    let (ice_amount, ice_amount_confidence) = if ice_ready {
         let ice_model = shake_ice.model.as_ref().expect("checked above");
         let ice_probabilities = averaged_prediction(&features, ice_model);
         let ice_index = ice_probabilities
