@@ -258,6 +258,15 @@ container/device/room/operator holdout collapses while session holdout is high,
 is likely learning energy, bottle, phone, operator, or room identity rather than
 ice amount.
 
+The count-adjacent public-data audit follows the same rule. Run
+`ml/audit_count_adjacent_metadata.py` against a local JSONL metadata snapshot to
+record label balance, duplicate IDs/audio references, object/material/sensor
+coverage, and provenance. Its output always carries
+`productionLabelEligible=false`; it cannot create `few`/`many` labels or update
+the production artifact. The checked-in Laser Vibrations report has only 0/1/2
+object counts in a laser-speckle/cardboard-box setup, so it is evidence for
+feature research—not ColdKeep accuracy.
+
 The collection protocol therefore keeps all six measured counts across each
 baseline water level and repeats them across independent sessions before any
 artifact gate is considered. The training gate also requires every group fold

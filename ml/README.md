@@ -171,6 +171,25 @@ reports direct three-class and experimental two-stage (`ice/no-ice` then
 and never writes a production artifact. With no exported ColdKeep recordings,
 the correct result is `status=insufficient_data`.
 
+### Count-adjacent metadata audit
+
+For public datasets that expose a numeric object-count field, use
+`audit_count_adjacent_metadata.py` with a local JSONL metadata snapshot. It
+reports provenance, class balance, duplicate IDs/audio references, and sensor
+or container coverage while explicitly setting `productionLabelEligible=false`.
+It never maps a public count to ColdKeep's `none`/`few`/`many` labels and never
+updates `shake_ice_amount_pilot.json`. Example:
+
+```powershell
+python ml/audit_count_adjacent_metadata.py `
+  --input <laser-vibrations-metadata.jsonl> `
+  --output ml/reports/laser_vibrations_count_audit.json `
+  --dataset-name "Laser Vibrations" `
+  --source-url https://huggingface.co/datasets/eturok-weizmann/laser-vibrations `
+  --license "dataset card (verify before redistribution)" `
+  --audio-field speckle_shifts_ifft_audio_file_name
+```
+
 For transient-only inspection, the checked-in
 `dataset/external/ice-shake-references/manifest.csv` contains ten CC0
 Freesound shake-like previews. Run the guarded probe with an optional
