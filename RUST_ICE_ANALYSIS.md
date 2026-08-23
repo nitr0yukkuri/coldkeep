@@ -53,3 +53,7 @@ fixtureであり、モデル精度を意味しない。
 `ml/run_shake_ice_ablation.py` はA/B/C、gain normalization有無、
 session/container/device holdout、直接3クラス/2段階分類を同一splitで比較する。
 データが不足する場合は `insufficient_data` とし、production artifactを生成しない。
+
+量モデルのtrainerは、構造上foldを作れるだけでは`trained`に昇格させない。
+session/container/device/room/operatorの各leave-one-group-outで実測した
+balanced accuracyがすべて0.67以上であることをartifactとpromotion gateで再検証する。

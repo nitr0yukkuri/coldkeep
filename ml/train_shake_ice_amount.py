@@ -15,6 +15,7 @@ import json
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,13 @@ from train_baseline import SoftmaxClassifier, metrics
 
 ICE_AMOUNT_NAMES = ("none", "few", "many")
 MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
+HOLDOUT_FIELDS = (
+    "session_id",
+    "container_id",
+    "device_id",
+    "room_id",
+    "operator_id",
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -79,6 +87,20 @@ def _required(row: dict[str, str], name: str, line: int) -> str:
     if not value:
         raise ValueError(f"manifest line {line}: missing {name}")
     return value
+
+
+def recording_day(value: str | None) -> str | None:
+    """Return an ISO calendar day only for a timezone-aware timestamp."""
+    if not value:
+        return None
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.date().isoformat()
 
 
 def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list[str]]:
@@ -134,6 +156,12 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         raise ValueError(f"{name} must be finite")
                     return value
 
+                recorded_at = row.get("recorded_at", "").strip() or None
+                if recorded_at is not None and recording_day(recorded_at) is None:
+                    raise ValueError(
+                        "recorded_at must be a valid ISO 8601 timestamp with a timezone"
+                    )
+
                 captures.append(
                     Capture(
                         recording_id=recording_id,
@@ -150,7 +178,7 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         microphone_distance_cm=optional_number(
                             "microphone_distance_cm"
                         ),
-                        recorded_at=row.get("recorded_at", "").strip() or None,
+                        recorded_at=recorded_at,
                         platform=row.get("platform", "").strip() or None,
                         label_source=label_source,
                     )
@@ -285,21 +313,38 @@ def recording_arrays(
     return features, labels, weights
 
 
-def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> dict:
+def evaluate(
+    captures: list[Capture],
+    feature_cache: dict[str, np.ndarray],
+    group_field: str = "session_id",
+) -> dict:
+    """Evaluate one complete leave-one-group-out split.
+
+    The previous trainer only computed session-held-out metrics while the
+    audit checked physical holdout coverage structurally.  A candidate could
+    therefore pass the deployment gate without any measured container/device
+    generalisation score.  Keep the split logic in one function and record a
+    metric report for every required nuisance group.
+    """
+    if group_field not in HOLDOUT_FIELDS:
+        raise ValueError(f"unsupported holdout field: {group_field}")
     classes = [0, 1, 2]
     true: list[int] = []
     predicted: list[int] = []
     predictions: list[dict] = []
-    for held_out_session in sorted({item.session_id for item in captures}):
-        train = [item for item in captures if item.session_id != held_out_session]
-        test = [item for item in captures if item.session_id == held_out_session]
+    held_out_groups = sorted({getattr(item, group_field) for item in captures})
+    for held_out_group in held_out_groups:
+        train = [item for item in captures if getattr(item, group_field) != held_out_group]
+        test = [item for item in captures if getattr(item, group_field) == held_out_group]
         if (
             {ice_amount_index(item.ice_count) for item in train} != set(classes)
             or {ice_amount_index(item.ice_count) for item in test} != set(classes)
         ):
             continue
         x_train, y_train, weights = recording_arrays(train, feature_cache)
-        seed = zlib.crc32(held_out_session.encode("utf-8")) & 0xFFFF
+        seed = zlib.crc32(
+            f"{group_field}:{held_out_group}".encode("utf-8")
+        ) & 0xFFFF
         classifier = SoftmaxClassifier(classes, seed=seed)
         classifier.fit(x_train, y_train, weights)
         for item in test:
@@ -311,7 +356,8 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
             predictions.append(
                 {
                     "recordingId": item.recording_id,
-                    "heldOutSession": held_out_session,
+                    "heldOutGroupField": group_field,
+                    "heldOutGroup": held_out_group,
                     "actual": ICE_AMOUNT_NAMES[actual],
                     "predicted": ICE_AMOUNT_NAMES[estimate],
                     "probabilities": probabilities.round(6).tolist(),
@@ -319,8 +365,43 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
             )
     result = metrics(true, predicted, classes)
     result["classes"] = list(ICE_AMOUNT_NAMES)
+    result["groupField"] = group_field
+    result["validFolds"] = sum(
+        1
+        for held_out_group in held_out_groups
+        if {
+            ice_amount_index(item.ice_count)
+            for item in captures
+            if getattr(item, group_field) != held_out_group
+        }
+        == set(classes)
+        and {
+            ice_amount_index(item.ice_count)
+            for item in captures
+            if getattr(item, group_field) == held_out_group
+        }
+        == set(classes)
+    )
     result["predictions"] = predictions
     return result
+
+
+def group_evaluations_pass_gate(evaluations: dict[str, dict]) -> bool:
+    """Return true only when every required holdout has scored the gate.
+
+    Structural holdout coverage and measured performance are intentionally
+    separate checks.  This function requires both a non-empty evaluation and
+    balanced accuracy >= the production threshold for every nuisance group.
+    """
+    return all(
+        isinstance(report, dict)
+        and int(report.get("recordings", 0)) > 0
+        and int(report.get("validFolds", 0)) > 0
+        and float(report.get("balanced_accuracy", 0.0))
+        >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        for field in HOLDOUT_FIELDS
+        for report in [evaluations.get(field)]
+    )
 
 
 def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
@@ -352,7 +433,11 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         )
     filters = mel_filterbank(TARGET_SAMPLE_RATE)
     feature_cache = {item.recording_id: features_for(item, filters) for item in captures}
-    evaluation = evaluate(captures, feature_cache)
+    group_evaluations = {
+        field: evaluate(captures, feature_cache, field)
+        for field in HOLDOUT_FIELDS
+    }
+    evaluation = group_evaluations["session_id"]
     x, y, weights = recording_arrays(captures, feature_cache)
     classifier = SoftmaxClassifier([0, 1, 2], seed=7)
     classifier.fit(x, y, weights)
@@ -360,7 +445,7 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "trained"
         if (
             audit_report["readyForTraining"]
-            and evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+            and group_evaluations_pass_gate(group_evaluations)
         )
         else "experimental"
     )
@@ -388,6 +473,7 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
             "trainerVersion": "shake_ice_amount_v1",
         },
         "evaluation": evaluation,
+        "groupEvaluations": group_evaluations,
         "warnings": [
             "Pilot only: collect new sessions across phones, bottles, rooms, and operators.",
             "Public output is none/few/many; exact ice cube counts are not estimated.",

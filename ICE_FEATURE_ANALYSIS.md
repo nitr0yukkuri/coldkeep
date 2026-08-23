@@ -167,9 +167,10 @@ with `status=research_only`, no model, and no production-artifact update.
 
 This is an intentional `insufficient_data` result, not a zero or fabricated
 accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
-contract, but a model also needs complete container/device/room/operator holdouts, no
-duplicate-audio label conflicts, and acceptable per-class recall before it can
-move from research to `trained`.
+contract. The trainer now scores every session/container/device/room/operator
+holdout independently; all five balanced accuracies must reach 0.67 alongside
+complete folds, no duplicate-audio label conflicts, and acceptable per-class
+recall before an artifact can move from research to `trained`.
 
 ### Synthetic physics sanity check (research-only)
 

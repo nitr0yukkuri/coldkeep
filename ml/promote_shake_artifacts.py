@@ -33,6 +33,13 @@ DEFAULT_FILL_TARGET = ROOT / "ml" / "artifacts" / "shake_fill_level_pilot.json"
 DEFAULT_ICE_TARGET = ROOT / "ml" / "artifacts" / "shake_ice_amount_pilot.json"
 MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
 MANIFEST_SHA256_LENGTH = 64
+REQUIRED_GROUP_EVALUATIONS = (
+    "session_id",
+    "container_id",
+    "device_id",
+    "room_id",
+    "operator_id",
+)
 
 
 def _number(value: Any, name: str) -> float:
@@ -49,6 +56,7 @@ def _validate_common(
     expected_task: str,
     classes: list[str],
     expected_manifest_sha256: str | None = None,
+    require_group_evaluations: bool = False,
 ) -> None:
     if artifact.get("version") != 1:
         raise ValueError("artifact version must be 1")
@@ -96,6 +104,8 @@ def _validate_common(
         _number(value, f"model.bias[{index}]")
 
     _validate_evaluation(artifact.get("evaluation"), classes)
+    if require_group_evaluations:
+        _validate_group_evaluations(artifact.get("groupEvaluations"), classes)
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or audit.get("readyForTraining") is not True:
         raise ValueError("audit.readyForTraining is not true")
@@ -199,6 +209,21 @@ def _validate_evaluation(value: Any, classes: list[str]) -> None:
         )
 
 
+def _validate_group_evaluations(value: Any, classes: list[str]) -> None:
+    """Require scored metrics for every physical nuisance holdout."""
+    if not isinstance(value, dict):
+        raise ValueError("groupEvaluations is missing")
+    if set(value) != set(REQUIRED_GROUP_EVALUATIONS):
+        raise ValueError(
+            "groupEvaluations must contain session/container/device/room/operator"
+        )
+    for field in REQUIRED_GROUP_EVALUATIONS:
+        report = value[field]
+        if not isinstance(report, dict) or report.get("groupField") != field:
+            raise ValueError(f"groupEvaluations[{field}] has the wrong groupField")
+        _validate_evaluation(report, classes)
+
+
 def validate_candidate(
     path: Path,
     task: str,
@@ -225,6 +250,7 @@ def validate_candidate(
             task,
             ["none", "few", "many"],
             expected_manifest_sha256,
+            require_group_evaluations=True,
         )
         schema = artifact.get("featureSchema")
         if not isinstance(schema, dict) or schema.get("name") != "log_mel_summary_v1" or schema.get("version") != 1:

@@ -47,10 +47,11 @@ screen and only trains when empty/half/full recordings exist in at least two
 sessions per class. The 10--30% and 70--90% transition bands are rejected
 instead of being guessed. Malformed rows, non-`coldkeep_measured` labels,
 duplicate audio SHA256 values, missing timezone-aware timestamps, and invalid
-WAV files block training. Evaluation holds out complete sessions and reports
-container/device folds; a `trained` artifact additionally requires all three
-physical holdouts and at least two calendar days per class. Otherwise the
-artifact is explicitly `experimental` and must not feed hydration math.
+WAV files block training. The ice-amount trainer scores complete
+session/container/device/room/operator holdouts; a `trained` artifact requires
+every holdout balanced accuracy to reach `0.67`, in addition to the structural
+folds and at least two calendar days per class. Otherwise the artifact is
+explicitly `experimental` and must not feed hydration math.
 
 The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
 pasta in one muesli box), so it cannot produce a trustworthy three-class shake
@@ -249,8 +250,10 @@ python ml/promote_shake_artifacts.py `
 Promotion requires the exact manifest used for training. The trainer records
 its SHA256 in the candidate and the promotion command verifies that hash,
 alongside measured-label provenance, complete session/container/device/room/operator and
-temporal holdouts, the shared feature schema, internally consistent confusion
-metrics, a valid model tensor shape, and balanced accuracy of at least `0.67`.
+temporal holdouts, scored physical holdouts (each with balanced accuracy of at
+least `0.67`), the shared feature schema, internally consistent confusion
+metrics, a valid model tensor shape, and session-held-out balanced accuracy of
+at least `0.67`.
 All candidates are validated before either target is written, and each target
 is replaced atomically. An `untrained` or `experimental` candidate is rejected
 and the checked-in artifact is left untouched. With the current repository data

@@ -17,7 +17,13 @@ from collections import defaultdict
 from pathlib import Path
 
 from audio_features import read_pcm16_wav
-from train_shake_ice_amount import ICE_AMOUNT_NAMES, Capture, ice_amount_index, load_manifest
+from train_shake_ice_amount import (
+    ICE_AMOUNT_NAMES,
+    Capture,
+    ice_amount_index,
+    load_manifest,
+    recording_day,
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -68,15 +74,9 @@ def _holdout_report(captures: list[Capture], field: str) -> dict:
 
 
 def _recording_day(value: str | None) -> str | None:
-    if not value:
-        return None
-    day = value.strip()[:10]
-    # ISO dates are what the mobile collectors emit. Treat malformed values as
-    # missing rather than allowing an arbitrary timestamp to satisfy a day
-    # holdout gate.
-    if len(day) != 10 or day[4] != "-" or day[7] != "-":
-        return None
-    return day
+    # Keep the audit and trainer on one strict parser. A date-looking prefix
+    # without a valid timezone must not satisfy the temporal holdout gate.
+    return recording_day(value)
 
 
 def _temporal_coverage(captures: list[Capture]) -> dict:

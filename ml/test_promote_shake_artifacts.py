@@ -56,6 +56,20 @@ def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
     }
     if task == "shake_ice_amount":
         artifact["featureSchema"] = {"name": "log_mel_summary_v1", "version": 1}
+        artifact["groupEvaluations"] = {
+            field: {
+                **evaluation,
+                "groupField": field,
+                "validFolds": 2,
+            }
+            for field in (
+                "session_id",
+                "container_id",
+                "device_id",
+                "room_id",
+                "operator_id",
+            )
+        }
     return artifact
 
 
@@ -77,6 +91,15 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             path = Path(directory) / "candidate.json"
             path.write_text(json.dumps(candidate("shake_ice_amount", score=0.66)), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "below the deployment gate"):
+                validate_candidate(path, "shake_ice_amount")
+
+    def test_ice_candidate_requires_scored_physical_holdouts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_ice_amount")
+            value.pop("groupEvaluations")
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "groupEvaluations is missing"):
                 validate_candidate(path, "shake_ice_amount")
 
     def test_fill_candidate_with_inferred_labels_is_rejected(self):

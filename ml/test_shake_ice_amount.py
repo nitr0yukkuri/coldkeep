@@ -5,8 +5,11 @@ from pathlib import Path
 from train_shake_ice_amount import (
     Capture,
     ICE_AMOUNT_NAMES,
+    HOLDOUT_FIELDS,
+    group_evaluations_pass_gate,
     ice_amount_index,
     load_manifest,
+    recording_day,
     validate_dataset,
 )
 
@@ -15,6 +18,28 @@ class ShakeIceAmountTests(unittest.TestCase):
     def test_public_bands_are_coarse_and_stable(self):
         self.assertEqual([ice_amount_index(value) for value in (0, 1, 2, 3, 99)], [0, 1, 1, 2, 2])
         self.assertEqual(ICE_AMOUNT_NAMES, ("none", "few", "many"))
+
+    def test_every_required_holdout_metric_must_pass_the_deployment_gate(self):
+        evaluations = {
+            field: {
+                "recordings": 6,
+                "validFolds": 2,
+                "balanced_accuracy": 0.67,
+            }
+            for field in HOLDOUT_FIELDS
+        }
+        self.assertTrue(group_evaluations_pass_gate(evaluations))
+
+        evaluations["device_id"]["balanced_accuracy"] = 0.669
+        self.assertFalse(group_evaluations_pass_gate(evaluations))
+        evaluations.pop("device_id")
+        self.assertFalse(group_evaluations_pass_gate(evaluations))
+
+    def test_recording_day_requires_a_valid_timezone_aware_iso_timestamp(self):
+        self.assertEqual(recording_day("2026-08-01T10:00:00Z"), "2026-08-01")
+        self.assertEqual(recording_day("2026-08-01T10:00:00+09:00"), "2026-08-01")
+        self.assertIsNone(recording_day("2026-08-01T10:00:00"))
+        self.assertIsNone(recording_day("2026-99-99T10:00:00Z"))
 
     def test_dataset_requires_all_bands_in_two_sessions(self):
         captures = [
