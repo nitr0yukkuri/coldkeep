@@ -14,8 +14,9 @@
   "featureSchema": {
     "name": "synthetic_log_mel_transient_v1",
     "version": 1,
-    "description": "synthetic physics model: log-mel summary plus transient descriptors"
+    "description": "synthetic physics model: combined features"
   },
+  "featureMode": "combined",
   "model": {
     "task": "synthetic_shake_ice_combined",
     "classes": [
