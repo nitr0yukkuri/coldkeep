@@ -89,6 +89,26 @@ conclusion: there is still no public raw dataset with phone + insulated bottle
 recordings and measured `ice_count` across nuisance holdouts. The production
 trainer must therefore continue to reject all of these leads.
 
+### Methodology references that are not ColdKeep corpora
+
+Several papers demonstrate that vibration or collision cues can encode material,
+action, mass, or approximate object count. They are useful for explaining the
+feature hypotheses, but none supplies the required phone + insulated-bottle
+recordings with measured ColdKeep `ice_count`:
+
+| reference | what it contains | why it stays out of production training |
+| --- | --- | --- |
+| [Tilt-Bot / “Swoosh! Rattle! Thump!”](https://dhiraj100892.github.io/swoosh/resources/rss_2020.pdf) | About 15,000 four-second robot-tray interactions with 60 everyday objects and contact microphones. | One object is placed in a tray per interaction; labels describe object/action, not the number of ice cubes in a handheld bottle. |
+| [RealImpact](https://arxiv.org/abs/2306.09944) | Roughly 150,000 controlled impact recordings over 50 everyday objects with material, force, and microphone-location metadata. | Impact-location/material data are not a count label and the sensing setup is not a phone recording. |
+| [EPIC-SOUNDS](https://arxiv.org/abs/2302.00646) | 78,000+ egocentric kitchen sound events with weak action/material annotations. | No measured ice count; source videos and CC BY-NC terms also require a separate redistribution review. |
+| [Clarke et al., granular-material audio feedback](https://samuelpclarke.com/files/clarkeCorl2018.pdf) | 13,750 shaking/pouring clips over five granular materials, with mass measured by scales. | Contact microphone on a robot scoop, granular mass rather than cube count, and no public ColdKeep phone/bottle corpus was found. |
+| [Chen, Snyder & Ramadge, tactile vibration signatures](https://www.researchwithnj.com/en/publications/learning-to-identify-container-contents-through-tactile-vibration-2/) | Human/object-count study reports binary and approximate 1--10 object enumeration from tactile vibration. | The raw dataset was not found as a redistributable phone-audio corpus; the sensor, objects, and container action differ from ColdKeep. |
+| [AudioSet: Rattle](https://research.google.com/audioset/dataset/rattle.html) | 1,072 weakly labelled clips of hard items moving in containers. | Event ontology has no ice count and source media are not a controlled, redistributable training set. |
+
+These references support testing onset density, decay, spectral flux, and
+open-set hard negatives. They are not accuracy evidence and must not change the
+`coldkeep_measured_only` trainer gate.
+
 Four CC0 previews that were obtainable without the original-download login are
 checked in separately under
 [`dataset/external/ice-count-references`](dataset/external/ice-count-references).
