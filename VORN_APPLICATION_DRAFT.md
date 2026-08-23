@@ -1,6 +1,6 @@
 # VORN Challenge 2026 応募フォーム下書き
 
-公式フォーム: [VORN Challenge エントリー](https://vorn-challenge.com/)  
+公式フォーム: [VORN Challenge エントリー](https://vorn-challenge.com/)
 ※実際の入力欄・文字数・ファイル形式は、フォーム表示を優先する。
 
 ## 1. 基本情報
