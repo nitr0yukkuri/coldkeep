@@ -3,11 +3,28 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from promote_shake_artifacts import promote, validate_candidate
+from promote_shake_artifacts import promote, promote_many, validate_candidate
 
 
 def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
     classes = ["empty", "half", "full"] if task == "shake_fill_level" else ["none", "few", "many"]
+    per_class = round(score * 100)
+    remainder = 100 - per_class
+    confusion = [
+        [per_class, remainder, 0],
+        [0, per_class, remainder],
+        [remainder, 0, per_class],
+    ]
+    evaluation = {
+        "classes": classes,
+        "recordings": 300,
+        "accuracy": score,
+        "balanced_accuracy": score,
+        "macro_f1": score,
+        "confusion_matrix": confusion,
+        "recall": {str(index): score for index in range(3)},
+        "precision": {str(index): score for index in range(3)},
+    }
     model = {
         "task": task,
         "classes": [0, 1, 2],
@@ -26,10 +43,15 @@ def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
         "hopSamples": 8_000,
         "featureSize": 128,
         "model": model,
-        "evaluation": {"balanced_accuracy": score},
+        "evaluation": evaluation,
         "audit": {
             "readyForTraining": True,
             "labelSource": "coldkeep_measured_only" if task == "shake_ice_amount" else "coldkeep_measured_only",
+        },
+        "provenance": {
+            "manifestSha256": "a" * 64,
+            "trainer": f"ml/train_{'shake_ice_amount' if task == 'shake_ice_amount' else 'shake_level'}.py",
+            "trainerVersion": "test",
         },
     }
     if task == "shake_ice_amount":
@@ -76,6 +98,36 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             promoted = promote(candidate_path, target, "shake_ice_amount")
             self.assertEqual(promoted["status"], "trained")
             self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["task"], "shake_ice_amount")
+
+    def test_bulk_promotion_validates_every_candidate_before_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fill_path = root / "fill.json"
+            ice_path = root / "ice.json"
+            fill_target = root / "fill-target.json"
+            ice_target = root / "ice-target.json"
+            fill_path.write_text(json.dumps(candidate("shake_fill_level")), encoding="utf-8")
+            invalid_ice = candidate("shake_ice_amount", score=0.66)
+            ice_path.write_text(json.dumps(invalid_ice), encoding="utf-8")
+            fill_target.write_text("keep-fill", encoding="utf-8")
+            ice_target.write_text("keep-ice", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "below the deployment gate"):
+                promote_many(
+                    [
+                        (fill_path, fill_target, "shake_fill_level"),
+                        (ice_path, ice_target, "shake_ice_amount"),
+                    ]
+                )
+            self.assertEqual(fill_target.read_text(encoding="utf-8"), "keep-fill")
+            self.assertEqual(ice_target.read_text(encoding="utf-8"), "keep-ice")
+
+    def test_manifest_hash_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            path.write_text(json.dumps(candidate("shake_ice_amount")), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "manifest hash"):
+                validate_candidate(path, "shake_ice_amount", "b" * 64)
 
 
 if __name__ == "__main__":

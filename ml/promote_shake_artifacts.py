@@ -9,6 +9,7 @@ The command is intentionally dependency-free so it can run in CI and on the
 Windows collection workstation:
 
     python ml/promote_shake_artifacts.py \
+      --manifest C:/path/to/coldkeep-dataset/manifest.csv \
       --fill-candidate C:/tmp/shake_fill.json \
       --ice-candidate C:/tmp/shake_ice.json
 
@@ -19,6 +20,7 @@ the corresponding default artifact.  No candidate is modified in-place.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import tempfile
@@ -30,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FILL_TARGET = ROOT / "ml" / "artifacts" / "shake_fill_level_pilot.json"
 DEFAULT_ICE_TARGET = ROOT / "ml" / "artifacts" / "shake_ice_amount_pilot.json"
 MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
+MANIFEST_SHA256_LENGTH = 64
 
 
 def _number(value: Any, name: str) -> float:
@@ -41,7 +44,12 @@ def _number(value: Any, name: str) -> float:
     return result
 
 
-def _validate_common(artifact: dict[str, Any], expected_task: str, classes: list[str]) -> None:
+def _validate_common(
+    artifact: dict[str, Any],
+    expected_task: str,
+    classes: list[str],
+    expected_manifest_sha256: str | None = None,
+) -> None:
     if artifact.get("version") != 1:
         raise ValueError("artifact version must be 1")
     if artifact.get("task") != expected_task:
@@ -64,6 +72,8 @@ def _validate_common(artifact: dict[str, Any], expected_task: str, classes: list
         raise ValueError("artifact model is missing")
     if model.get("classes") != list(range(len(classes))):
         raise ValueError("artifact model class indexes do not match the public classes")
+    if model.get("task") != expected_task:
+        raise ValueError("artifact model task does not match the artifact task")
     feature_size = artifact["featureSize"]
     for name in ("featureMean", "featureScale"):
         values = model.get(name)
@@ -85,25 +95,102 @@ def _validate_common(artifact: dict[str, Any], expected_task: str, classes: list
     for index, value in enumerate(bias):
         _number(value, f"model.bias[{index}]")
 
-    evaluation = artifact.get("evaluation")
-    if not isinstance(evaluation, dict):
-        raise ValueError("evaluation report is missing")
-    balanced_accuracy = _number(
-        evaluation.get("balanced_accuracy"), "evaluation.balanced_accuracy"
-    )
-    if balanced_accuracy < MIN_DEPLOYABLE_BALANCED_ACCURACY:
-        raise ValueError(
-            "balanced accuracy is below the deployment gate "
-            f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}"
-        )
+    _validate_evaluation(artifact.get("evaluation"), classes)
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or audit.get("readyForTraining") is not True:
         raise ValueError("audit.readyForTraining is not true")
     if audit.get("labelSource") != "coldkeep_measured_only":
         raise ValueError("artifact was not trained from measured ColdKeep labels")
+    provenance = artifact.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("artifact provenance is missing")
+    manifest_sha256 = provenance.get("manifestSha256")
+    if (
+        not isinstance(manifest_sha256, str)
+        or len(manifest_sha256) != MANIFEST_SHA256_LENGTH
+        or any(character not in "0123456789abcdef" for character in manifest_sha256.lower())
+    ):
+        raise ValueError("artifact provenance.manifestSha256 is invalid")
+    if expected_manifest_sha256 is not None and manifest_sha256.lower() != expected_manifest_sha256:
+        raise ValueError("artifact manifest hash does not match the supplied manifest")
 
 
-def validate_candidate(path: Path, task: str) -> dict[str, Any]:
+def _validate_evaluation(value: Any, classes: list[str]) -> None:
+    """Reject incomplete or internally inconsistent claimed metrics.
+
+    Promotion still expects the candidate to come from the checked-in
+    trainers, but validating the confusion matrix and class recalls prevents a
+    hand-edited score from disagreeing with the evidence carried in the same
+    artifact.  The manifest-level audit remains the source of truth for data
+    provenance.
+    """
+    if not isinstance(value, dict):
+        raise ValueError("evaluation report is missing")
+    if value.get("classes") != classes:
+        raise ValueError("evaluation classes do not match the artifact classes")
+    recordings = value.get("recordings")
+    if isinstance(recordings, bool) or not isinstance(recordings, int) or recordings <= 0:
+        raise ValueError("evaluation.recordings must be a positive integer")
+    metrics = {}
+    for name in ("accuracy", "balanced_accuracy", "macro_f1"):
+        score = _number(value.get(name), f"evaluation.{name}")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError(f"evaluation.{name} must be between 0 and 1")
+        metrics[name] = score
+
+    confusion = value.get("confusion_matrix")
+    if not isinstance(confusion, list) or len(confusion) != len(classes):
+        raise ValueError("evaluation.confusion_matrix has the wrong shape")
+    if any(
+        not isinstance(row, list)
+        or len(row) != len(classes)
+        or any(isinstance(cell, bool) or not isinstance(cell, int) or cell < 0 for cell in row)
+        for row in confusion
+    ):
+        raise ValueError("evaluation.confusion_matrix contains invalid counts")
+    total = sum(cell for row in confusion for cell in row)
+    if total != recordings:
+        raise ValueError("evaluation.confusion_matrix does not match recordings")
+    confusion_accuracy = sum(confusion[index][index] for index in range(len(classes))) / recordings
+    if abs(confusion_accuracy - metrics["accuracy"]) > 1e-6:
+        raise ValueError("evaluation.accuracy disagrees with confusion_matrix")
+
+    recall = value.get("recall")
+    if not isinstance(recall, dict):
+        raise ValueError("evaluation.recall is missing")
+    recalls: list[float] = []
+    for index in range(len(classes)):
+        score = _number(recall.get(str(index)), f"evaluation.recall[{index}]")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError(f"evaluation.recall[{index}] must be between 0 and 1")
+        row_total = sum(confusion[index])
+        expected = confusion[index][index] / row_total if row_total else 0.0
+        if abs(expected - score) > 1e-6:
+            raise ValueError(f"evaluation.recall[{index}] disagrees with confusion_matrix")
+        recalls.append(score)
+    if abs(sum(recalls) / len(recalls) - metrics["balanced_accuracy"]) > 1e-6:
+        raise ValueError("evaluation.balanced_accuracy disagrees with class recall")
+
+    precision = value.get("precision")
+    if not isinstance(precision, dict):
+        raise ValueError("evaluation.precision is missing")
+    for index in range(len(classes)):
+        score = _number(precision.get(str(index)), f"evaluation.precision[{index}]")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError(f"evaluation.precision[{index}] must be between 0 and 1")
+
+    if metrics["balanced_accuracy"] < MIN_DEPLOYABLE_BALANCED_ACCURACY:
+        raise ValueError(
+            "balanced accuracy is below the deployment gate "
+            f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}"
+        )
+
+
+def validate_candidate(
+    path: Path,
+    task: str,
+    expected_manifest_sha256: str | None = None,
+) -> dict[str, Any]:
     """Validate one candidate and return its parsed JSON."""
     try:
         artifact = json.loads(path.read_text(encoding="utf-8"))
@@ -113,9 +200,19 @@ def validate_candidate(path: Path, task: str) -> dict[str, Any]:
         raise ValueError("candidate root must be an object")
 
     if task == "shake_fill_level":
-        _validate_common(artifact, task, ["empty", "half", "full"])
+        _validate_common(
+            artifact,
+            task,
+            ["empty", "half", "full"],
+            expected_manifest_sha256,
+        )
     elif task == "shake_ice_amount":
-        _validate_common(artifact, task, ["none", "few", "many"])
+        _validate_common(
+            artifact,
+            task,
+            ["none", "few", "many"],
+            expected_manifest_sha256,
+        )
         schema = artifact.get("featureSchema")
         if not isinstance(schema, dict) or schema.get("name") != "log_mel_summary_v1" or schema.get("version") != 1:
             raise ValueError("ice artifact feature schema must be log_mel_summary_v1 v1")
@@ -146,32 +243,62 @@ def promote(candidate: Path, target: Path, task: str) -> dict[str, Any]:
     return artifact
 
 
+def promote_many(
+    candidates: list[tuple[Path, Path, str]],
+    expected_manifest_sha256: str | None = None,
+) -> list[tuple[str, Path, dict[str, Any]]]:
+    """Validate all candidates before writing any production artifact."""
+    pending: list[tuple[Path, Path, str, dict[str, Any]]] = []
+    for candidate, target, task in candidates:
+        pending.append(
+            (
+                candidate,
+                target,
+                task,
+                validate_candidate(candidate, task, expected_manifest_sha256),
+            )
+        )
+    promoted: list[tuple[str, Path, dict[str, Any]]] = []
+    for _, target, task, artifact in pending:
+        _atomic_write(target, artifact)
+        promoted.append((task, target, artifact))
+    return promoted
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fill-candidate", type=Path)
     parser.add_argument("--ice-candidate", type=Path)
     parser.add_argument("--fill-target", type=Path, default=DEFAULT_FILL_TARGET)
     parser.add_argument("--ice-target", type=Path, default=DEFAULT_ICE_TARGET)
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        required=True,
+        help="the exact ColdKeep manifest used for both candidates",
+    )
     args = parser.parse_args()
     if args.fill_candidate is None and args.ice_candidate is None:
         parser.error("at least one candidate is required")
 
     try:
+        manifest_digest = hashlib.sha256(args.manifest.read_bytes()).hexdigest()
+        # Validate every candidate before touching either target.  This keeps
+        # a bad ice candidate from leaving a newly promoted fill artifact when
+        # both models are supplied in one release operation.
+        candidates: list[tuple[Path, Path, str]] = []
         if args.fill_candidate is not None:
-            artifact = promote(args.fill_candidate, args.fill_target, "shake_fill_level")
-            print(
-                f"promoted shake_fill_level: "
-                f"balanced_accuracy={artifact['evaluation']['balanced_accuracy']:.3f} "
-                f"-> {args.fill_target}"
-            )
+            candidates.append((args.fill_candidate, args.fill_target, "shake_fill_level"))
         if args.ice_candidate is not None:
-            artifact = promote(args.ice_candidate, args.ice_target, "shake_ice_amount")
+            candidates.append((args.ice_candidate, args.ice_target, "shake_ice_amount"))
+
+        for task, target, artifact in promote_many(candidates, manifest_digest):
             print(
-                f"promoted shake_ice_amount: "
+                f"promoted {task}: "
                 f"balanced_accuracy={artifact['evaluation']['balanced_accuracy']:.3f} "
-                f"-> {args.ice_target}"
+                f"-> {target}"
             )
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         print(f"SHAKE PROMOTION BLOCKED: {error}")
         raise SystemExit(2) from error
 

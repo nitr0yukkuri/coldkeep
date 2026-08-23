@@ -151,7 +151,7 @@ pour contract, but its artifact is not applied to the shake product path.
 
 `audit_shake_dataset.py` checks the exported ColdKeep manifest for duplicate
 audio hashes, label conflicts, class/group confounds, valid
-session/container/device holdouts, and at least two valid recording days per
+session/container/device/room/operator holdouts, and at least two valid recording days per
 class. `run_shake_ice_ablation.py` compares three
 feature sets on exactly those recording-level folds:
 
@@ -222,14 +222,18 @@ the same gate used by release automation:
 
 ```powershell
 python ml/promote_shake_artifacts.py `
+  --manifest C:\path\to\coldkeep-dataset\manifest.csv `
   --fill-candidate C:\tmp\shake_fill_level.json `
   --ice-candidate C:\tmp\shake_ice_amount.json
 ```
 
-Promotion requires measured-label provenance, complete session/container/
-device and temporal holdouts, the shared feature schema, a valid model tensor
-shape, and balanced accuracy of at least `0.67`. It writes each target
-atomically. An `untrained` or `experimental` candidate is rejected and the
-checked-in artifact is left untouched. With the current repository data the
-command is expected to reject because the production candidates are still
+Promotion requires the exact manifest used for training. The trainer records
+its SHA256 in the candidate and the promotion command verifies that hash,
+alongside measured-label provenance, complete session/container/device/room/operator and
+temporal holdouts, the shared feature schema, internally consistent confusion
+metrics, a valid model tensor shape, and balanced accuracy of at least `0.67`.
+All candidates are validated before either target is written, and each target
+is replaced atomically. An `untrained` or `experimental` candidate is rejected
+and the checked-in artifact is left untouched. With the current repository data
+the command is expected to reject because the production candidates are still
 untrained; that is a data-availability result, not a model score.

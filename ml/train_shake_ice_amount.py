@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import zlib
 from collections import Counter, defaultdict
@@ -33,6 +34,14 @@ ICE_AMOUNT_NAMES = ("none", "few", "many")
 MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 @dataclass(frozen=True)
 class Capture:
     recording_id: str
@@ -41,6 +50,12 @@ class Capture:
     device_id: str
     ice_count: int
     path: Path
+    # The CSV loader requires these fields so physical/environment holdouts
+    # cannot silently disappear.  Defaults preserve compatibility for small
+    # in-memory fixtures and external research scripts that predate the
+    # expanded collection schema; such fixtures are never deployable data.
+    room_id: str = "unknown-room"
+    operator_id: str = "unknown-operator"
     capacity_ml: float | None = None
     water_ml: float | None = None
     temperature_c: float | None = None
@@ -79,6 +94,8 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
             "session_id",
             "container_id",
             "device_id",
+            "room_id",
+            "operator_id",
             "ice_count",
             "action",
             "audio_filename",
@@ -123,6 +140,8 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         session_id=_required(row, "session_id", line),
                         container_id=_required(row, "container_id", line),
                         device_id=_required(row, "device_id", line),
+                        room_id=_required(row, "room_id", line),
+                        operator_id=_required(row, "operator_id", line),
                         ice_count=ice_count,
                         path=audio,
                         capacity_ml=optional_number("capacity_ml"),
@@ -150,10 +169,14 @@ def validate_dataset(captures: list[Capture]) -> dict:
     counts = Counter(labels.values())
     sessions_by_class: dict[int, set[str]] = defaultdict(set)
     containers_by_class: dict[int, set[str]] = defaultdict(set)
+    rooms_by_class: dict[int, set[str]] = defaultdict(set)
+    operators_by_class: dict[int, set[str]] = defaultdict(set)
     for item in captures:
         label = labels[item.recording_id]
         sessions_by_class[label].add(item.session_id)
         containers_by_class[label].add(item.container_id)
+        rooms_by_class[label].add(item.room_id)
+        operators_by_class[label].add(item.operator_id)
     report = {
         "totalShakeRows": len(captures),
         "classCounts": {ICE_AMOUNT_NAMES[index]: counts[index] for index in range(3)},
@@ -162,6 +185,12 @@ def validate_dataset(captures: list[Capture]) -> dict:
         },
         "containersPerClass": {
             ICE_AMOUNT_NAMES[index]: len(containers_by_class[index]) for index in range(3)
+        },
+        "roomsPerClass": {
+            ICE_AMOUNT_NAMES[index]: len(rooms_by_class[index]) for index in range(3)
+        },
+        "operatorsPerClass": {
+            ICE_AMOUNT_NAMES[index]: len(operators_by_class[index]) for index in range(3)
         },
         "deviceCount": len({item.device_id for item in captures}),
         "recordedAtCount": len({item.recorded_at for item in captures if item.recorded_at}),
@@ -193,7 +222,7 @@ def validate_dataset(captures: list[Capture]) -> dict:
         )
     report["holdoutCoverage"] = {}
     all_classes = set(range(3))
-    for field in ("session_id", "container_id", "device_id"):
+    for field in ("session_id", "container_id", "device_id", "room_id", "operator_id"):
         groups = sorted({getattr(item, field) for item in captures})
         valid = []
         invalid = {}
@@ -353,13 +382,18 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "model": classifier.serializable("shake_ice_amount"),
         "dataset": report,
         "audit": audit_report,
+        "provenance": {
+            "manifestSha256": _file_sha256(manifest),
+            "trainer": "ml/train_shake_ice_amount.py",
+            "trainerVersion": "shake_ice_amount_v1",
+        },
         "evaluation": evaluation,
         "warnings": [
-            "Pilot only: collect new sessions across phones, bottles, and rooms.",
+            "Pilot only: collect new sessions across phones, bottles, rooms, and operators.",
             "Public output is none/few/many; exact ice cube counts are not estimated.",
             f"Deployment status is {status}; balanced accuracy gate is "
             f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}.",
-            "A trained artifact requires complete session/container/device holdouts and a clean audio audit.",
+            "A trained artifact requires complete session/container/device/room/operator holdouts and a clean audio audit.",
         ],
     }
     if diagnostics:
