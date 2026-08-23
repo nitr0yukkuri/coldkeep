@@ -57,6 +57,15 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "below the deployment gate"):
                 validate_candidate(path, "shake_ice_amount")
 
+    def test_fill_candidate_with_inferred_labels_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_fill_level")
+            value["audit"]["labelSource"] = "external_unlabeled"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "measured ColdKeep labels"):
+                validate_candidate(path, "shake_fill_level")
+
     def test_trained_candidate_is_atomically_promoted(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

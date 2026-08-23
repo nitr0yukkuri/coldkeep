@@ -99,6 +99,8 @@ def _validate_common(artifact: dict[str, Any], expected_task: str, classes: list
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or audit.get("readyForTraining") is not True:
         raise ValueError("audit.readyForTraining is not true")
+    if audit.get("labelSource") != "coldkeep_measured_only":
+        raise ValueError("artifact was not trained from measured ColdKeep labels")
 
 
 def validate_candidate(path: Path, task: str) -> dict[str, Any]:
@@ -117,9 +119,6 @@ def validate_candidate(path: Path, task: str) -> dict[str, Any]:
         schema = artifact.get("featureSchema")
         if not isinstance(schema, dict) or schema.get("name") != "log_mel_summary_v1" or schema.get("version") != 1:
             raise ValueError("ice artifact feature schema must be log_mel_summary_v1 v1")
-        audit = artifact.get("audit")
-        if audit.get("labelSource") != "coldkeep_measured_only":
-            raise ValueError("ice artifact was not trained from measured ColdKeep labels")
     return artifact
 
 
