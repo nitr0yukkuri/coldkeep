@@ -1,11 +1,11 @@
-"""Create a ColdKeep shake manifest from the public CORSMAL CCM train set.
+"""Create an explicitly unlabeled external manifest from CORSMAL CCM.
 
 The official annotation table contains filling levels but does not expose the
 physical action as a ColdKeep label.  Therefore this importer requires an
 explicit file of IDs known to be shaking recordings.  It never guesses an
-action from a filename or scenario.  The generated rows are pre-training
-material only: the ColdKeep trainer still requires phone/water-bottle sessions
-before it can emit a deployable artifact.
+action from a filename or scenario.  The generated rows are external material
+only: CORSMAL has no measured ColdKeep ice-count ground truth, so the ColdKeep
+trainer must reject these rows as labels.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ OUTPUT_HEADER = [
     "bit_depth",
     "duration_seconds",
     "platform",
+    "label_source",
 ]
 
 
@@ -150,8 +151,11 @@ def import_manifest(
                     "device_id": "corsmal-array-8ch",
                     "capacity_ml": f"{capacity:g}",
                     "water_ml": f"{capacity * ratio:g}",
-                    "ice_count": "0",
-                    "ice_mass_g": "0",
+                    # CORSMAL has no ColdKeep ice-count ground truth. Keep the
+                    # fields empty instead of turning external audio into a
+                    # false `none` label.
+                    "ice_count": "",
+                    "ice_mass_g": "",
                     "temperature_c": "20",
                     "microphone_distance_cm": "0",
                     "action": "shake",
@@ -161,6 +165,7 @@ def import_manifest(
                     "bit_depth": "16",
                     "duration_seconds": "",
                     "platform": "corsmal-ccm-pretrain",
+                    "label_source": "external_unlabeled",
                 }
             )
             written += 1

@@ -41,6 +41,13 @@ class Capture:
     device_id: str
     ice_count: int
     path: Path
+    capacity_ml: float | None = None
+    water_ml: float | None = None
+    temperature_c: float | None = None
+    microphone_distance_cm: float | None = None
+    recorded_at: str | None = None
+    platform: str | None = None
+    label_source: str = "coldkeep_measured"
 
 
 def ice_amount_index(count: int) -> int:
@@ -75,6 +82,7 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
             "ice_count",
             "action",
             "audio_filename",
+            "label_source",
         }
         missing = sorted(required - set(reader.fieldnames or []))
         if missing:
@@ -86,6 +94,12 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                 recording_id = _required(row, "recording_id", line)
                 if recording_id in seen_recording_ids:
                     raise ValueError(f"duplicate recording_id: {recording_id}")
+                label_source = _required(row, "label_source", line)
+                if label_source != "coldkeep_measured":
+                    raise ValueError(
+                        "label_source must be coldkeep_measured for supervised training; "
+                        f"got {label_source!r}"
+                    )
                 ice_count = int(_required(row, "ice_count", line))
                 if ice_count < 0:
                     raise ValueError("ice_count must be >= 0")
@@ -94,7 +108,15 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                     raise ValueError("audio_filename escapes the audio root")
                 if not audio.is_file():
                     raise ValueError(f"audio file not found: {audio}")
-                seen_recording_ids.add(recording_id)
+                def optional_number(name: str) -> float | None:
+                    raw = row.get(name, "").strip()
+                    if not raw:
+                        return None
+                    value = float(raw)
+                    if not np.isfinite(value):
+                        raise ValueError(f"{name} must be finite")
+                    return value
+
                 captures.append(
                     Capture(
                         recording_id=recording_id,
@@ -103,8 +125,18 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         device_id=_required(row, "device_id", line),
                         ice_count=ice_count,
                         path=audio,
+                        capacity_ml=optional_number("capacity_ml"),
+                        water_ml=optional_number("water_ml"),
+                        temperature_c=optional_number("temperature_c"),
+                        microphone_distance_cm=optional_number(
+                            "microphone_distance_cm"
+                        ),
+                        recorded_at=row.get("recorded_at", "").strip() or None,
+                        platform=row.get("platform", "").strip() or None,
+                        label_source=label_source,
                     )
                 )
+                seen_recording_ids.add(recording_id)
             except (TypeError, ValueError) as error:
                 diagnostics.append(str(error))
     return captures, diagnostics
@@ -132,6 +164,7 @@ def validate_dataset(captures: list[Capture]) -> dict:
             ICE_AMOUNT_NAMES[index]: len(containers_by_class[index]) for index in range(3)
         },
         "deviceCount": len({item.device_id for item in captures}),
+        "recordedAtCount": len({item.recorded_at for item in captures if item.recorded_at}),
     }
     missing = [ICE_AMOUNT_NAMES[index] for index in range(3) if counts[index] == 0]
     if missing:
@@ -158,6 +191,35 @@ def validate_dataset(captures: list[Capture]) -> dict:
             "at least 2 sessions; sparse="
             + ", ".join(split_sparse)
         )
+    report["holdoutCoverage"] = {}
+    all_classes = set(range(3))
+    for field in ("session_id", "container_id", "device_id"):
+        groups = sorted({getattr(item, field) for item in captures})
+        valid = []
+        invalid = {}
+        for held_out in groups:
+            train = [item for item in captures if getattr(item, field) != held_out]
+            test = [item for item in captures if getattr(item, field) == held_out]
+            train_classes = {ice_amount_index(item.ice_count) for item in train}
+            test_classes = {ice_amount_index(item.ice_count) for item in test}
+            if train_classes == all_classes and test_classes == all_classes:
+                valid.append(str(held_out))
+            else:
+                invalid[str(held_out)] = {
+                    "missingTrain": [
+                        ICE_AMOUNT_NAMES[index]
+                        for index in sorted(all_classes - train_classes)
+                    ],
+                    "missingTest": [
+                        ICE_AMOUNT_NAMES[index]
+                        for index in sorted(all_classes - test_classes)
+                    ],
+                }
+        report["holdoutCoverage"][field] = {
+            "groupCount": len(groups),
+            "validFolds": valid,
+            "invalidFolds": invalid,
+        }
     return report
 
 
@@ -202,10 +264,11 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
     for held_out_session in sorted({item.session_id for item in captures}):
         train = [item for item in captures if item.session_id != held_out_session]
         test = [item for item in captures if item.session_id == held_out_session]
-        if {ice_amount_index(item.ice_count) for item in train} != set(classes):
-            raise ValueError(
-                f"session {held_out_session!r} leaves a training fold without all 3 classes"
-            )
+        if (
+            {ice_amount_index(item.ice_count) for item in train} != set(classes)
+            or {ice_amount_index(item.ice_count) for item in test} != set(classes)
+        ):
+            continue
         x_train, y_train, weights = recording_arrays(train, feature_cache)
         seed = zlib.crc32(held_out_session.encode("utf-8")) & 0xFFFF
         classifier = SoftmaxClassifier(classes, seed=seed)
@@ -233,7 +296,27 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
 
 def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     captures, diagnostics = load_manifest(manifest, audio_root)
+    if diagnostics:
+        raise ValueError(
+            "manifest contains invalid or unlabeled shake rows; refusing to train: "
+            + " | ".join(diagnostics)
+        )
     report = validate_dataset(captures)
+    # Import locally to avoid the audit module's intentional dependency on the
+    # Capture/load helpers above.
+    from audit_shake_dataset import audit
+
+    audit_report = audit(captures, diagnostics)
+    if audit_report["fileErrors"]:
+        raise ValueError(
+            "audio audit failed; refusing to train: "
+            + " | ".join(audit_report["fileErrors"])
+        )
+    if audit_report["duplicateAudio"]:
+        raise ValueError(
+            "duplicate audio audit failed; refusing to train: "
+            + json.dumps(audit_report["duplicateAudio"], ensure_ascii=False)
+        )
     filters = mel_filterbank(TARGET_SAMPLE_RATE)
     feature_cache = {item.recording_id: features_for(item, filters) for item in captures}
     evaluation = evaluate(captures, feature_cache)
@@ -242,7 +325,10 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     classifier.fit(x, y, weights)
     status = (
         "trained"
-        if evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        if (
+            audit_report["readyForTraining"]
+            and evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        )
         else "experimental"
     )
     artifact = {
@@ -254,14 +340,22 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "windowSamples": TARGET_SAMPLE_RATE,
         "hopSamples": TARGET_SAMPLE_RATE // 2,
         "featureSize": 128,
+        "featureSchema": {
+            "name": "log_mel_summary_v1",
+            "version": 1,
+            "description": "32 normalized log-mel bands plus mean/std and first differences",
+            "gainNormalization": "per-window RMS target 0.05, clip [-1,1]",
+        },
         "model": classifier.serializable("shake_ice_amount"),
         "dataset": report,
+        "audit": audit_report,
         "evaluation": evaluation,
         "warnings": [
             "Pilot only: collect new sessions across phones, bottles, and rooms.",
             "Public output is none/few/many; exact ice cube counts are not estimated.",
             f"Deployment status is {status}; balanced accuracy gate is "
             f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}.",
+            "A trained artifact requires complete session/container/device holdouts and a clean audio audit.",
         ],
     }
     if diagnostics:

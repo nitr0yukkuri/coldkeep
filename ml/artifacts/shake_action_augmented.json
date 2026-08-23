@@ -1,0 +1,447 @@
+{
+  "version": 1,
+  "task": "shake_action",
+  "status": "experimental",
+  "featureMode": "transient",
+  "featureNames": [
+    "onset_count",
+    "transients_per_second",
+    "inter_onset_interval_mean_s",
+    "inter_onset_interval_std_s",
+    "spectral_flux_mean",
+    "spectral_flux_max",
+    "spectral_flux_peak_count",
+    "spectral_centroid_mean_hz",
+    "spectral_centroid_std_hz",
+    "high_frequency_energy_ratio",
+    "spectral_rolloff_mean_hz",
+    "zero_crossing_rate_mean",
+    "zero_crossing_rate_std",
+    "crest_factor_mean",
+    "crest_factor_std",
+    "rms_mean",
+    "rms_std",
+    "rms_max",
+    "peak_to_rms",
+    "transient_decay_mean_s",
+    "transient_decay_std_s"
+  ],
+  "classes": [
+    "pour",
+    "shake"
+  ],
+  "sampleRate": 16000,
+  "windowSamples": 16000,
+  "hopSamples": 8000,
+  "featureSize": 21,
+  "model": {
+    "task": "shake_action_transient",
+    "classes": [
+      0,
+      1
+    ],
+    "featureMean": [
+      4.71999979019165,
+      4.71999979019165,
+      0.1550348848104477,
+      0.07925295829772949,
+      0.06705833971500397,
+      0.1726481169462204,
+      4.71999979019165,
+      1641.5579833984375,
+      904.9468994140625,
+      0.2925568222999573,
+      2876.875732421875,
+      0.24899397790431976,
+      0.10080008208751678,
+      3.314114809036255,
+      0.7904223799705505,
+      0.03609355911612511,
+      0.030073394998908043,
+      0.15465280413627625,
+      23.95345115661621,
+      0.2150188386440277,
+      0.11010919511318207
+    ],
+    "featureScale": [
+      1.8397711515426636,
+      1.8397711515426636,
+      0.09894102811813354,
+      0.061319414526224136,
+      0.009995341300964355,
+      0.09837044775485992,
+      1.8397711515426636,
+      1027.5084228515625,
+      482.3205871582031,
+      0.20611093938350677,
+      1499.90185546875,
+      0.11929666996002197,
+      0.04450105503201485,
+      0.5627524256706238,
+      0.3794034719467163,
+      0.01058690994977951,
+      0.011695201508700848,
+      0.06158416345715523,
+      125.04209899902344,
+      0.133870929479599,
+      0.06733180582523346
+    ],
+    "weights": [
+      [
+        -0.07105321877883784,
+        0.07105321877881733
+      ],
+      [
+        -0.07105321877881877,
+        0.07105321877890615
+      ],
+      [
+        -0.09337739554760303,
+        0.09337739554737085
+      ],
+      [
+        0.18863607565880916,
+        -0.18863607565873755
+      ],
+      [
+        0.14655140449097243,
+        -0.14655140449100384
+      ],
+      [
+        0.14629166455262757,
+        -0.14629166455268225
+      ],
+      [
+        -0.0710532187788453,
+        0.07105321877890942
+      ],
+      [
+        0.28527848414193474,
+        -0.2852784841419327
+      ],
+      [
+        0.36715035248676264,
+        -0.36715035248675926
+      ],
+      [
+        0.19411072324560294,
+        -0.19411072324561138
+      ],
+      [
+        0.26646204310529453,
+        -0.2664620431053027
+      ],
+      [
+        0.004263684635248934,
+        -0.004263684635249428
+      ],
+      [
+        -0.06184989741193458,
+        0.06184989741193454
+      ],
+      [
+        -0.014964363673684849,
+        0.014964363673684762
+      ],
+      [
+        0.258556778921498,
+        -0.258556778921498
+      ],
+      [
+        -0.2256525543632921,
+        0.22565255436419657
+      ],
+      [
+        -0.6751652206674587,
+        0.6751652206664212
+      ],
+      [
+        0.1448595390321415,
+        -0.1448595390321372
+      ],
+      [
+        0.08124888609824174,
+        -0.08124888609816416
+      ],
+      [
+        -0.46703779027435527,
+        0.46703779027435866
+      ],
+      [
+        -0.08981043400146049,
+        0.08981043400145797
+      ]
+    ],
+    "bias": [
+      0.28246475606534727,
+      -0.2824647560653548
+    ]
+  },
+  "dataset": {
+    "localSource": "ACM-S2",
+    "localRecordings": 21,
+    "localClassCounts": {
+      "pour": 19,
+      "shake": 2
+    },
+    "externalSource": "EPFL Multimodal Sensory Learning (Zenodo 6372438)",
+    "externalRecordings": 50,
+    "externalWindows": 150,
+    "externalPositiveWeight": 0.25,
+    "externalFeatureCache": "tmp\\mml_shake_features.npz",
+    "externalFeatureCacheSha256": "d6f588b16927b9c20fe62f23f2adb2f2a1006ce39d64a376ee4de78fdd81fe4b",
+    "externalLicenseStatus": "review_required"
+  },
+  "evaluation": {
+    "recordings": 21,
+    "correct": 19,
+    "accuracy": 0.9047619047619048,
+    "accuracy_wilson_95": [
+      0.7108586092608176,
+      0.9734812325619255
+    ],
+    "majority_baseline_accuracy": 0.9047619047619048,
+    "balanced_accuracy": 0.9473684210526316,
+    "macro_f1": 0.8055555555555556,
+    "confusion_matrix": [
+      [
+        17,
+        2
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "recall": {
+      "0": 0.8947368421052632,
+      "1": 1.0
+    },
+    "precision": {
+      "0": 1.0,
+      "1": 0.5
+    },
+    "classes": [
+      "pour",
+      "shake"
+    ],
+    "predictions": [
+      {
+        "recordingId": 7,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.745104,
+          0.254896
+        ]
+      },
+      {
+        "recordingId": 16,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.863796,
+          0.136204
+        ]
+      },
+      {
+        "recordingId": 2,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.713995,
+          0.286005
+        ]
+      },
+      {
+        "recordingId": 8,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.676915,
+          0.323085
+        ]
+      },
+      {
+        "recordingId": 12,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.628617,
+          0.371383
+        ]
+      },
+      {
+        "recordingId": 15,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.729379,
+          0.270621
+        ]
+      },
+      {
+        "recordingId": 14,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.7858,
+          0.2142
+        ]
+      },
+      {
+        "recordingId": 1,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.765328,
+          0.234672
+        ]
+      },
+      {
+        "recordingId": 3,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.505733,
+          0.494267
+        ]
+      },
+      {
+        "recordingId": 13,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.909227,
+          0.090773
+        ]
+      },
+      {
+        "recordingId": 9,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.681294,
+          0.318706
+        ]
+      },
+      {
+        "recordingId": 21,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.696291,
+          0.303709
+        ]
+      },
+      {
+        "recordingId": 10,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.68422,
+          0.31578
+        ]
+      },
+      {
+        "recordingId": 17,
+        "actual": "shake",
+        "predicted": "shake",
+        "probabilities": [
+          0.420321,
+          0.579679
+        ]
+      },
+      {
+        "recordingId": 11,
+        "actual": "shake",
+        "predicted": "shake",
+        "probabilities": [
+          0.423971,
+          0.576029
+        ]
+      },
+      {
+        "recordingId": 19,
+        "actual": "pour",
+        "predicted": "shake",
+        "probabilities": [
+          0.467042,
+          0.532958
+        ]
+      },
+      {
+        "recordingId": 6,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.508448,
+          0.491552
+        ]
+      },
+      {
+        "recordingId": 4,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.662956,
+          0.337044
+        ]
+      },
+      {
+        "recordingId": 18,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.935046,
+          0.064954
+        ]
+      },
+      {
+        "recordingId": 5,
+        "actual": "pour",
+        "predicted": "pour",
+        "probabilities": [
+          0.883279,
+          0.116721
+        ]
+      },
+      {
+        "recordingId": 20,
+        "actual": "pour",
+        "predicted": "shake",
+        "probabilities": [
+          0.384323,
+          0.615677
+        ]
+      }
+    ],
+    "operatingPoints": {
+      "0.5": {
+        "accuracy": 0.9047619047619048,
+        "balancedAccuracy": 0.9473684210526316,
+        "macroF1": 0.8055555555555556,
+        "shakePrecision": 0.5,
+        "shakeRecall": 1.0,
+        "falsePositivePourCount": 2
+      },
+      "0.6": {
+        "accuracy": 0.8571428571428571,
+        "balancedAccuracy": 0.47368421052631576,
+        "macroF1": 0.46153846153846156,
+        "shakePrecision": 0.0,
+        "shakeRecall": 0.0,
+        "falsePositivePourCount": 1
+      }
+    }
+  },
+  "warnings": [
+    "Experimental action gate only; this is not a fill-level or millilitre model.",
+    "External positives are robot-mounted microphone recordings of a plastic container.",
+    "ACM-S2 negatives are 19 pours from a different room and microphone setup.",
+    "The model has no phone, water-bottle, or user-recorded validation fold.",
+    "The Zenodo record does not state a redistributable license; review terms before sharing derived data or weights.",
+    "Recording-held-out scores must not be presented as product accuracy.",
+    "A real ColdKeep collection should retrain with phone recordings before deployment."
+  ]
+}

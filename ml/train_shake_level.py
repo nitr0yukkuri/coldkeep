@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -42,6 +44,11 @@ class Capture:
     water_ml: float
     action: str
     path: Path
+    # These fields are deliberately optional on the in-memory type so small
+    # unit-test fixtures can still construct Capture positionally.  A real
+    # manifest is required to provide both values by load_manifest().
+    recorded_at: str | None = None
+    label_source: str = "coldkeep_measured"
 
     @property
     def ratio(self) -> float:
@@ -86,6 +93,8 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
             "water_ml",
             "action",
             "audio_filename",
+            "recorded_at",
+            "label_source",
         }
         missing = sorted(required - set(reader.fieldnames or []))
         if missing:
@@ -110,6 +119,17 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                     raise ValueError("audio_filename escapes the audio root")
                 if not audio.is_file():
                     raise ValueError(f"audio file not found: {audio}")
+                label_source = _required(row, "label_source", line)
+                if label_source != "coldkeep_measured":
+                    raise ValueError(
+                        "label_source must be coldkeep_measured for fill-level training"
+                    )
+                recorded_at = _required(row, "recorded_at", line)
+                parsed_recorded_at = datetime.fromisoformat(
+                    recorded_at.replace("Z", "+00:00")
+                )
+                if parsed_recorded_at.tzinfo is None:
+                    raise ValueError("recorded_at must include a timezone")
                 seen_recording_ids.add(recording_id)
                 captures.append(
                     Capture(
@@ -121,11 +141,93 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         water_ml=water,
                         action=action,
                         path=audio,
+                        recorded_at=recorded_at,
+                        label_source=label_source,
                     )
                 )
             except ValueError as error:
                 diagnostics.append(str(error))
     return captures, diagnostics
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _group_holdout_report(
+    captures: list[Capture], key: str
+) -> dict[str, object]:
+    """Describe whether each physical group can be held out safely.
+
+    A model that only works when the same bottle/phone remains in the train
+    fold is not evidence of generalisation.  This report is informational for
+    now, but it is part of the deployment gate below.
+    """
+    groups: dict[str, list[Capture]] = defaultdict(list)
+    for capture in captures:
+        groups[getattr(capture, key)].append(capture)
+    details: dict[str, dict[str, object]] = {}
+    for group, items in sorted(groups.items()):
+        train = [item for item in captures if getattr(item, key) != group]
+        train_classes = {
+            level_index(item.ratio) for item in train if level_index(item.ratio) is not None
+        }
+        details[group] = {
+            "recordings": len(items),
+            "trainClasses": [LEVEL_NAMES[index] for index in sorted(train_classes)],
+            "allClassesInTrain": train_classes == {0, 1, 2},
+        }
+    return {
+        "groupCount": len(groups),
+        "groups": details,
+        "allFoldsEvaluatable": bool(details)
+        and all(bool(item["allClassesInTrain"]) for item in details.values()),
+    }
+
+
+def _temporal_coverage(captures: list[Capture]) -> dict[str, object]:
+    by_class: dict[str, set[str]] = {name: set() for name in LEVEL_NAMES}
+    invalid = 0
+    for capture in captures:
+        index = level_index(capture.ratio)
+        if index is None:
+            continue
+        if not capture.recorded_at:
+            invalid += 1
+            continue
+        try:
+            parsed = datetime.fromisoformat(capture.recorded_at.replace("Z", "+00:00"))
+            by_class[LEVEL_NAMES[index]].add(parsed.date().isoformat())
+        except ValueError:
+            invalid += 1
+    counts = {name: len(days) for name, days in by_class.items()}
+    return {
+        "daysPerClass": counts,
+        "missingOrInvalidDates": invalid,
+        "minimumTwoDaysPerClass": invalid == 0 and all(value >= 2 for value in counts.values()),
+    }
+
+
+def _audio_audit(captures: list[Capture]) -> dict[str, object]:
+    hashes: dict[str, list[str]] = defaultdict(list)
+    errors: list[str] = []
+    for capture in captures:
+        try:
+            if capture.path.stat().st_size <= 44:
+                raise ValueError("file is empty or shorter than a WAV header")
+            hashes[_file_sha256(capture.path)].append(capture.recording_id)
+        except (OSError, ValueError) as error:
+            errors.append(f"{capture.recording_id}: {error}")
+    duplicates = [ids for ids in hashes.values() if len(ids) > 1]
+    return {
+        "fileErrors": errors,
+        "duplicateSha256": duplicates,
+        "clean": not errors and not duplicates,
+    }
 
 
 def validate_dataset(captures: list[Capture]) -> dict:
@@ -152,6 +254,12 @@ def validate_dataset(captures: list[Capture]) -> dict:
         },
         "containerCount": len({capture.container_id for capture in usable}),
         "deviceCount": len({capture.device_id for capture in usable}),
+        "holdout": {
+            "session": _group_holdout_report(usable, "session_id"),
+            "container": _group_holdout_report(usable, "container_id"),
+            "device": _group_holdout_report(usable, "device_id"),
+        },
+        "temporalCoverage": _temporal_coverage(usable),
     }
     missing = [LEVEL_NAMES[index] for index in range(3) if counts[index] == 0]
     if missing:
@@ -250,7 +358,22 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
 
 def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     captures, diagnostics = load_manifest(manifest, audio_root)
+    if diagnostics:
+        raise ValueError(
+            "cannot train with malformed/skipped manifest rows: "
+            + " | ".join(diagnostics[:5])
+        )
     report = validate_dataset(captures)
+    # Transition bands are intentionally not labels.  The previous trainer
+    # validated them but then accidentally passed them to _recording_arrays,
+    # which could produce None labels or crash during evaluation.
+    captures = [item for item in captures if level_index(item.ratio) is not None]
+    audio_audit = _audio_audit(captures)
+    if not bool(audio_audit["clean"]):
+        raise ValueError(
+            "cannot train with duplicate or invalid audio files: "
+            + json.dumps(audio_audit, ensure_ascii=False)
+        )
     filters = mel_filterbank(TARGET_SAMPLE_RATE)
     feature_cache = {
         item.recording_id: features_for(item, filters) for item in captures
@@ -259,9 +382,24 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     x, y, weights = _recording_arrays(captures, feature_cache)
     classifier = SoftmaxClassifier([0, 1, 2], seed=7)
     classifier.fit(x, y, weights)
+    audit = {
+        "readyForTraining": bool(
+            report["temporalCoverage"]["minimumTwoDaysPerClass"]
+            and report["holdout"]["session"]["allFoldsEvaluatable"]
+            and report["holdout"]["container"]["allFoldsEvaluatable"]
+            and report["holdout"]["device"]["allFoldsEvaluatable"]
+            and audio_audit["clean"]
+        ),
+        "labelSource": "coldkeep_measured_only",
+        "audio": audio_audit,
+        "temporalCoverage": report["temporalCoverage"],
+        "holdout": report["holdout"],
+        "diagnostics": diagnostics,
+    }
     status = (
         "trained"
-        if evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        if audit["readyForTraining"]
+        and evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
         else "experimental"
     )
     artifact = {
@@ -276,6 +414,7 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "model": classifier.serializable("shake_fill_level"),
         "dataset": report,
         "evaluation": evaluation,
+        "audit": audit,
         "warnings": [
             "Pilot only: use a new session for every phone/room/operator change.",
             "Classifies broad fill bands; it does not estimate arbitrary mL.",

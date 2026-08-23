@@ -208,6 +208,15 @@ def metrics(true: list[int], predicted: list[int], classes: list[int]) -> dict:
         / denominator
     )
     majority_count = max(true.count(label) for label in classes)
+    recall_by_class = {
+        str(classes[index]): float(recalls[index]) for index in range(len(classes))
+    }
+    precision_by_class = {
+        str(classes[index]): float(
+            confusion[index, index] / max(confusion[:, index].sum(), 1)
+        )
+        for index in range(len(classes))
+    }
     return {
         "recordings": len(true),
         "correct": correct,
@@ -217,6 +226,8 @@ def metrics(true: list[int], predicted: list[int], classes: list[int]) -> dict:
         "balanced_accuracy": float(np.mean(recalls)),
         "macro_f1": float(np.mean(f1_scores)),
         "confusion_matrix": confusion.tolist(),
+        "recall": recall_by_class,
+        "precision": precision_by_class,
     }
 
 
