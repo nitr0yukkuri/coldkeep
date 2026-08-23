@@ -17,6 +17,7 @@ const SHAKE_ICE_MODEL_JSON: &str =
 const FFT_SIZE: usize = 512;
 const FRAME_SIZE: usize = 400;
 const FRAME_HOP: usize = 160;
+const TRANSIENT_FEATURE_SIZE: usize = 21;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,7 +89,23 @@ fn shake_status(status: &str) -> &'static str {
 struct ShakeIceAmountArtifact {
     status: String,
     classes: Vec<String>,
+    #[serde(rename = "sampleRate")]
+    sample_rate: Option<u32>,
+    #[serde(rename = "windowSamples")]
+    window_samples: Option<usize>,
+    #[serde(rename = "hopSamples")]
+    hop_samples: Option<usize>,
+    #[serde(rename = "featureSize")]
+    feature_size: Option<usize>,
+    #[serde(rename = "featureSchema")]
+    feature_schema: Option<FeatureSchema>,
     model: Option<LinearModel>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FeatureSchema {
+    name: String,
+    version: u8,
 }
 
 fn shake_ice_artifact() -> Result<ShakeIceAmountArtifact, String> {
@@ -101,6 +118,14 @@ fn shake_ice_status(status: &str) -> &'static str {
         "trained" => "trained",
         "experimental" => "experimental",
         _ => "untrained",
+    }
+}
+
+fn effective_shake_ice_status(status: &str, has_model: bool) -> &'static str {
+    if status == "trained" && !has_model {
+        "untrained"
+    } else {
+        shake_ice_status(status)
     }
 }
 
@@ -187,6 +212,9 @@ fn parse_wav(bytes: &[u8]) -> Result<(Vec<f64>, u32), String> {
     }
 
     let bytes_per_frame = channels * 2;
+    if data.len() % bytes_per_frame != 0 {
+        return Err("PCM WAV contains an incomplete sample frame".to_string());
+    }
     let frame_count = data.len() / bytes_per_frame;
     if frame_count == 0 {
         return Err("PCM WAV contains no audio samples".to_string());
@@ -480,6 +508,256 @@ fn averaged_prediction(features: &[Vec<f64>], model: &LinearModel) -> Vec<f64> {
     average
 }
 
+fn prepare_samples(input: &[f64], gain_normalize: bool) -> Vec<f64> {
+    let mut samples = if input.is_empty() {
+        vec![0.0; FRAME_SIZE]
+    } else {
+        input.to_vec()
+    };
+    let mean = samples.iter().sum::<f64>() / samples.len().max(1) as f64;
+    for sample in &mut samples {
+        *sample -= mean;
+    }
+    if gain_normalize {
+        let squared = samples.iter().map(|sample| sample * sample).sum::<f64>();
+        let gain = 0.05
+            / (squared / samples.len().max(1) as f64 + 1e-12)
+                .sqrt()
+                .max(1e-5);
+        for sample in &mut samples {
+            *sample = (*sample * gain).clamp(-1.0, 1.0);
+        }
+    } else {
+        for sample in &mut samples {
+            *sample = (*sample).clamp(-1.0, 1.0);
+        }
+    }
+    samples
+}
+
+fn analysis_frames(samples: &[f64]) -> Vec<Vec<f64>> {
+    let mut padded = samples.to_vec();
+    if padded.len() < FRAME_SIZE {
+        padded.resize(FRAME_SIZE, 0.0);
+    }
+    (0..=padded.len().saturating_sub(FRAME_SIZE))
+        .step_by(FRAME_HOP)
+        .map(|start| padded[start..start + FRAME_SIZE].to_vec())
+        .collect()
+}
+
+fn average(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        0.0
+    } else {
+        values.iter().sum::<f64>() / values.len() as f64
+    }
+}
+
+fn deviation(values: &[f64], mean: f64) -> f64 {
+    if values.is_empty() {
+        0.0
+    } else {
+        (values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / values.len() as f64)
+            .sqrt()
+    }
+}
+
+fn median(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|left, right| left.total_cmp(right));
+    let middle = sorted.len() / 2;
+    if sorted.len() % 2 == 0 {
+        (sorted[middle - 1] + sorted[middle]) / 2.0
+    } else {
+        sorted[middle]
+    }
+}
+
+fn onset_indices(flux: &[f64]) -> Vec<usize> {
+    if flux.len() < 3 {
+        return Vec::new();
+    }
+    let threshold = median(flux) + 1.5 * deviation(flux, average(flux));
+    let mut selected = Vec::new();
+    for index in 1..flux.len() - 1 {
+        if flux[index] <= threshold
+            || flux[index] < flux[index - 1]
+            || flux[index] <= flux[index + 1]
+        {
+            continue;
+        }
+        if selected
+            .last()
+            .map_or(true, |previous| index - *previous >= 5)
+        {
+            selected.push(index);
+        } else if flux[index] > flux[*selected.last().expect("selected is non-empty")] {
+            *selected.last_mut().expect("selected is non-empty") = index;
+        }
+    }
+    selected
+}
+
+fn spectral_flux_peak_count(flux: &[f64]) -> usize {
+    // Keep the same refractory selector as onset_count for cross-runtime
+    // determinism near the adaptive threshold.
+    onset_indices(flux).len()
+}
+
+/// Rust-compatible 21-scalar transient vector used by the ablation harness.
+/// It is intentionally not an ice-count label: impacts can bounce or merge.
+fn extract_transient_features(input: &[f64], sample_rate: u32, gain_normalize: bool) -> Vec<f64> {
+    let samples = prepare_samples(input, gain_normalize);
+    let frames = analysis_frames(&samples);
+    let powers: Vec<Vec<f64>> = frames.iter().map(|frame| fft_power(frame)).collect();
+    let rms: Vec<f64> = frames
+        .iter()
+        .map(|frame| {
+            (frame.iter().map(|sample| sample * sample).sum::<f64>() / FRAME_SIZE as f64 + 1e-12)
+                .sqrt()
+        })
+        .collect();
+    let magnitudes: Vec<Vec<f64>> = powers
+        .iter()
+        .map(|row| row.iter().map(|value| value.sqrt()).collect())
+        .collect();
+    let normalized: Vec<Vec<f64>> = magnitudes
+        .iter()
+        .map(|row| {
+            let total = row.iter().sum::<f64>().max(1e-12);
+            row.iter().map(|value| value / total).collect()
+        })
+        .collect();
+    let mut flux = vec![0.0; normalized.len()];
+    for index in 1..normalized.len() {
+        flux[index] = normalized[index]
+            .iter()
+            .zip(&normalized[index - 1])
+            .map(|(current, previous)| (current - previous).powi(2))
+            .sum::<f64>()
+            .sqrt();
+    }
+    let frequencies: Vec<f64> = (0..=FFT_SIZE / 2)
+        .map(|index| index as f64 * sample_rate as f64 / FFT_SIZE as f64)
+        .collect();
+    let centroid: Vec<f64> = powers
+        .iter()
+        .map(|row| {
+            let total = row.iter().sum::<f64>().max(1e-12);
+            row.iter()
+                .zip(&frequencies)
+                .map(|(power, frequency)| power * frequency)
+                .sum::<f64>()
+                / total
+        })
+        .collect();
+    let rolloff: Vec<f64> = powers
+        .iter()
+        .map(|row| {
+            let threshold = row.iter().sum::<f64>() * 0.85;
+            let mut cumulative = 0.0;
+            row.iter()
+                .enumerate()
+                .find_map(|(index, power)| {
+                    cumulative += power;
+                    (cumulative >= threshold).then_some(frequencies[index])
+                })
+                .unwrap_or(*frequencies.last().unwrap_or(&0.0))
+        })
+        .collect();
+    let zcr: Vec<f64> = frames
+        .iter()
+        .map(|frame| {
+            let crossings = frame
+                .windows(2)
+                .filter(|pair| pair[0] * pair[1] < 0.0)
+                .count();
+            crossings as f64 / (FRAME_SIZE - 1) as f64
+        })
+        .collect();
+    let crest: Vec<f64> = frames
+        .iter()
+        .enumerate()
+        .map(|(index, frame)| {
+            let peak = frame.iter().map(|sample| sample.abs()).fold(0.0, f64::max);
+            peak / rms[index].max(1e-5)
+        })
+        .collect();
+    let onsets = onset_indices(&flux);
+    let onset_times: Vec<f64> = onsets
+        .iter()
+        .map(|index| *index as f64 * FRAME_HOP as f64 / sample_rate as f64)
+        .collect();
+    let intervals: Vec<f64> = onset_times
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    let hf_ratio: Vec<f64> = powers
+        .iter()
+        .map(|row| {
+            let total = row.iter().sum::<f64>().max(1e-12);
+            let high = row
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| frequencies[*index] >= 2000.0)
+                .map(|(_, power)| *power)
+                .sum::<f64>();
+            high / total
+        })
+        .collect();
+    let mut decay = Vec::new();
+    for onset in &onsets {
+        let level = rms[*onset];
+        let limit = rms
+            .len()
+            .min(*onset + (0.5 * sample_rate as f64 / FRAME_HOP as f64).round() as usize);
+        let mut end = *onset;
+        while end < limit && rms[end] >= level * 0.5 {
+            end += 1;
+        }
+        decay.push((end - onset) as f64 * FRAME_HOP as f64 / sample_rate as f64);
+    }
+    let max_abs = samples
+        .iter()
+        .map(|sample| sample.abs())
+        .fold(0.0, f64::max);
+    let duration =
+        (samples.len() as f64 / sample_rate as f64).max(FRAME_SIZE as f64 / sample_rate as f64);
+    let values = vec![
+        onsets.len() as f64,
+        onsets.len() as f64 / duration,
+        average(&intervals),
+        deviation(&intervals, average(&intervals)),
+        average(&flux),
+        flux.iter().copied().fold(0.0, f64::max),
+        spectral_flux_peak_count(&flux) as f64,
+        average(&centroid),
+        deviation(&centroid, average(&centroid)),
+        average(&hf_ratio),
+        average(&rolloff),
+        average(&zcr),
+        deviation(&zcr, average(&zcr)),
+        average(&crest),
+        deviation(&crest, average(&crest)),
+        average(&rms),
+        deviation(&rms, average(&rms)),
+        rms.iter().copied().fold(0.0, f64::max),
+        max_abs / average(&rms).max(1e-5),
+        average(&decay),
+        deviation(&decay, average(&decay)),
+    ];
+    debug_assert_eq!(values.len(), TRANSIENT_FEATURE_SIZE);
+    values
+}
+
 fn binary_prediction_from_present_probability(present_probability: f64) -> (bool, f64) {
     let presence = present_probability >= 0.5;
     let confidence = if presence {
@@ -656,6 +934,33 @@ mod tests {
             (false, 0.8)
         );
     }
+
+    #[test]
+    fn feature_extractors_match_the_cross_runtime_golden_fixture() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../ml/fixtures/audio_features_golden.json"
+        ))
+        .expect("golden fixture JSON");
+        let length = fixture["length"].as_u64().expect("fixture length") as usize;
+        let mut samples = vec![0.0; length];
+        for (offset, value) in fixture["pcm16Impulses"].as_object().expect("impulses") {
+            let index = offset.parse::<usize>().expect("impulse offset");
+            samples[index] = value.as_f64().expect("impulse value") / 32768.0;
+        }
+        let model = artifact().expect("baseline artifact");
+        let expected_log_mel = fixture["logMel"].as_array().expect("log-mel");
+        let actual_log_mel = extract_features(&samples, &model);
+        assert_eq!(actual_log_mel.len(), expected_log_mel.len());
+        for (actual, expected) in actual_log_mel.iter().zip(expected_log_mel) {
+            assert!((actual - expected.as_f64().unwrap()).abs() < 1e-4);
+        }
+        let expected_transient = fixture["transient"].as_array().expect("transient");
+        let actual_transient = extract_transient_features(&samples, 16_000, true);
+        assert_eq!(actual_transient.len(), expected_transient.len());
+        for (actual, expected) in actual_transient.iter().zip(expected_transient) {
+            assert!((actual - expected.as_f64().unwrap()).abs() < 1e-4);
+        }
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -683,7 +988,7 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
     let shake = shake_artifact()?;
     let status = shake_status(&shake.status);
     let shake_ice = shake_ice_artifact()?;
-    let ice_status = shake_ice_status(&shake_ice.status);
+    let ice_status = effective_shake_ice_status(&shake_ice.status, shake_ice.model.is_some());
     let Some(shake_model) = shake.model.as_ref() else {
         return parse_wav(bytes).map(|_| Prediction {
             contains_water: false,
@@ -699,9 +1004,29 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
             engine: "rust",
             model_version: 1,
             measurement_action: Some("shake"),
-            measurement_status: Some(status),
+            // A manifest-only artifact is not a user-facing model. Keep the
+            // native production fallback aligned with TypeScript.
+            measurement_status: Some("untrained"),
         });
     };
+    if status != "trained" {
+        return parse_wav(bytes).map(|_| Prediction {
+            contains_water: false,
+            water_confidence: 0.0,
+            fill_level: None,
+            fill_confidence: None,
+            ice_presence: None,
+            ice_confidence: None,
+            ice_status: "untrained",
+            ice_amount: None,
+            ice_amount_confidence: None,
+            ice_amount_status: Some(ice_status),
+            engine: "rust",
+            model_version: 1,
+            measurement_action: Some("shake"),
+            measurement_status: Some("untrained"),
+        });
+    }
     if shake.classes.len() != 3 {
         return Err("shake model must contain empty/half/full classes".to_string());
     }
@@ -728,25 +1053,33 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         _ => return Err("shake model class must be 0, 1, or 2".to_string()),
     };
     let confidence = probabilities.get(best_index).copied().unwrap_or(0.0);
-    let (ice_amount, ice_amount_confidence) =
-        if ice_status == "trained" && shake_ice.model.is_some() && shake_ice.classes.len() == 3 {
-            let ice_model = shake_ice.model.as_ref().expect("checked above");
-            let ice_probabilities = averaged_prediction(&features, ice_model);
-            let ice_index = ice_probabilities
-                .iter()
-                .enumerate()
-                .max_by(|(_, left), (_, right)| left.total_cmp(right))
-                .map(|(index, _)| index)
-                .unwrap_or(0);
-            let ice_class = shake_ice
-                .classes
-                .get(ice_index)
-                .and_then(|class| shake_ice_class(class))
-                .ok_or("shake ice model class must be none, few, or many")?;
-            (Some(ice_class), ice_probabilities.get(ice_index).copied())
-        } else {
-            (None, None)
-        };
+    let (ice_amount, ice_amount_confidence) = if ice_status == "trained"
+        && shake_ice.model.is_some()
+        && shake_ice.classes.len() == 3
+        && shake_ice.sample_rate == Some(baseline.sample_rate)
+        && shake_ice.window_samples == Some(baseline.window_samples)
+        && shake_ice.hop_samples == Some(baseline.hop_samples)
+        && shake_ice.feature_size == Some(baseline.feature_size)
+        && shake_ice.feature_schema.as_ref().map_or(false, |schema| {
+            schema.name == "log_mel_summary_v1" && schema.version == 1
+        }) {
+        let ice_model = shake_ice.model.as_ref().expect("checked above");
+        let ice_probabilities = averaged_prediction(&features, ice_model);
+        let ice_index = ice_probabilities
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        let ice_class = shake_ice
+            .classes
+            .get(ice_index)
+            .and_then(|class| shake_ice_class(class))
+            .ok_or("shake ice model class must be none, few, or many")?;
+        (Some(ice_class), ice_probabilities.get(ice_index).copied())
+    } else {
+        (None, None)
+    };
     Ok(Prediction {
         contains_water: true,
         water_confidence: confidence,

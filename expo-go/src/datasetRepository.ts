@@ -1,12 +1,14 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { File, FileMode } from 'expo-file-system';
 
 import {
-  COLLECTION_CSV_HEADER,
   CollectionLabels,
   CollectionRecord,
   collectionRecordToCsv,
+  collectionExportFileNames,
   createRecordingId,
+  normalizeCollectionManifest,
 } from '../../src/features/collection/domain/collection';
 import type {
   DatasetRepository,
@@ -14,14 +16,46 @@ import type {
   RecordingRef,
 } from '../../src/features/shared/application/ports';
 import { encodePcm16WavBase64 } from '../../src/platform/audio/pcmWav';
-import { createStoreZipBase64 } from '../../src/platform/archive/storeZip';
-import { writeTextAtomically } from '../../src/platform/storage/atomicTextFile';
+import { writeStoreZipArchive } from '../../src/platform/archive/storeZip';
+import {
+  readTextWithRecovery,
+  writeTextAtomically,
+} from '../../src/platform/storage/atomicTextFile';
 
 function documentRoot(): string {
   if (!FileSystem.documentDirectory) {
     throw new Error('Expo document directory is unavailable');
   }
   return `${FileSystem.documentDirectory}coldkeep-dataset/`;
+}
+
+function manifestFileOps() {
+  return {
+    exists: async (candidate: string) =>
+      (await FileSystem.getInfoAsync(candidate)).exists,
+    readFile: (candidate: string) =>
+      FileSystem.readAsStringAsync(candidate, {
+        encoding: FileSystem.EncodingType.UTF8,
+      }),
+    writeFile: (candidate: string, contents: string) =>
+      FileSystem.writeAsStringAsync(candidate, contents, {
+        encoding: FileSystem.EncodingType.UTF8,
+      }),
+    moveFile: (from: string, to: string) => FileSystem.moveAsync({ from, to }),
+    unlink: (candidate: string) =>
+      FileSystem.deleteAsync(candidate, { idempotent: true }),
+  };
+}
+
+async function readCollectionManifest(uri: string): Promise<string | null> {
+  return readTextWithRecovery(uri, manifestFileOps(), contents => {
+    try {
+      collectionExportFileNames(normalizeCollectionManifest(contents));
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export class ExpoDatasetRepository implements DatasetRepository {
@@ -46,15 +80,32 @@ export class ExpoDatasetRepository implements DatasetRepository {
   ): Promise<CollectionRecord> {
     await this.saveQueue;
     const recordedAt = new Date();
-    const recordingId = createRecordingId(labels, recordedAt);
     const root = documentRoot();
     const audioDirectory = `${root}audio/`;
     const metadataDirectory = `${root}metadata/`;
-    const audioFilename = `audio/${recordingId}.wav`;
     const manifestUri = `${root}manifest.csv`;
+    // Validate the manifest before creating any audio/metadata files. An app
+    // upgrade with an old CSV schema must not leave orphaned recordings when
+    // the append is rejected.
+    const existing = await readCollectionManifest(manifestUri);
+    const normalizedExisting = normalizeCollectionManifest(existing);
+    const existingNames = collectionExportFileNames(normalizedExisting);
+    const baseRecordingId = createRecordingId(labels, recordedAt);
+    let recordingId = baseRecordingId;
+    let suffix = 1;
+    while (
+      existingNames.has(`audio/${recordingId}.wav`) ||
+      (await FileSystem.getInfoAsync(`${audioDirectory}${recordingId}.wav`)).exists ||
+      (await FileSystem.getInfoAsync(`${metadataDirectory}${recordingId}.json`)).exists
+    ) {
+      recordingId = `${baseRecordingId}-${suffix}`;
+      suffix += 1;
+    }
+    const audioFilename = `audio/${recordingId}.wav`;
     const record: CollectionRecord = {
       ...labels,
       recordingId,
+      labelSource: 'coldkeep_measured',
       recordedAt: recordedAt.toISOString(),
       audioFilename,
       sampleRateHz: audio.sampleRate,
@@ -64,87 +115,101 @@ export class ExpoDatasetRepository implements DatasetRepository {
       platform: Platform.OS,
     };
 
-    await FileSystem.makeDirectoryAsync(audioDirectory, {
-      intermediates: true,
-    });
-    await FileSystem.makeDirectoryAsync(metadataDirectory, {
-      intermediates: true,
-    });
-    await FileSystem.writeAsStringAsync(
-      `${root}${audioFilename}`,
-      encodePcm16WavBase64(audio),
-      { encoding: FileSystem.EncodingType.Base64 },
-    );
-    await FileSystem.writeAsStringAsync(
-      `${metadataDirectory}${recordingId}.json`,
-      JSON.stringify(record, null, 2),
-      { encoding: FileSystem.EncodingType.UTF8 },
-    );
-    const manifestInfo = await FileSystem.getInfoAsync(manifestUri);
-    const existing = manifestInfo.exists
-      ? await FileSystem.readAsStringAsync(manifestUri, {
-          encoding: FileSystem.EncodingType.UTF8,
-        })
-      : COLLECTION_CSV_HEADER;
-    await writeTextAtomically(
-      manifestUri,
-      `${existing.trimEnd()}\n${collectionRecordToCsv(record)}\n`,
-      {
-        exists: async candidate =>
-          (await FileSystem.getInfoAsync(candidate)).exists,
-        readFile: candidate =>
-          FileSystem.readAsStringAsync(candidate, {
-            encoding: FileSystem.EncodingType.UTF8,
-          }),
-        writeFile: (candidate, contents) =>
-          FileSystem.writeAsStringAsync(candidate, contents, {
-            encoding: FileSystem.EncodingType.UTF8,
-          }),
-        moveFile: (from, to) => FileSystem.moveAsync({ from, to }),
-        unlink: candidate =>
-          FileSystem.deleteAsync(candidate, { idempotent: true }),
-      },
-    );
+    const audioUri = `${root}${audioFilename}`;
+    const metadataUri = `${metadataDirectory}${recordingId}.json`;
+    try {
+      await FileSystem.makeDirectoryAsync(audioDirectory, {
+        intermediates: true,
+      });
+      await FileSystem.makeDirectoryAsync(metadataDirectory, {
+        intermediates: true,
+      });
+      await FileSystem.writeAsStringAsync(
+        audioUri,
+        encodePcm16WavBase64(audio),
+        { encoding: FileSystem.EncodingType.Base64 },
+      );
+      await FileSystem.writeAsStringAsync(
+        metadataUri,
+        JSON.stringify(record, null, 2),
+        { encoding: FileSystem.EncodingType.UTF8 },
+      );
+      await writeTextAtomically(
+        manifestUri,
+        `${normalizedExisting.trimEnd()}\n${collectionRecordToCsv(record)}\n`,
+        manifestFileOps(),
+      );
+    } catch (error) {
+      await FileSystem.deleteAsync(audioUri, { idempotent: true }).catch(
+        () => undefined,
+      );
+      await FileSystem.deleteAsync(metadataUri, { idempotent: true }).catch(
+        () => undefined,
+      );
+      await FileSystem.deleteAsync(`${manifestUri}.tmp`, {
+        idempotent: true,
+      }).catch(() => undefined);
+      throw error;
+    }
     return record;
   }
 
   async readManifest(): Promise<string | null> {
     const manifestUri = `${documentRoot()}manifest.csv`;
-    const info = await FileSystem.getInfoAsync(manifestUri);
-    if (!info.exists) {
-      return null;
-    }
-    return FileSystem.readAsStringAsync(manifestUri, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    return readCollectionManifest(manifestUri);
   }
 
   async createExportArchive(): Promise<string> {
     const root = documentRoot();
     const manifestUri = `${root}manifest.csv`;
-    if (!(await FileSystem.getInfoAsync(manifestUri)).exists) {
+    const manifest = await readCollectionManifest(manifestUri);
+    if (manifest === null) {
       throw new Error('No recordings have been saved yet');
     }
-    const files = await this.readFiles(root, root);
+    const allowedNames = collectionExportFileNames(manifest);
+    const files = await this.listFiles(root, root, allowedNames);
+    const foundNames = new Set(files.map(file => file.name));
+    const missingNames = [...allowedNames].filter(name => !foundNames.has(name));
+    if (missingNames.length > 0) {
+      throw new Error(`Dataset is incomplete; missing ${missingNames.join(', ')}`);
+    }
     const archiveDirectory = `${root}exports/`;
     await FileSystem.makeDirectoryAsync(archiveDirectory, {
       intermediates: true,
     });
     const archiveUri = `${archiveDirectory}coldkeep-dataset-${Date.now()}.zip`;
-    await FileSystem.writeAsStringAsync(
-      archiveUri,
-      createStoreZipBase64(files),
-      { encoding: FileSystem.EncodingType.Base64 },
-    );
+    const archiveFile = new File(archiveUri);
+    archiveFile.create({ intermediates: true, overwrite: true });
+    const handle = archiveFile.open(FileMode.Truncate);
+    let completed = false;
+    try {
+      await writeStoreZipArchive(
+        files.map(file => ({
+          name: file.name,
+          readBase64: () =>
+            FileSystem.readAsStringAsync(file.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            }),
+        })),
+        { write: bytes => handle.writeBytes(bytes) },
+      );
+      completed = true;
+    } finally {
+      handle.close();
+      if (!completed) {
+        await FileSystem.deleteAsync(archiveUri, { idempotent: true });
+      }
+    }
     return archiveUri;
   }
 
-  private async readFiles(
+  private async listFiles(
     directory: string,
     root: string,
-  ): Promise<Array<{ name: string; base64: string }>> {
+    allowedNames: Set<string>,
+  ): Promise<Array<{ name: string; uri: string }>> {
     const names = await FileSystem.readDirectoryAsync(directory);
-    const files: Array<{ name: string; base64: string }> = [];
+    const files: Array<{ name: string; uri: string }> = [];
     for (const name of names) {
       if (name.endsWith('.zip')) {
         continue;
@@ -152,13 +217,15 @@ export class ExpoDatasetRepository implements DatasetRepository {
       const uri = `${directory}${name}`;
       const info = await FileSystem.getInfoAsync(uri);
       if (info.isDirectory) {
-        files.push(...(await this.readFiles(`${uri}/`, root)));
+        files.push(...(await this.listFiles(`${uri}/`, root, allowedNames)));
       } else {
+        const relativeName = uri.slice(root.length);
+        if (!allowedNames.has(relativeName)) {
+          continue;
+        }
         files.push({
-          name: uri.slice(root.length),
-          base64: await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          }),
+          name: relativeName,
+          uri,
         });
       }
     }

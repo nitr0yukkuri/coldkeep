@@ -15,6 +15,26 @@ npx expo start
 表示されたQRコードをExpo Goで読み込みます。Windowsからでも、同じLAN上のiPhoneまたは
 Androidで確認できます。接続できない場合は `npx expo start --tunnel` を使います。
 
+### データ収集画面を開く
+
+個人向け画面とデータ収集画面は分離しています。Expo Goで収集画面を確認する場合は、
+PowerShellで次のように起動します。
+
+```powershell
+$env:EXPO_PUBLIC_APP_MODE='collector'
+npx expo start --clear
+```
+
+通常の個人向け画面へ戻すときは、環境変数を削除してMetroを再起動します。
+
+```powershell
+Remove-Item Env:EXPO_PUBLIC_APP_MODE -ErrorAction SilentlyContinue
+npx expo start --clear
+```
+
+EASでは `collector` プロファイルが同じモードを設定します。通常の提出・配布版には
+データ収集画面への導線を含めません。
+
 ### 「Project is incompatible with this version of Expo Go」と表示された場合
 
 これは録音処理のエラーではなく、端末側のExpo GoがこのコンパニオンアプリのSDKより古い
@@ -29,20 +49,20 @@ App StoreまたはAndroidのPlay StoreでExpo Goを最新版へ更新してか�
 - `expo-audio` の `useAudioStream` で16-bit PCMをメモリに受け取る
 - モノラル化・リサンプリングを行い、ネイティブ経路と同じ16 kHz `PcmAudio`に正規化する
 - 既存の `ScanBottleUseCase` と `publicAudioClassifier.ts`（TypeScript経路）へ渡す
-- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、共有時は音声込みZIPを作る
-- 個人向け画面では水筒容量・1日目標・手動飲水量・音響残量観測をDocument directoryへ保存する
+- `COLLECT DATA` はPCM16 WAV・JSON・CSVを `expo-file-system` のDocument directoryへ保存し、`expo-sharing`で音声込みZIPを共有する
+- 個人向け画面では水筒容量・音響残量観測・音響由来の自動飲水量をDocument directoryへ保存する
 
 Expo GoにはこのリポジトリのRust/TFLiteカスタムネイティブモジュールは含まれないため、
-Expo経路の推論エンジン表示はTypeScriptになります。氷モデルは現時点で未学習なので、
-振り音の氷量は引き続き `未判定` です。
+Expo経路の推論エンジン表示はTypeScriptになります。振り音の残量モデルは未学習ですが、
+汎用の低信頼度ヒューリスティックを`experimental`として表示します。飲水量の自動記録には使いません。
 
-水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。音響差分を
-飲水量へ追加する場合も、画面の確認ボタンを押したときだけ保存します。
+水分記録は熱中症の診断や予防を保証するものではなく、個人の補助記録です。信頼度を満たす
+音響差分だけを、確認ボタンなしで飲水量へ自動保存します。
 
 ## 入力動作の注意
 
 個人向けのSCANとデータ収集は **shake（振る）** に固定しています。1秒以上、一定の強さで
-水筒を振ってください。振り音モデルが未学習または信頼度不足の場合は `未判定` となり、
+水筒を振ってください。振り音モデルの試験推定が信頼度不足の場合は `未判定` となり、
 注ぐ音モデルへ自動フォールバックしません。`pour`（注ぐ）と`still`（静置）は比較データの
 互換ラベルとしてのみ残しています。
 

@@ -7,6 +7,8 @@ measured before each recording.
 ## Recommended first experiment
 
 - One container and one phone
+- Enter a stable, operator-chosen device ID (for example `pixel7-lab-a`);
+  never use only a platform name such as `android` or `ios`.
 - Water: 25%, 50%, and 75% of capacity
 - Ice: 0 g, 50 g, and 100 g
 - Temperature: 5 °C, 20 °C, and 50 °C
@@ -111,6 +113,11 @@ phones, rooms, and operators before treating the result as a product model.
 The checked-in artifact is manifest-only and the scan screen remains
 `未判定` until the session-held-out balanced-accuracy gate passes.
 
+Every supervised row must carry `label_source=coldkeep_measured`. External
+CORSMAL/Freesound rows use `label_source=external_unlabeled` and leave
+`ice_count`/`ice_mass_g` blank; the shake-ice trainer rejects them rather than
+inventing a `none` label.
+
 After copying the complete `coldkeep-dataset` directory to a training machine,
 run:
 
@@ -122,8 +129,56 @@ python ml/train_shake_ice_amount.py `
 ```
 
 The command refuses to train when a band is missing, when a band has fewer than
-two recordings, or when a band appears in fewer than two sessions. It performs
-session-held-out evaluation before writing `ml/artifacts/shake_ice_amount_pilot.json`;
-rebuilding the Rust library then embeds that artifact automatically. Treat the
-first model as a pilot and evaluate on a held-out phone and bottle before
-relying on it.
+two recordings, when a band appears in fewer than two sessions, when manifest
+rows are malformed/unlabeled, or when audio is duplicated. A `trained` artifact
+also requires every session/container/device fold to contain all classes and
+at least two valid calendar days per class. This prevents a class recorded on a
+single day from becoming a date/room shortcut. Until those gates pass, only an
+`experimental` result is written and the product scan remains untrained.
+
+## Ice-count matrix for generalisation
+
+The pilot above is only a gate. The production evidence set must retain the
+measured integer count and must not infer a count from an effect sound. Use the
+following balanced matrix before running the ablation harness:
+
+| factor | controlled baseline | robustness expansion |
+| --- | --- | --- |
+| `ice_count` | 0, 1, 2, 3, 4, 5 cubes | repeat the same six counts |
+| water level | 25%, 50%, 75% of capacity | repeat at all three levels |
+| container | one bottle | at least two unseen bottles for holdout |
+| phone | one phone | at least one unseen phone for holdout |
+| distance | fixed measured distance | a separately labelled distance study |
+| action | fixed shake cadence, direction, duration | a separately labelled operator study |
+
+A practical first block is 10 repetitions for every count × water-level
+combination (180 recordings) with one bottle, one phone, one room, and one
+operator. Do not put all `many` rows on a different day. Then add independent
+sessions covering a different day, room, bottle, phone, and operator. Every
+class must occur in every group that is intended to be held out.
+
+The public target remains `none` (0), `few` (1--2), and `many` (3+). Keep the
+integer `ice_count` in the manifest for auditing, but never use the number of
+onsets in an external effect sound as a substitute label. External sounds can
+only be marked `ice_present`, used to inspect an onset detector, or mixed as a
+documented augmentation; they are excluded from the `none/few/many` trainer.
+
+Before fitting, run the two research-only checks:
+
+```powershell
+python ml/audit_shake_dataset.py `
+  --manifest <path>\coldkeep-dataset\manifest.csv `
+  --audio-root <path>\coldkeep-dataset `
+  --output ml/reports/shake_dataset_audit.json
+
+python ml/run_shake_ice_ablation.py `
+  --manifest <path>\coldkeep-dataset\manifest.csv `
+  --audio-root <path>\coldkeep-dataset `
+  --output ml/reports/shake_ice_ablation.json
+```
+
+The ablation report evaluates the same recordings under session-, container-,
+and device-held-out folds, with and without gain normalisation. It does not
+write a model artifact. Only after the report has been reviewed and the
+balanced-accuracy/recall/shortcut gates pass may the existing trainer be run
+to produce a `trained` artifact.

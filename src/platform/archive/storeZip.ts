@@ -5,6 +5,35 @@ export type StoreZipFile = {
   base64: string;
 };
 
+export type StoreZipReadableFile = {
+  name: string;
+  readBase64: () => Promise<string>;
+};
+
+function safeEntryName(value: string): string {
+  const name = value;
+  const segments = name.split('/');
+  const hasControlCharacter = [...name].some(character => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  });
+  if (
+    !name ||
+    name.startsWith('/') ||
+    /^[A-Za-z]:($|\\)/.test(name) ||
+    name.includes('\\') ||
+    segments.some(segment => !segment || segment === '.' || segment === '..') ||
+    hasControlCharacter
+  ) {
+    throw new Error('Invalid ZIP entry name');
+  }
+  return name;
+}
+
+export type StoreZipSink = {
+  write: (bytes: Uint8Array) => void | Promise<void>;
+};
+
 const BASE64 =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -107,9 +136,15 @@ export function createStoreZipBase64(files: readonly StoreZipFile[]): string {
   const centralDirectory: number[] = [];
   const entries: Array<{ name: Uint8Array; data: Uint8Array; offset: number }> =
     [];
+  const names = new Set<string>();
 
   for (const file of files) {
-    const name = encodeUtf8(file.name.replace(/^\/+/, ''));
+    const safeName = safeEntryName(file.name);
+    if (names.has(safeName)) {
+      throw new Error(`Duplicate ZIP entry name: ${safeName}`);
+    }
+    names.add(safeName);
+    const name = encodeUtf8(safeName);
     const data = decodeBase64(file.base64);
     const offset = output.length;
     const checksum = crc32(data);
@@ -161,4 +196,90 @@ export function createStoreZipBase64(files: readonly StoreZipFile[]): string {
   writeU32(output, centralOffset);
   writeU16(output, 0);
   return encodeBase64(new Uint8Array(output));
+}
+
+/**
+ * Write a ZIP sequentially, retaining only one input file in memory at a
+ * time. This is the mobile-safe path used by dataset export; the old
+ * `createStoreZipBase64` function remains for small deterministic unit tests.
+ */
+export async function writeStoreZipArchive(
+  files: readonly StoreZipReadableFile[],
+  sink: StoreZipSink,
+): Promise<void> {
+  if (files.length === 0) {
+    throw new Error('Cannot export an empty dataset');
+  }
+
+  const centralDirectory: number[] = [];
+  const entries: Array<{
+    name: Uint8Array;
+    checksum: number;
+    size: number;
+    offset: number;
+  }> = [];
+  const names = new Set<string>();
+  let offset = 0;
+
+  for (const file of files) {
+    const safeName = safeEntryName(file.name);
+    if (names.has(safeName)) {
+      throw new Error(`Duplicate ZIP entry name: ${safeName}`);
+    }
+    names.add(safeName);
+    const name = encodeUtf8(safeName);
+    const data = decodeBase64(await file.readBase64());
+    const checksum = crc32(data);
+    const header: number[] = [];
+    writeU32(header, 0x04034b50);
+    writeU16(header, 20);
+    writeU16(header, 0);
+    writeU16(header, 0);
+    writeU16(header, 0);
+    writeU16(header, 0);
+    writeU32(header, checksum);
+    writeU32(header, data.length);
+    writeU32(header, data.length);
+    writeU16(header, name.length);
+    writeU16(header, 0);
+    writeBytes(header, name);
+    await sink.write(new Uint8Array(header));
+    await sink.write(data);
+    entries.push({ name, checksum, size: data.length, offset });
+    offset += header.length + data.length;
+  }
+
+  const centralOffset = offset;
+  for (const entry of entries) {
+    writeU32(centralDirectory, 0x02014b50);
+    writeU16(centralDirectory, 20);
+    writeU16(centralDirectory, 20);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU32(centralDirectory, entry.checksum);
+    writeU32(centralDirectory, entry.size);
+    writeU32(centralDirectory, entry.size);
+    writeU16(centralDirectory, entry.name.length);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU16(centralDirectory, 0);
+    writeU32(centralDirectory, 0);
+    writeU32(centralDirectory, entry.offset);
+    writeBytes(centralDirectory, entry.name);
+  }
+  await sink.write(new Uint8Array(centralDirectory));
+
+  const end: number[] = [];
+  writeU32(end, 0x06054b50);
+  writeU16(end, 0);
+  writeU16(end, 0);
+  writeU16(end, entries.length);
+  writeU16(end, entries.length);
+  writeU32(end, centralDirectory.length);
+  writeU32(end, centralOffset);
+  writeU16(end, 0);
+  await sink.write(new Uint8Array(end));
 }

@@ -83,6 +83,13 @@ venv/
 # --- ColdKeep Audio Data (重すぎるので無視) ---
 dataset/
 *.wav
+# Keep the small, auditable label map and provenance next to the ignored audio.
+!dataset/
+dataset/*
+!dataset/derived/
+!dataset/derived/acm-s2-shake-action/
+!dataset/derived/acm-s2-shake-action/action_labels.csv
+!dataset/derived/acm-s2-shake-action/README.md
 
 # --- Editors ---
 .vscode/

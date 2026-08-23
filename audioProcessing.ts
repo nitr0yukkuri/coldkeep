@@ -103,6 +103,9 @@ export function parsePcm16Wav(base64: string): WavAudio {
   }
 
   const frameSize = channels * 2;
+  if (dataLength % frameSize !== 0) {
+    throw new Error('WAV data chunk contains an incomplete sample frame');
+  }
   const frameCount = Math.floor(dataLength / frameSize);
   const samples = new Float32Array(frameCount);
 

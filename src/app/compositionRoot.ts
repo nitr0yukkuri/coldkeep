@@ -38,7 +38,10 @@ export function createAppDependencies() {
     recording,
     scan: new ScanBottleUseCase(
       reader,
-      [new RustClassifierAdapter(), new TypeScriptClassifierAdapter()],
+      [
+        new RustClassifierAdapter(),
+        new TypeScriptClassifierAdapter({ allowExperimentalPreview: true }),
+      ],
       MODEL_RECORDING_ACTION,
     ),
     collect: new CollectSampleUseCase(reader, repository),

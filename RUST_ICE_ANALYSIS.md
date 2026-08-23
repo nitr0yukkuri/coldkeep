@@ -25,3 +25,31 @@
 - セッション、容器、スマホ単位で評価を分離する。WAVの窓単位のランダム分割はしない。学習スクリプトは容器ホールドアウトを最低限実行し、端末・セッションを変えた外部検証を別途行う。
 - 端末マイク・容器を変えた外部検証で、accuracyだけでなく3クラスの再現率と混同行列を確認する。
 - 未検証データでは `未判定` を維持し、粗い3段階を強制表示しない。正確な個数・重量は返さない。
+
+## 特徴量研究の追加契約
+
+現行の本番候補は互換性のため `log_mel_summary_v1`（128次元）を維持する。
+今回追加した `audio_features.py` のtransient schemaは、衝突イベントの仮説を
+検証する研究用の21次元ベクトルである。onset countは跳ね返りを含むため、
+氷個数そのものの教師ラベルではない。
+
+ベクトルの順序は次のとおりで、NumPy/TypeScript/Rustで固定する。
+
+`onset_count`, `transients_per_second`, `inter_onset_interval_mean_s`,
+`inter_onset_interval_std_s`, `spectral_flux_mean`, `spectral_flux_max`,
+`spectral_flux_peak_count`, `spectral_centroid_mean_hz`,
+`spectral_centroid_std_hz`, `high_frequency_energy_ratio`,
+`spectral_rolloff_mean_hz`, `zero_crossing_rate_mean`,
+`zero_crossing_rate_std`, `crest_factor_mean`, `crest_factor_std`,
+`rms_mean`, `rms_std`, `rms_max`, `peak_to_rms`,
+`transient_decay_mean_s`, `transient_decay_std_s`。
+
+`publicShakeClassifier.ts` とRust bridgeは、学習artifactのsample rate/window/hop/
+feature size/schemaが現在のbaselineと一致しない場合、氷量結果を公開しない。
+これは古い128次元artifactを新しい特徴量へ誤適用する事故を防ぐ境界である。
+`ml/fixtures/audio_features_golden.json` は同じPCM入力をPython/TS/Rustで比較する
+fixtureであり、モデル精度を意味しない。
+
+`ml/run_shake_ice_ablation.py` はA/B/C、gain normalization有無、
+session/container/device holdout、直接3クラス/2段階分類を同一splitで比較する。
+データが不足する場合は `insufficient_data` とし、production artifactを生成しない。

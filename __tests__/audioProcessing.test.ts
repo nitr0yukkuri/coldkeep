@@ -1,3 +1,5 @@
+/* eslint-disable no-bitwise */
+
 import { fitAudioToInput, parsePcm16Wav } from '../audioProcessing';
 
 const BASE64_ALPHABET =
@@ -64,6 +66,34 @@ test('parses PCM16 WAV metadata and averages stereo channels', () => {
 test('rejects a file that is not WAV', () => {
   expect(() => parsePcm16Wav('bm90IGEgd2F2')).toThrow(
     'Recording is not a WAV file',
+  );
+});
+
+test('rejects a WAV data chunk with an incomplete sample frame', () => {
+  const bytes = new Uint8Array(
+    // Decode the small fixture locally so the malformed length can be changed.
+    (() => {
+      const clean = createStereoWav();
+      const output: number[] = [];
+      for (let index = 0; index < clean.length; index += 4) {
+        const a = BASE64_ALPHABET.indexOf(clean[index]);
+        const b = BASE64_ALPHABET.indexOf(clean[index + 1]);
+        const c = BASE64_ALPHABET.indexOf(clean[index + 2]);
+        const d = BASE64_ALPHABET.indexOf(clean[index + 3]);
+        output.push((a << 2) | (b >> 4));
+        if (c >= 0) {
+          output.push(((b & 15) << 4) | (c >> 2));
+        }
+        if (d >= 0) {
+          output.push(((c & 3) << 6) | d);
+        }
+      }
+      return output;
+    })(),
+  );
+  new DataView(bytes.buffer).setUint32(40, 7, true);
+  expect(() => parsePcm16Wav(toBase64(bytes))).toThrow(
+    'incomplete sample frame',
   );
 });
 

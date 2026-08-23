@@ -26,10 +26,17 @@ export class RustClassifierAdapter implements AudioClassifier {
       if (!classifier.classifyShakeWav) {
         throw new Error('Rust shake inference is unavailable');
       }
-      return normalizeScanResult(
+      const result = normalizeScanResult(
         await classifier.classifyShakeWav(input.recording.uri),
         'shake',
       );
+      // The native path intentionally has no heuristic preview. Let the
+      // configured TypeScript adapter provide the generic experimental
+      // estimate when the checked-in shake artifact is still untrained.
+      if (result.measurementStatus === 'untrained') {
+        throw new Error('Rust shake model is untrained; use experimental fallback');
+      }
+      return result;
     }
     return normalizeScanResult(
       await classifier.classifyWav(input.recording.uri),

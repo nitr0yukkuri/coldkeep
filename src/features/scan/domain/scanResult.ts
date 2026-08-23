@@ -1,5 +1,6 @@
 import {
   ICE_AMOUNT_CONFIDENCE_THRESHOLD,
+  ICE_AMOUNT_CLASSES,
   type IceAmountClass,
 } from './iceAmount';
 
@@ -71,6 +72,35 @@ function clampConfidence(value: number | null): number | null {
   return Math.min(1, Math.max(0, value));
 }
 
+function isScanAction(value: unknown): value is ScanAction {
+  return value === 'pour' || value === 'shake';
+}
+
+function normalizeStatus(value: unknown): ScanMeasurementStatus {
+  return value === 'trained' || value === 'experimental' || value === 'untrained'
+    ? value
+    : 'untrained';
+}
+
+function normalizeFillLevel(
+  action: ScanAction,
+  value: unknown,
+): ScanResult['fillLevel'] {
+  if (action === 'shake' && (value === 0 || value === 50 || value === 100)) {
+    return value;
+  }
+  if (action === 'pour' && (value === 50 || value === 90)) {
+    return value;
+  }
+  return null;
+}
+
+function normalizeIceAmount(value: unknown): IceAmountClass | null {
+  return ICE_AMOUNT_CLASSES.includes(value as IceAmountClass)
+    ? (value as IceAmountClass)
+    : null;
+}
+
 /**
  * Enforces the public result contract at the application boundary.
  * A classifier is not allowed to expose a fill level when it predicts no water.
@@ -79,38 +109,44 @@ export function normalizeScanResult(
   result: ScanResultInput,
   expectedAction?: ScanAction,
 ): ScanResult {
-  const action = expectedAction ?? result.measurementAction ?? 'pour';
+  const action =
+    expectedAction ??
+    (isScanAction(result.measurementAction) ? result.measurementAction : 'pour');
   const actionMatches =
     result.measurementAction === undefined ||
     result.measurementAction === action;
-  const measurementStatus: ScanMeasurementStatus =
-    actionMatches && result.measurementStatus
-      ? result.measurementStatus
-      : 'untrained';
+  const measurementStatus: ScanMeasurementStatus = actionMatches
+    ? normalizeStatus(result.measurementStatus)
+    : 'untrained';
   const containsWater = result.containsWater === true;
   const waterConfidence = clampConfidence(result.waterConfidence ?? 0) ?? 0;
   const fillLevel =
-    containsWater && actionMatches ? (result.fillLevel ?? null) : null;
+    containsWater && actionMatches
+      ? normalizeFillLevel(action, result.fillLevel)
+      : null;
   const fillConfidence =
     containsWater && actionMatches
       ? clampConfidence(result.fillConfidence ?? null)
       : null;
-  const candidateIceConfidence =
-    result.icePresence === null || result.icePresence === undefined
+  const hasBooleanIcePresence =
+    result.icePresence === true || result.icePresence === false;
+  const candidateIceConfidence = !hasBooleanIcePresence
       ? null
       : clampConfidence(result.iceConfidence ?? null);
   const iceIsReliable =
     result.iceStatus === 'trained' &&
-    result.icePresence !== null &&
-    result.icePresence !== undefined &&
+    hasBooleanIcePresence &&
     candidateIceConfidence !== null &&
     candidateIceConfidence >= MIN_ICE_CONFIDENCE;
+  const normalizedIceAmount = normalizeIceAmount(result.iceAmount);
   const candidateIceAmountConfidence = clampConfidence(
     result.iceAmountConfidence ?? null,
   );
   const iceAmountIsReliable =
+    action === 'shake' &&
+    actionMatches &&
     result.iceAmountStatus === 'trained' &&
-    result.iceAmount !== null &&
+    normalizedIceAmount !== null &&
     candidateIceAmountConfidence !== null &&
     candidateIceAmountConfidence >= ICE_AMOUNT_CONFIDENCE_THRESHOLD;
 
@@ -121,10 +157,10 @@ export function normalizeScanResult(
     fillConfidence,
     measurementAction: action,
     measurementStatus,
-    icePresence: iceIsReliable ? (result.icePresence ?? null) : null,
+    icePresence: iceIsReliable ? (result.icePresence as boolean) : null,
     iceConfidence: iceIsReliable ? candidateIceConfidence : null,
     iceStatus: result.iceStatus === 'trained' ? 'trained' : 'untrained',
-    iceAmount: iceAmountIsReliable ? (result.iceAmount ?? null) : null,
+    iceAmount: iceAmountIsReliable ? normalizedIceAmount : null,
     iceAmountConfidence: iceAmountIsReliable
       ? candidateIceAmountConfidence
       : null,

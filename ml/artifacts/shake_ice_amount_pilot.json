@@ -7,6 +7,12 @@
   "windowSamples": 16000,
   "hopSamples": 8000,
   "featureSize": 128,
+  "featureSchema": {
+    "name": "log_mel_summary_v1",
+    "version": 1,
+    "description": "32 normalized log-mel bands plus mean/std and first differences",
+    "gainNormalization": "per-window RMS target 0.05, clip [-1,1]"
+  },
   "model": null,
   "trainingGate": {
     "requiredClasses": ["none", "few", "many"],

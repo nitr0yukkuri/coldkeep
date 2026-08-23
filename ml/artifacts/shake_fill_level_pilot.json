@@ -8,10 +8,11 @@
   "hopSamples": 8000,
   "featureSize": 128,
   "model": null,
+  "heuristic": "energy-profile-v1",
   "trainingGate": {
     "requiredClasses": ["empty", "half", "full"],
     "minimumRecordingsPerClass": 2,
     "minimumSessionsPerClass": 2,
-    "activation": "Replace this manifest-only artifact with the output of ml/train_shake_level.py after phone/water-bottle validation."
+    "activation": "This preview uses a transparent experimental acoustic profile only. Replace with ml/train_shake_level.py output after phone/water-bottle validation; experimental output must never feed hydration math."
   }
 }

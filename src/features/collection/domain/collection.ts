@@ -21,6 +21,10 @@ export const COLLECTION_ACTION_INSTRUCTIONS: Record<CollectionAction, string> = 
 
 export type CollectionAction = (typeof COLLECTION_ACTIONS)[number];
 
+function isCollectionAction(value: unknown): value is CollectionAction {
+  return COLLECTION_ACTIONS.includes(value as CollectionAction);
+}
+
 export type CollectionDraft = {
   sessionId: string;
   containerId: string;
@@ -49,6 +53,8 @@ export type CollectionLabels = {
 
 export type CollectionRecord = CollectionLabels & {
   recordingId: string;
+  /** Provenance of the measured labels. ML trainers only accept this value. */
+  labelSource: 'coldkeep_measured';
   recordedAt: string;
   audioFilename: string;
   sampleRateHz: number;
@@ -77,7 +83,108 @@ export const COLLECTION_CSV_HEADER = [
   'bit_depth',
   'duration_seconds',
   'platform',
+  'label_source',
 ].join(',');
+
+/**
+ * Prevent an app upgrade from silently appending a new-schema row to an old
+ * manifest. A mixed CSV could look valid to a spreadsheet but would be
+ * rejected by the ML trainer with shifted columns, so fail before writing.
+ */
+export function normalizeCollectionManifest(existing: string | null): string {
+  if (!existing || !existing.trim()) {
+    return COLLECTION_CSV_HEADER;
+  }
+  const firstLine = existing.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0].trim();
+  if (firstLine !== COLLECTION_CSV_HEADER) {
+    throw new Error(
+      'Collection manifest schema mismatch; export or migrate the existing dataset before adding recordings',
+    );
+  }
+  return existing;
+}
+
+/** Parse the collection manifest just far enough to build a safe export list.
+ * This is intentionally dependency-free and supports the CSV quoting emitted
+ * by collectionRecordToCsv (commas, quotes, and newlines inside cells). */
+function parseManifestCsv(manifest: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < manifest.length; index += 1) {
+    const character = manifest[index];
+    if (quoted) {
+      if (character === '"') {
+        if (manifest[index + 1] === '"') {
+          cell += '"';
+          index += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        cell += character;
+      }
+      continue;
+    }
+    if (character === '"' && cell.length === 0) {
+      quoted = true;
+    } else if (character === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (character === '\n') {
+      row.push(cell.endsWith('\r') ? cell.slice(0, -1) : cell);
+      if (row.some(value => value.length > 0)) {
+        rows.push(row);
+      }
+      row = [];
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  if (quoted) {
+    throw new Error('Collection manifest contains an unterminated quoted field');
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Return the only files a dataset export is allowed to contain. */
+export function collectionExportFileNames(manifest: string): Set<string> {
+  const rows = parseManifestCsv(manifest.replace(/^\uFEFF/, ''));
+  if (rows.length === 0 || rows[0].join(',') !== COLLECTION_CSV_HEADER) {
+    throw new Error('Collection manifest schema mismatch; cannot export dataset');
+  }
+  const names = new Set<string>(['manifest.csv']);
+  const recordingIds = new Set<string>();
+  for (const [index, columns] of rows.slice(1).entries()) {
+    if (columns.length !== COLLECTION_CSV_HEADER.split(',').length) {
+      throw new Error(`Collection manifest row ${index + 2} has an invalid column count`);
+    }
+    const recordingId = columns[0];
+    const audioFilename = columns[12];
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(recordingId)) {
+      throw new Error(`Collection manifest row ${index + 2} has an invalid recording_id`);
+    }
+    if (recordingIds.has(recordingId)) {
+      throw new Error(`Collection manifest row ${index + 2} duplicates recording_id`);
+    }
+    recordingIds.add(recordingId);
+    if (audioFilename !== `audio/${recordingId}.wav`) {
+      throw new Error(`Collection manifest row ${index + 2} has an invalid audio_filename`);
+    }
+    if (columns[18] !== 'coldkeep_measured') {
+      throw new Error(`Collection manifest row ${index + 2} has an unsupported label_source`);
+    }
+    names.add(audioFilename);
+    names.add(`metadata/${recordingId}.json`);
+  }
+  return names;
+}
 
 function requiredText(value: string, label: string): string {
   const normalized = value.trim();
@@ -111,6 +218,9 @@ function numberInRange(
 }
 
 export function validateCollectionDraft(draft: CollectionDraft): CollectionLabels {
+  if (!isCollectionAction(draft.action)) {
+    throw new Error('Action must be pour, shake, or still');
+  }
   const labels: CollectionLabels = {
     sessionId: requiredText(draft.sessionId, 'Session ID'),
     containerId: requiredText(draft.containerId, 'Container ID'),
@@ -128,6 +238,9 @@ export function validateCollectionDraft(draft: CollectionDraft): CollectionLabel
     ),
     action: draft.action,
   };
+  if (['android', 'ios', 'web', 'device-01', 'enter-device-id'].includes(labels.deviceId.toLowerCase())) {
+    throw new Error('Device ID must be a stable, operator-entered identifier (not the platform name)');
+  }
   if (labels.waterMl > labels.capacityMl) {
     throw new Error('Water amount cannot exceed container capacity');
   }
@@ -176,6 +289,7 @@ export function collectionRecordToCsv(record: CollectionRecord): string {
     record.bitDepth,
     record.durationSeconds.toFixed(3),
     record.platform,
+    record.labelSource,
   ]
     .map(csvCell)
     .join(',');

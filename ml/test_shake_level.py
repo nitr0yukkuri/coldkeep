@@ -44,10 +44,10 @@ class ShakeLevelTests(unittest.TestCase):
             (audio_root / "ok.wav").write_bytes(b"not a wav")
             manifest = root / "manifest.csv"
             manifest.write_text(
-                "recording_id,session_id,container_id,device_id,capacity_ml,water_ml,ice_count,ice_mass_g,temperature_c,microphone_distance_cm,action,audio_filename\n"
-                "outside,s1,bottle,phone,500,250,0,0,20,10,shake,../outside.wav\n"
-                "same,s1,bottle,phone,500,250,0,0,20,10,shake,ok.wav\n"
-                "same,s1,bottle,phone,500,250,0,0,20,10,shake,ok.wav\n",
+                "recording_id,recorded_at,session_id,container_id,device_id,capacity_ml,water_ml,ice_count,ice_mass_g,temperature_c,microphone_distance_cm,action,audio_filename,sample_rate_hz,channels,bit_depth,duration_seconds,platform,label_source\n"
+                "outside,2026-07-29T01:02:03.456Z,s1,bottle,phone,500,250,0,0,20,10,shake,../outside.wav,16000,1,16,1.0,android,coldkeep_measured\n"
+                "same,2026-07-29T01:02:03.456Z,s1,bottle,phone,500,250,0,0,20,10,shake,ok.wav,16000,1,16,1.0,android,coldkeep_measured\n"
+                "same,2026-07-29T01:02:03.456Z,s1,bottle,phone,500,250,0,0,20,10,shake,ok.wav,16000,1,16,1.0,android,coldkeep_measured\n",
                 encoding="utf-8",
             )
 

@@ -45,21 +45,27 @@ not applied to shake recordings.
 `shake` action. It accepts a labelled CSV exported from the app's collection
 screen and only trains when empty/half/full recordings exist in at least two
 sessions per class. The 10--30% and 70--90% transition bands are rejected
-instead of being guessed. Evaluation holds out complete sessions; the report
-records container/device coverage. Container- and phone-held-out
-generalization is a follow-up gate, not a result claimed by this pilot. No
-artifact is written when the dataset is too small.
+instead of being guessed. Malformed rows, non-`coldkeep_measured` labels,
+duplicate audio SHA256 values, missing timezone-aware timestamps, and invalid
+WAV files block training. Evaluation holds out complete sessions and reports
+container/device folds; a `trained` artifact additionally requires all three
+physical holdouts and at least two calendar days per class. Otherwise the
+artifact is explicitly `experimental` and must not feed hydration math.
 
 The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
-pasta in one muesli box), so it intentionally cannot produce a trustworthy
-three-class shake model. The app's scan action is now `shake`, but the checked-in
-`ml/artifacts/shake_fill_level_pilot.json` is explicitly `untrained`; the UI
-returns `未判定` rather than falling back to the unrelated pour model. Replace
-that artifact only after phone/water-bottle validation passes.
+pasta in one muesli box), so it cannot produce a trustworthy three-class shake
+model. The checked-in `ml/artifacts/shake_fill_level_pilot.json` is `untrained`;
+the production scan returns `未判定` until phone/water-bottle validation passes.
+The energy-profile preview is available only through an explicit test/demo
+opt-in and never feeds hydration math. Replace it only with the output of
+`train_shake_level.py` after validation passes. The separate ice-amount artifact
+remains `untrained`.
 
-For public CORSMAL pre-training, `import_corsmal_shake.py` converts only an
-explicit list of known shake IDs. The action list is required because the
-official annotation table does not encode ColdKeep's action label:
+For public CORSMAL feature research, `import_corsmal_shake.py` converts only an
+explicit list of known shake IDs and marks every row `external_unlabeled`.
+Those rows have no `ice_count` and are rejected by the supervised trainer. The
+action list is required because the official annotation table does not encode
+ColdKeep's action label:
 
 ```powershell
 python ml/import_corsmal_shake.py `
@@ -74,6 +80,61 @@ default session is deliberately a single `corsmal-train` group, so the
 session-held-out trainer remains blocked until a real session map and a
 phone/water-bottle validation set are supplied.
 
+## Minimum shake model (action gate)
+
+`train_shake_action.py` is the first reproducible fitted model for the shake
+path. It trains a small 128-feature linear classifier on the 21 available
+ACM-S2 recordings: 2 explicit `shake` recordings and 19 `pour` recordings.
+The action mapping is stored in
+`dataset/derived/acm-s2-shake-action/action_labels.csv`; it is not guessed from
+audio filenames. Run:
+
+```powershell
+python ml/train_shake_action.py
+```
+
+The resulting `ml/artifacts/shake_action_pilot.json` contains the fitted model
+and recording-held-out metrics. Its status is deliberately `experimental`:
+both shake examples are the same muesli-box setup, so this is an action-gate
+pilot, not evidence of water-bottle fill-level or mL accuracy. It must not be
+used to convert a recording into hydration data. The existing
+`shake_fill_level_pilot.json` therefore remains `untrained` until measured
+phone/water-bottle recordings cover empty/half/full in independent sessions.
+
+### Expanded shake pre-training comparison
+
+To push the action gate beyond the two local shake examples, the optional
+`import_mml_shake.py` importer can read the open EPFL Multimodal Sensory
+Learning archive (Zenodo record 6372438). It selects a fixed number of trials
+per material/motion condition, decodes the embedded 16 kHz microphone stream,
+and writes only derived features. The raw ROS bags are not copied into this
+repository. Install the optional dependencies first:
+
+```powershell
+python -m pip install -r ml\requirements-external-shake.txt
+python ml\import_mml_shake.py `
+  --per-condition 5 `
+  --partial-archive <optional-partial-download> `
+  --output <work>\mml_shake_features.npz
+python ml\train_shake_action_augmented.py `
+  --external-features <work>\mml_shake_features.npz
+```
+
+`train_shake_action_augmented.py` uses the 19 ACM-S2 pours as local negative
+examples and the external robot-shake bags as positive pre-training examples.
+It uses the 21 interpretable transient descriptors rather than the original
+log-mel summary, and gives the target-domain ACM-S2 examples four times the
+total weight of the external positives. On the checked run (50 external bags,
+150 windows), recording-held-out ACM-S2 results were accuracy `0.905`,
+balanced accuracy `0.947`, macro-F1 `0.806`, and shake recall `1.000` (17/19
+pour recordings correct; 2 false-positive shake calls). These numbers are a
+research comparison only: the external microphone is attached to a robot and
+the container is plastic, while ColdKeep must eventually validate on phone
+microphones and insulated water bottles. The artifact remains
+`experimental`, and `shake_fill_level_pilot.json` remains `untrained`. The
+Zenodo record does not state a redistributable license, so do not commit the
+raw archive or share the derived cache/weights until its terms are checked.
+
 ## Shake ice amount pilot
 
 `train_shake_ice_amount.py` uses the exact `ice_count` field only as collection
@@ -85,6 +146,30 @@ Exact cube counts and ice mass are never inferred.
 
 The older `train_ice_presence.py` binary task remains available for the legacy
 pour contract, but its artifact is not applied to the shake product path.
+
+## Shake ice research harness
+
+`audit_shake_dataset.py` checks the exported ColdKeep manifest for duplicate
+audio hashes, label conflicts, class/group confounds, valid
+session/container/device holdouts, and at least two valid recording days per
+class. `run_shake_ice_ablation.py` compares three
+feature sets on exactly those recording-level folds:
+
+- A: the current 128-dimensional log-mel summary;
+- B: 21 interpretable onset/transient descriptors;
+- C: A + B.
+
+Both gain-normalised and raw waveform variants are reported. The script also
+reports direct three-class and experimental two-stage (`ice/no-ice` then
+`few/many`) results. It never consumes external effect sounds as count labels
+and never writes a production artifact. With no exported ColdKeep recordings,
+the correct result is `status=insufficient_data`.
+
+The shared transient schema is implemented in NumPy, TypeScript, and Rust and
+is covered by `ml/fixtures/audio_features_golden.json`. The fixture is a
+deterministic PCM impulse vector used to detect runtime drift, not to claim
+model accuracy. Rust parity still needs to be run on a machine with Cargo and
+the Android/Rust toolchain available.
 
 ## Public shake-data candidate
 

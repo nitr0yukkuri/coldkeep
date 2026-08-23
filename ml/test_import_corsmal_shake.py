@@ -31,6 +31,9 @@ class CorsmalShakeImporterTests(unittest.TestCase):
             self.assertEqual(row["action"], "shake")
             self.assertEqual(row["water_ml"], "500")
             self.assertEqual(row["session_id"], "corsmal-train")
+            self.assertEqual(row["label_source"], "external_unlabeled")
+            self.assertEqual(row["ice_count"], "")
+            self.assertEqual(row["ice_mass_g"], "")
 
     def test_missing_audio_is_reported_without_guessing(self):
         with tempfile.TemporaryDirectory() as directory:
