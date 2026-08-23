@@ -31,13 +31,15 @@ from audio_features import (
 from train_baseline import SoftmaxClassifier, metrics
 
 
-SYNTHETIC_VERSION = "synthetic_physics_v1"
+SYNTHETIC_VERSION = "synthetic_physics_v2"
 SAMPLE_RATE = TARGET_SAMPLE_RATE
 DURATION_SECONDS = 2.0
 CLASS_NAMES = ("none", "few", "many")
 FEATURE_MODES = ("log_mel", "transient", "combined")
 NORMALIZATION_MODES = ("gain_normalized", "raw")
 GROUP_FIELDS = ("session_id", "container_id", "device_id", "room_id")
+NUISANCE_SEED_TAG = 0x4E554953  # "NUIS"
+IMPACT_SEED_TAG = 0x494D5041  # "IMPA"
 
 
 @dataclass(frozen=True)
@@ -104,38 +106,51 @@ def _generate_recording(
     room_index: int,
     seed: int,
 ) -> SyntheticRecording:
-    rng = np.random.default_rng(seed)
+    # Keep the nuisance realization independent of the target label.  The
+    # impact stream is allowed to depend on the exact count, but background
+    # noise, rattles, room gain, and device gain must not get a label-derived
+    # PRNG stream by accident.
+    nuisance_rng = np.random.default_rng(
+        np.random.SeedSequence([seed, NUISANCE_SEED_TAG])
+    )
+    impact_rng = np.random.default_rng(
+        np.random.SeedSequence([seed, IMPACT_SEED_TAG, ice_count])
+    )
     length = round(DURATION_SECONDS * SAMPLE_RATE)
-    samples = rng.normal(0.0, 0.0025, length).astype(np.float32)
+    samples = nuisance_rng.normal(0.0, 0.0025, length).astype(np.float32)
 
     # Low-frequency slosh/noise is independent of ice count.  This prevents a
     # classifier from using water movement as a direct count shortcut.
-    slosh = rng.normal(0.0, 1.0, length).astype(np.float32)
+    slosh = nuisance_rng.normal(0.0, 1.0, length).astype(np.float32)
     kernel = np.ones(401, dtype=np.float32) / 401.0
     slosh = np.convolve(slosh, kernel, mode="same")
-    samples += slosh * float(rng.uniform(0.015, 0.035))
+    samples += slosh * float(nuisance_rng.uniform(0.015, 0.035))
 
     # Each cube can produce zero or several impacts.  The overlap and missed
     # collisions intentionally make event count an imperfect proxy for cubes.
     resonance = 1_650.0 + container_index * 820.0
     for _ in range(ice_count):
-        collision_count = int(rng.poisson(1.25))
+        collision_count = int(impact_rng.poisson(1.25))
         for _ in range(collision_count):
-            start = int(rng.integers(0, max(1, length - round(0.16 * SAMPLE_RATE))))
-            amplitude = float(rng.uniform(0.018, 0.14))
-            impact = _damped_impact(SAMPLE_RATE, rng, resonance, amplitude)
+            start = int(
+                impact_rng.integers(0, max(1, length - round(0.16 * SAMPLE_RATE)))
+            )
+            amplitude = float(impact_rng.uniform(0.018, 0.14))
+            impact = _damped_impact(SAMPLE_RATE, impact_rng, resonance, amplitude)
             end = min(length, start + len(impact))
             samples[start:end] += impact[: end - start]
 
     # Background rattles are present at every class, including none.  They are
     # not labelled as cubes and make a perfect onset-count shortcut harder.
-    for _ in range(int(rng.poisson(0.45))):
-        start = int(rng.integers(0, max(1, length - round(0.16 * SAMPLE_RATE))))
+    for _ in range(int(nuisance_rng.poisson(0.45))):
+        start = int(
+            nuisance_rng.integers(0, max(1, length - round(0.16 * SAMPLE_RATE)))
+        )
         impact = _damped_impact(
             SAMPLE_RATE,
-            rng,
-            resonance * float(rng.uniform(0.65, 1.8)),
-            float(rng.uniform(0.01, 0.055)),
+            nuisance_rng,
+            resonance * float(nuisance_rng.uniform(0.65, 1.8)),
+            float(nuisance_rng.uniform(0.01, 0.055)),
         )
         end = min(length, start + len(impact))
         samples[start:end] += impact[: end - start]
@@ -148,14 +163,14 @@ def _generate_recording(
     if delay < len(samples):
         reverberated[delay:] += samples[:-delay] * float(0.08 + room_index * 0.04)
     reverberated = _apply_device_response(reverberated, SAMPLE_RATE, device_index)
-    reverberated *= float(rng.uniform(0.45, 1.8))
+    reverberated *= float(nuisance_rng.uniform(0.45, 1.8))
     reverberated = reverberated - reverberated.mean()
     peak = float(np.max(np.abs(reverberated)))
     if peak > 0.95:
         reverberated *= 0.95 / peak
 
     return SyntheticRecording(
-        recording_id=f"synthetic-{session_index}-{container_index}-{device_index}-{room_index}-{seed}",
+        recording_id=f"synthetic-{session_index}-{container_index}-{device_index}-{room_index}-ice-{ice_count}-{seed}",
         ice_count=ice_count,
         session_id=f"session-{session_index}",
         container_id=f"container-{container_index}",
@@ -199,7 +214,6 @@ def generate_recordings(
                     + container_index * 101
                     + device_index * 17
                     + room_index * 3
-                    + ice_count * 5
                     + repetition
                 )
                 recordings.append(
@@ -319,7 +333,7 @@ def run_experiment(
             "seed": seed,
             "notes": [
                 "Damped resonator impacts are a hypothesis, not measured bottle audio.",
-                "Each cube produces a random number of collisions; nuisance rattles are class-independent.",
+                "Each cube produces a random number of collisions; nuisance realizations are seeded independently of ice_count.",
                 "Results cannot establish phone/container generalization or deployability.",
             ],
         },

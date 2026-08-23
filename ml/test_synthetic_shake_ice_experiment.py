@@ -16,6 +16,7 @@ class SyntheticShakeIceExperimentTests(unittest.TestCase):
         second = generate_recordings(groups=2, repetitions=1, seed=123)
         self.assertEqual(len(first), len(second))
         self.assertEqual(len(first), 48)
+        self.assertEqual(len({item.recording_id for item in first}), len(first))
         for left, right in zip(first, second):
             self.assertEqual(left.recording_id, right.recording_id)
             np.testing.assert_array_equal(left.samples, right.samples)

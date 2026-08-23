@@ -132,19 +132,19 @@ move from research to `trained`.
 Because no measured ColdKeep recordings are available, the feature hypothesis
 was also tested with `ml/run_synthetic_shake_ice_experiment.py`. It generates
 two-second mono signals from exact synthetic counts 0--5 using damped collision
-responses, class-independent background rattles, random gain, and independent
-container/device/room response factors. The labels are generated parameters,
+responses, matched class-independent background/rattle/gain realizations, and
+independent container/device/room response factors. The labels are generated parameters,
 not external audio annotations. The run used 216 recordings, three groups per
 holdout factor, two repetitions, and 350 optimizer epochs:
 
 | features | normalization | session BA | container BA | device BA | room BA |
 | --- | --- | ---: | ---: | ---: | ---: |
-| log-mel | gain-normalized | 0.580 | 0.585 | 0.576 | 0.605 |
-| log-mel | raw | 0.603 | 0.560 | 0.549 | 0.599 |
-| transient | gain-normalized | 0.603 | 0.593 | 0.600 | 0.603 |
-| transient | raw | 0.617 | 0.585 | 0.605 | 0.599 |
-| log-mel + transient | gain-normalized | 0.616 | 0.617 | 0.591 | 0.616 |
-| log-mel + transient | raw | 0.613 | 0.559 | 0.582 | 0.630 |
+| log-mel | gain-normalized | 0.568 | 0.486 | 0.562 | 0.559 |
+| log-mel | raw | 0.549 | 0.508 | 0.548 | 0.552 |
+| transient | gain-normalized | 0.568 | 0.557 | 0.545 | 0.562 |
+| transient | raw | 0.588 | 0.542 | 0.509 | 0.560 |
+| log-mel + transient | gain-normalized | 0.566 | 0.511 | 0.566 | 0.537 |
+| log-mel + transient | raw | 0.573 | 0.494 | 0.549 | 0.549 |
 
 No synthetic configuration reached the 0.67 deployability gate. That is a
 useful negative result: even a controlled collision-density hypothesis is
