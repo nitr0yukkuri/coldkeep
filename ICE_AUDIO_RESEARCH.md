@@ -93,6 +93,18 @@ All ten previews decoded with zero diagnostics. They are useful for checking
 whether transient detectors behave sensibly on shake-like ice events, but they
 remain presence/domain references and cannot train `none`/`few`/`many`.
 
+### EPIC-SOUNDS hard-negative metadata (not imported)
+
+The public [EPIC-SOUNDS annotation repository](https://github.com/epic-kitchens/epic-sounds-annotations)
+contains four useful `glass clink` / `glass-only collision` annotations in the
+training CSV (participant/video `P10_04`, plus a `clink` annotation in
+`P26_108`). The dataset is an egocentric kitchen corpus, not a controlled
+ice-in-bottle recording; its license is CC BY-NC 4.0 and the repository
+distributes timestamps/metadata while the source videos require a separate
+download step. We therefore record it as a hard-negative lead only. No
+EPIC-SOUNDS audio or annotation is used as a ColdKeep amount label, and no
+file is copied into the training manifest.
+
 ## Domain gap
 
 [CORSMAL's catalogue](https://corsmal.github.io/data.html) describes 1,140
