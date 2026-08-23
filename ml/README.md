@@ -147,7 +147,9 @@ exposed by the UI as a trained result.
 Exact cube counts and ice mass are never inferred.
 
 The older `train_ice_presence.py` binary task remains available for the legacy
-pour contract, but its artifact is not applied to the shake product path.
+pour contract, but its artifact is not applied to the shake product path. It
+also requires `label_source=coldkeep_measured`; external effect manifests are
+rejected even for this legacy binary task.
 
 ## Shake ice research harness
 

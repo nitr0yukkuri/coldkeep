@@ -1,7 +1,8 @@
+import tempfile
 import unittest
 from pathlib import Path
 
-from train_ice_presence import Capture, validate_dataset
+from train_ice_presence import Capture, load_manifest, validate_dataset
 
 
 class IcePresenceTests(unittest.TestCase):
@@ -29,6 +30,26 @@ class IcePresenceTests(unittest.TestCase):
 
         self.assertEqual(report["classCounts"], {"0": 2, "1": 2})
         self.assertEqual(report["containersPerClass"], {"0": 2, "1": 2})
+
+    def test_manifest_rejects_external_label_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            audio = root / "audio"
+            audio.mkdir()
+            (audio / "external.wav").write_bytes(b"not a wav")
+            manifest = root / "manifest.csv"
+            manifest.write_text(
+                "recording_id,session_id,container_id,device_id,ice_count,audio_filename,label_source\n"
+                "external,s1,bottle,phone,1,external.wav,external_unlabeled\n",
+                encoding="utf-8",
+            )
+
+            captures, diagnostics = load_manifest(manifest, audio)
+
+        self.assertEqual(captures, [])
+        self.assertTrue(
+            any("label_source must be coldkeep_measured" in item for item in diagnostics)
+        )
 
 
 if __name__ == "__main__":
