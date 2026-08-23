@@ -133,7 +133,9 @@ The reproducible command was also run against the checked-out
 `dataset/external/ice-references/manifest.csv` using the optional `miniaudio`
 decoder. It produced 17 finite feature records and 5 decoder diagnostics (the
 five Google OGG previews were not decodable by that optional backend). The
-report remained `status=research_only`, with `model=null`,
+reproducible output is
+[`ml/reports/ice_references_feature_probe.json`](ml/reports/ice_references_feature_probe.json).
+The report remained `status=research_only`, with `model=null`,
 `labelsUsedForTraining=false`, and `productionArtifactUpdated=false`. Decoder
 failures are intentionally recorded as diagnostics rather than treated as
 negative or amount labels.
