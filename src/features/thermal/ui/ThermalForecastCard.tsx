@@ -2,7 +2,11 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { IceAmountClass } from '../../scan/domain/iceAmount';
-import { forecastTemperature } from '../domain/thermalForecast';
+import {
+  THERMAL_FORECAST_GRAPH_POINTS_MINUTES,
+  forecastTemperature,
+} from '../domain/thermalForecast';
+import { ThermalForecastGraph } from './ThermalForecastGraph';
 
 type ThermalForecastCardProps = {
   capacityMl: number;
@@ -43,15 +47,14 @@ export function ThermalForecastCard({
   onChangeAmbientTemp,
   onChangeElapsedMinutes,
 }: ThermalForecastCardProps) {
-  const forecast = useMemo(
-    () =>
-      forecastTemperature({
-        currentWaterTempC: parseNumber(currentWaterTempText),
-        ambientTempC: parseNumber(ambientTempText),
-        volumeMl: capacityMl,
-        iceAmount,
-        elapsedMinutes: parseNumber(elapsedMinutesText),
-      }),
+  const modelInput = useMemo(
+    () => ({
+      currentWaterTempC: parseNumber(currentWaterTempText),
+      ambientTempC: parseNumber(ambientTempText),
+      volumeMl: capacityMl,
+      iceAmount,
+      elapsedMinutes: parseNumber(elapsedMinutesText),
+    }),
     [
       ambientTempText,
       capacityMl,
@@ -61,8 +64,38 @@ export function ThermalForecastCard({
     ],
   );
 
+  const forecast = useMemo(
+    () => forecastTemperature(modelInput),
+    [modelInput],
+  );
+
+  const graphPoints = useMemo(
+    () =>
+      THERMAL_FORECAST_GRAPH_POINTS_MINUTES.flatMap(minutes => {
+        const point = forecastTemperature(modelInput, minutes);
+        if (
+          point.status !== 'ready' ||
+          point.projectedTemperatureC === null ||
+          point.temperatureRangeC === null
+        ) {
+          return [];
+        }
+        return [
+          {
+            minutes,
+            projectedTemperatureC: point.projectedTemperatureC,
+            lowTemperatureC: point.temperatureRangeC.low,
+            highTemperatureC: point.temperatureRangeC.high,
+          },
+        ];
+      }),
+    [modelInput],
+  );
+
   const range = forecast.temperatureRangeC;
   const hold = forecast.iceHoldMinutesRange;
+  const endPoint = graphPoints[graphPoints.length - 1];
+  const ambientTempC = modelInput.ambientTempC;
 
   return (
     <View style={styles.card}>
@@ -70,10 +103,10 @@ export function ThermalForecastCard({
         <View style={styles.headerCopy}>
           <Text style={styles.title}>冷却の目安</Text>
           <Text style={styles.subtitle}>
-            外気温と現在の水温から60分後を参考計算
+            外気温と現在の水温から4時間の推移を参考計算
           </Text>
         </View>
-        <Text style={styles.horizon}>60分後</Text>
+        <Text style={styles.horizon}>4時間の推移</Text>
       </View>
 
       <View style={styles.inputRow}>
@@ -124,14 +157,21 @@ export function ThermalForecastCard({
         </View>
       </View>
 
-      {forecast.status === 'ready' && range ? (
+      {forecast.status === 'ready' &&
+        range &&
+        endPoint &&
+        typeof ambientTempC === 'number' ? (
         <View style={styles.resultBox}>
-          <Text style={styles.resultLabel}>60分後の水温（参考）</Text>
+          <ThermalForecastGraph
+            points={graphPoints}
+            ambientTempC={ambientTempC}
+          />
+          <Text style={styles.resultLabel}>4時間後の水温（参考）</Text>
           <Text style={styles.resultValue}>
-            約{forecast.projectedTemperatureC}℃
+            約{endPoint.projectedTemperatureC}℃
           </Text>
           <Text style={styles.resultRange}>
-            予測範囲 {range.low}〜{range.high}℃
+            予測範囲 {endPoint.lowTemperatureC}〜{endPoint.highTemperatureC}℃
           </Text>
           {hold && hold.high > 0 ? (
             <Text style={styles.resultSubtext}>

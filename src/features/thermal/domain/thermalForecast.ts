@@ -24,6 +24,9 @@ export type ThermalForecast = {
 };
 
 export const THERMAL_FORECAST_HORIZON_MINUTES = 60;
+export const THERMAL_FORECAST_GRAPH_HORIZON_MINUTES = 240;
+export const THERMAL_FORECAST_GRAPH_POINTS_MINUTES =
+  [0, 30, 60, 120, 180, 240] as const;
 export const DEFAULT_COOLING_COEFFICIENT_PER_HOUR = 0.12;
 
 const WATER_HEAT_CAPACITY_J_PER_G_K = 4.186;
@@ -138,11 +141,12 @@ function invalidForecast(message: string): ThermalForecast {
 }
 
 /**
- * Project one hour ahead with a transparent Newton-style baseline. Unknown
- * ice is shown as a widened no-ice baseline so the assumption stays visible.
+ * Project ahead with a transparent Newton-style baseline. Unknown ice is shown
+ * as a widened no-ice baseline so the assumption stays visible.
  */
 export function forecastTemperature(
   input: Partial<ThermalForecastInput>,
+  horizonMinutes = THERMAL_FORECAST_HORIZON_MINUTES,
 ): ThermalForecast {
   if (
     input.currentWaterTempC === undefined ||
@@ -181,11 +185,18 @@ export function forecastTemperature(
   if (elapsedMinutes < 0 || elapsedMinutes > 24 * 60) {
     return invalidForecast('経過時間は0〜1440分で入力してください');
   }
+  if (
+    !Number.isFinite(horizonMinutes) ||
+    horizonMinutes < 0 ||
+    horizonMinutes > THERMAL_FORECAST_GRAPH_HORIZON_MINUTES
+  ) {
+    return invalidForecast('予測時間は0〜240分で指定してください');
+  }
 
   const baseProjection = projectedWithoutIce(
     currentWaterTempC,
     ambientTempC,
-    THERMAL_FORECAST_HORIZON_MINUTES,
+    horizonMinutes,
     DEFAULT_COOLING_COEFFICIENT_PER_HOUR,
   );
   const iceAmount = input.iceAmount ?? null;
@@ -206,12 +217,12 @@ export function forecastTemperature(
   const massRange = ICE_MASS_RANGE_G[iceAmount];
   const coolerProjection = projectedWithIce(
     { ...input, iceAmount } as ThermalForecastInput,
-    THERMAL_FORECAST_HORIZON_MINUTES,
+    horizonMinutes,
     massRange.max,
   );
   const warmerProjection = projectedWithIce(
     { ...input, iceAmount } as ThermalForecastInput,
-    THERMAL_FORECAST_HORIZON_MINUTES,
+    horizonMinutes,
     massRange.min,
   );
   const holdLow = iceHoldMinutes(

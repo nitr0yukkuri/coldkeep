@@ -1,5 +1,7 @@
 import {
   forecastTemperature,
+  THERMAL_FORECAST_GRAPH_HORIZON_MINUTES,
+  THERMAL_FORECAST_GRAPH_POINTS_MINUTES,
   THERMAL_FORECAST_HORIZON_MINUTES,
 } from '../src/features/thermal/domain/thermalForecast';
 
@@ -114,6 +116,34 @@ describe('thermal forecast domain', () => {
         iceAmount: 'none',
         elapsedMinutes: THERMAL_FORECAST_HORIZON_MINUTES * 30,
       }).status,
+    ).toBe('invalid_input');
+  });
+  test('supports the bounded four-hour graph horizon', () => {
+    const input = {
+      currentWaterTempC: 6,
+      ambientTempC: 30,
+      volumeMl: 500,
+      iceAmount: 'none' as const,
+      elapsedMinutes: 0,
+    };
+    const points = THERMAL_FORECAST_GRAPH_POINTS_MINUTES.map(minutes =>
+      forecastTemperature(input, minutes),
+    );
+
+    expect(THERMAL_FORECAST_GRAPH_POINTS_MINUTES).toEqual([
+      0,
+      30,
+      60,
+      120,
+      180,
+      240,
+    ]);
+    expect(points.every(point => point.status === 'ready')).toBe(true);
+    expect(
+      forecastTemperature(input, THERMAL_FORECAST_GRAPH_HORIZON_MINUTES).status,
+    ).toBe('ready');
+    expect(
+      forecastTemperature(input, THERMAL_FORECAST_GRAPH_HORIZON_MINUTES + 1).status,
     ).toBe('invalid_input');
   });
 });
