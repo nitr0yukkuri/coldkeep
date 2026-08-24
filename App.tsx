@@ -24,6 +24,7 @@ import {
   HydrationState,
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
+import { ThermalForecastCard } from './src/features/thermal/ui/ThermalForecastCard';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
 
 const MetricCard = ({
@@ -96,6 +97,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [autoRecordedIntakeMl, setAutoRecordedIntakeMl] = useState<
     number | null
   >(null);
+  const [currentWaterTempText, setCurrentWaterTempText] = useState('');
+  const [ambientTempText, setAmbientTempText] = useState('');
+  const [elapsedMinutesText, setElapsedMinutesText] = useState('0');
   const [showMeasurementDetails, setShowMeasurementDetails] = useState(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
@@ -611,6 +615,20 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             onSaveProfile={saveHydrationProfile}
             modelActionLabel="振る"
             disabled={isRecording || isProcessing || !hydrationReady}
+          />
+
+          <ThermalForecastCard
+            capacityMl={
+              hydrationState?.profile.capacityMl ??
+              DEFAULT_HYDRATION_PROFILE.capacityMl
+            }
+            iceAmount={iceAmount}
+            currentWaterTempText={currentWaterTempText}
+            ambientTempText={ambientTempText}
+            elapsedMinutesText={elapsedMinutesText}
+            onChangeCurrentWaterTemp={setCurrentWaterTempText}
+            onChangeAmbientTemp={setAmbientTempText}
+            onChangeElapsedMinutes={setElapsedMinutesText}
           />
 
           <Text style={styles.resultNote}>
