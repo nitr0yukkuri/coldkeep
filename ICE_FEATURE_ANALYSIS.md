@@ -69,10 +69,12 @@ python ml/run_shake_ice_ablation.py `
   --output ml/reports/shake_ice_ablation.json
 ```
 
-It evaluates session-, container-, device-, room-, and operator-held-out groups, plus
+It evaluates session-, container-, device-, room-, operator-, and calendar-day-held-out groups, plus
 gain-normalised and raw waveform variants. A fold is not silently filled in:
 if its train or test side lacks a class, it is reported as skipped. The audit
-script reports the same issue before fitting.
+script reports the same issue before fitting. Direct results also record deterministic
+bootstrap intervals, calibration diagnostics, and selective metrics when low-
+confidence outputs are treated as `未判定`.
 
 ## Current results
 
@@ -81,6 +83,7 @@ checked-in amount artifact is `untrained`. Consequently:
 
 - no A/B/C score exists;
 - no two-stage score exists;
+- no real recording-level confidence or calendar-day holdout score exists;
 - no shortcut conclusion can be drawn;
 - no production model is generated.
 

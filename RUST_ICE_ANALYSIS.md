@@ -51,9 +51,10 @@ feature size/schemaが現在のbaselineと一致しない場合、氷量結果�
 fixtureであり、モデル精度を意味しない。
 
 `ml/run_shake_ice_ablation.py` はA/B/C、gain normalization有無、
-session/container/device holdout、直接3クラス/2段階分類を同一splitで比較する。
+session/container/device/operator/room/calendar-day holdout、直接3クラス/2段階分類を同一splitで比較する。
+直接分類にはbootstrap区間、calibration診断、0.65で棄却した場合のcoverage/性能も記録する。
 データが不足する場合は `insufficient_data` とし、production artifactを生成しない。
 
 量モデルのtrainerは、構造上foldを作れるだけでは`trained`に昇格させない。
-session/container/device/room/operatorの各leave-one-group-outで実測した
+session/container/device/room/operator/calendar-dayの各leave-one-group-outで実測した
 balanced accuracyがすべて0.67以上であることをartifactとpromotion gateで再検証する。

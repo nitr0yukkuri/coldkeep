@@ -20,6 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
+from evaluation_evidence import evidence_metrics
+
 from audio_features import (
     TARGET_SAMPLE_RATE,
     extract_features,
@@ -40,6 +42,8 @@ HOLDOUT_FIELDS = (
     "room_id",
     "operator_id",
 )
+TEMPORAL_HOLDOUT_FIELD = "recorded_day"
+EVALUATION_HOLDOUT_FIELDS = HOLDOUT_FIELDS + (TEMPORAL_HOLDOUT_FIELD,)
 
 
 def _file_sha256(path: Path) -> str:
@@ -101,6 +105,15 @@ def recording_day(value: str | None) -> str | None:
     if parsed.tzinfo is None:
         return None
     return parsed.date().isoformat()
+
+
+def holdout_value(capture: Capture, field: str) -> str | None:
+    """Return a stable group key, including the calendar-day holdout."""
+    if field == TEMPORAL_HOLDOUT_FIELD:
+        return recording_day(capture.recorded_at)
+    if field not in HOLDOUT_FIELDS:
+        raise ValueError(f"unsupported holdout field: {field}")
+    return str(getattr(capture, field))
 
 
 def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list[str]]:
@@ -318,24 +331,37 @@ def evaluate(
     feature_cache: dict[str, np.ndarray],
     group_field: str = "session_id",
 ) -> dict:
-    """Evaluate one complete leave-one-group-out split.
+    """Evaluate complete leave-one-group-out recording splits.
 
-    The previous trainer only computed session-held-out metrics while the
-    audit checked physical holdout coverage structurally.  A candidate could
-    therefore pass the deployment gate without any measured container/device
-    generalisation score.  Keep the split logic in one function and record a
-    metric report for every required nuisance group.
+    Windows from one recording are always kept together.  In addition to the
+    required physical holdouts, ``recorded_day`` is scored when timestamps are
+    available so a class recorded on a different day cannot pass by shortcut.
     """
-    if group_field not in HOLDOUT_FIELDS:
+    if group_field not in EVALUATION_HOLDOUT_FIELDS:
         raise ValueError(f"unsupported holdout field: {group_field}")
     classes = [0, 1, 2]
     true: list[int] = []
     predicted: list[int] = []
     predictions: list[dict] = []
-    held_out_groups = sorted({getattr(item, group_field) for item in captures})
+    probabilities_by_recording: list[list[float]] = []
+    held_out_groups = sorted(
+        {
+            value
+            for item in captures
+            if (value := holdout_value(item, group_field)) is not None
+        }
+    )
     for held_out_group in held_out_groups:
-        train = [item for item in captures if getattr(item, group_field) != held_out_group]
-        test = [item for item in captures if getattr(item, group_field) == held_out_group]
+        train = [
+            item
+            for item in captures
+            if holdout_value(item, group_field) != held_out_group
+        ]
+        test = [
+            item
+            for item in captures
+            if holdout_value(item, group_field) == held_out_group
+        ]
         if (
             {ice_amount_index(item.ice_count) for item in train} != set(classes)
             or {ice_amount_index(item.ice_count) for item in test} != set(classes)
@@ -348,11 +374,14 @@ def evaluate(
         classifier = SoftmaxClassifier(classes, seed=seed)
         classifier.fit(x_train, y_train, weights)
         for item in test:
-            probabilities = classifier.predict_proba(feature_cache[item.recording_id]).mean(axis=0)
+            probabilities = classifier.predict_proba(
+                feature_cache[item.recording_id]
+            ).mean(axis=0)
             estimate = int(classifier.classes[np.argmax(probabilities)])
             actual = ice_amount_index(item.ice_count)
             true.append(actual)
             predicted.append(estimate)
+            probabilities_by_recording.append(probabilities.tolist())
             predictions.append(
                 {
                     "recordingId": item.recording_id,
@@ -363,46 +392,66 @@ def evaluate(
                     "probabilities": probabilities.round(6).tolist(),
                 }
             )
-    result = metrics(true, predicted, classes)
-    result["classes"] = list(ICE_AMOUNT_NAMES)
-    result["groupField"] = group_field
-    result["validFolds"] = sum(
+    valid_folds = sum(
         1
         for held_out_group in held_out_groups
         if {
             ice_amount_index(item.ice_count)
             for item in captures
-            if getattr(item, group_field) != held_out_group
+            if holdout_value(item, group_field) != held_out_group
         }
         == set(classes)
         and {
             ice_amount_index(item.ice_count)
             for item in captures
-            if getattr(item, group_field) == held_out_group
+            if holdout_value(item, group_field) == held_out_group
         }
         == set(classes)
     )
+    if not true:
+        return {
+            "status": "insufficient_data",
+            "recordings": 0,
+            "correct": 0,
+            "accuracy": 0.0,
+            "balanced_accuracy": 0.0,
+            "macro_f1": 0.0,
+            "classes": list(ICE_AMOUNT_NAMES),
+            "groupField": group_field,
+            "validFolds": valid_folds,
+            "predictions": [],
+        }
+    result = metrics(true, predicted, classes)
+    result["classes"] = list(ICE_AMOUNT_NAMES)
+    result["groupField"] = group_field
+    result["validFolds"] = valid_folds
     result["predictions"] = predictions
+    result["evidence"] = evidence_metrics(
+        true,
+        predicted,
+        probabilities_by_recording,
+        classes,
+        seed=zlib.crc32(f"evidence:{group_field}".encode("utf-8")) & 0xFFFF,
+    )
     return result
 
-
 def group_evaluations_pass_gate(evaluations: dict[str, dict]) -> bool:
-    """Return true only when every required holdout has scored the gate.
-
-    Structural holdout coverage and measured performance are intentionally
-    separate checks.  This function requires both a non-empty evaluation and
-    balanced accuracy >= the production threshold for every nuisance group.
-    """
+    """Require every physical nuisance holdout to meet the score gate."""
     return all(
+        evaluation_passes_gate(evaluations.get(field, {}))
+        for field in HOLDOUT_FIELDS
+    )
+
+
+def evaluation_passes_gate(report: dict) -> bool:
+    """Apply the deployment BA gate to one scored holdout report."""
+    return (
         isinstance(report, dict)
         and int(report.get("recordings", 0)) > 0
         and int(report.get("validFolds", 0)) > 0
         and float(report.get("balanced_accuracy", 0.0))
         >= MIN_DEPLOYABLE_BALANCED_ACCURACY
-        for field in HOLDOUT_FIELDS
-        for report in [evaluations.get(field)]
     )
-
 
 def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     captures, diagnostics = load_manifest(manifest, audio_root)
@@ -437,6 +486,11 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         field: evaluate(captures, feature_cache, field)
         for field in HOLDOUT_FIELDS
     }
+    temporal_evaluation = evaluate(
+        captures,
+        feature_cache,
+        TEMPORAL_HOLDOUT_FIELD,
+    )
     evaluation = group_evaluations["session_id"]
     x, y, weights = recording_arrays(captures, feature_cache)
     classifier = SoftmaxClassifier([0, 1, 2], seed=7)
@@ -446,6 +500,7 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         if (
             audit_report["readyForTraining"]
             and group_evaluations_pass_gate(group_evaluations)
+            and evaluation_passes_gate(temporal_evaluation)
         )
         else "experimental"
     )
@@ -474,16 +529,17 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "provenance": {
             "manifestSha256": _file_sha256(manifest),
             "trainer": "ml/train_shake_ice_amount.py",
-            "trainerVersion": "shake_ice_amount_v1",
+            "trainerVersion": "shake_ice_amount_v2_evidence",
         },
         "evaluation": evaluation,
         "groupEvaluations": group_evaluations,
+        "temporalEvaluation": temporal_evaluation,
         "warnings": [
             "Pilot only: collect new sessions across phones, bottles, rooms, and operators.",
             "Public output is none/few/many; exact ice cube counts are not estimated.",
             f"Deployment status is {status}; balanced accuracy gate is "
             f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}.",
-            "A trained artifact requires complete session/container/device/room/operator holdouts and a clean audio audit.",
+            "A trained artifact requires complete session/container/device/room/operator holdouts, a calendar-day holdout, and a clean audio audit.",
         ],
     }
     if diagnostics:

@@ -141,7 +141,7 @@ raw archive or share the derived cache/weights until its terms are checked.
 `train_shake_ice_amount.py` uses the exact `ice_count` field only as collection
 ground truth, then maps it to `none` (0), `few` (1--2), or `many` (3+). It
 requires at least two recordings of every band across at least two sessions and
-reports scored session/container/device/room/operator-held-out metrics. The
+reports scored session/container/device/room/operator/calendar-day-held-out metrics, plus calibration and selective-abstention evidence. The
 training weights first equalize each recording and then equalize the observed
 class mass, preventing an imbalanced 0--5 collection matrix from teaching a
 majority-band shortcut. The artifact remains `experimental` below the
@@ -157,7 +157,7 @@ rejected even for this legacy binary task.
 
 `audit_shake_dataset.py` checks the exported ColdKeep manifest for duplicate
 audio hashes, label conflicts, class/group confounds, valid
-session/container/device/room/operator holdouts, and at least two valid recording days per
+session/container/device/room/operator/calendar-day holdouts, and at least two valid recording days per
 class. `run_shake_ice_ablation.py` compares three
 feature sets on exactly those recording-level folds:
 
@@ -165,7 +165,9 @@ feature sets on exactly those recording-level folds:
 - B: 21 interpretable onset/transient descriptors;
 - C: A + B.
 
-Both gain-normalised and raw waveform variants are reported. The script also
+Both gain-normalised and raw waveform variants are reported. Direct three-class
+results include bootstrap intervals, Brier/ECE calibration diagnostics, and
+coverage/retained metrics at 0.55/0.65/0.75 confidence. The script also
 reports direct three-class and experimental two-stage (`ice/no-ice` then
 `few/many`) results. It never consumes external effect sounds as count labels
 and never writes a production artifact. With no exported ColdKeep recordings,

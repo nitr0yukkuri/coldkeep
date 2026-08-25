@@ -106,6 +106,7 @@ def _validate_common(
     _validate_evaluation(artifact.get("evaluation"), classes)
     if require_group_evaluations:
         _validate_group_evaluations(artifact.get("groupEvaluations"), classes)
+        _validate_temporal_evaluation(artifact.get("temporalEvaluation"), classes)
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or audit.get("readyForTraining") is not True:
         raise ValueError("audit.readyForTraining is not true")
@@ -223,6 +224,16 @@ def _validate_group_evaluations(value: Any, classes: list[str]) -> None:
             raise ValueError(f"groupEvaluations[{field}] has the wrong groupField")
         _validate_evaluation(report, classes)
 
+
+def _validate_temporal_evaluation(value: Any, classes: list[str]) -> None:
+    """Require a scored calendar-day holdout for the ice production model."""
+    if not isinstance(value, dict) or value.get("groupField") != "recorded_day":
+        raise ValueError("temporalEvaluation must be a recorded_day holdout")
+    if isinstance(value.get("validFolds"), bool) or not isinstance(value.get("validFolds"), int):
+        raise ValueError("temporalEvaluation.validFolds is missing")
+    if value["validFolds"] <= 0:
+        raise ValueError("temporalEvaluation has no valid folds")
+    _validate_evaluation(value, classes)
 
 def validate_candidate(
     path: Path,

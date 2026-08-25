@@ -70,6 +70,11 @@ def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
                 "operator_id",
             )
         }
+        artifact["temporalEvaluation"] = {
+            **evaluation,
+            "groupField": "recorded_day",
+            "validFolds": 2,
+        }
     return artifact
 
 
@@ -93,6 +98,14 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "below the deployment gate"):
                 validate_candidate(path, "shake_ice_amount")
 
+    def test_ice_candidate_requires_scored_calendar_day_holdout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_ice_amount")
+            value.pop("temporalEvaluation")
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "temporalEvaluation"):
+                validate_candidate(path, "shake_ice_amount")
     def test_ice_candidate_requires_scored_physical_holdouts(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "candidate.json"

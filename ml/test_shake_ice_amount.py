@@ -9,7 +9,9 @@ from train_shake_ice_amount import (
     Capture,
     ICE_AMOUNT_NAMES,
     HOLDOUT_FIELDS,
+    evaluation_passes_gate,
     group_evaluations_pass_gate,
+    holdout_value,
     ice_amount_index,
     load_manifest,
     recording_day,
@@ -52,6 +54,19 @@ class ShakeIceAmountTests(unittest.TestCase):
         evaluations.pop("device_id")
         self.assertFalse(group_evaluations_pass_gate(evaluations))
 
+    def test_calendar_day_is_a_distinct_holdout_key(self):
+        capture = Capture(
+            "r1",
+            "s1",
+            "bottle",
+            "phone",
+            0,
+            Path("x"),
+            recorded_at="2026-08-01T10:00:00+09:00",
+        )
+        self.assertEqual(holdout_value(capture, "recorded_day"), "2026-08-01")
+        self.assertFalse(evaluation_passes_gate({"recordings": 12, "validFolds": 1, "balanced_accuracy": 0.669}))
+        self.assertTrue(evaluation_passes_gate({"recordings": 12, "validFolds": 1, "balanced_accuracy": 0.67}))
     def test_recording_day_requires_a_valid_timezone_aware_iso_timestamp(self):
         self.assertEqual(recording_day("2026-08-01T10:00:00Z"), "2026-08-01")
         self.assertEqual(recording_day("2026-08-01T10:00:00+09:00"), "2026-08-01")

@@ -183,8 +183,9 @@ python ml/run_shake_ice_ablation.py `
 ```
 
 The ablation report evaluates the same recordings under session-, container-,
-device-, room-, and operator-held-out folds, with and without gain
-normalisation. It does not write a model artifact. Only after the report has
+device-, room-, operator-, and calendar-day-held-out folds, with and without gain
+normalisation. Direct three-class results also include confidence/abstention and
+calibration evidence. It does not write a model artifact. Only after the report has
 been reviewed and the balanced-accuracy/recall/shortcut gates pass for all
-five holdout groups may the existing trainer be run to produce a `trained`
+six physical/calendar-day holdout groups may the existing trainer be run to produce a `trained`
 artifact.
