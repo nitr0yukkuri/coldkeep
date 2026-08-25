@@ -57,6 +57,7 @@ def _validate_common(
     classes: list[str],
     expected_manifest_sha256: str | None = None,
     require_group_evaluations: bool = False,
+    require_evidence: bool = False,
 ) -> None:
     if artifact.get("version") != 1:
         raise ValueError("artifact version must be 1")
@@ -103,10 +104,14 @@ def _validate_common(
     for index, value in enumerate(bias):
         _number(value, f"model.bias[{index}]")
 
-    _validate_evaluation(artifact.get("evaluation"), classes)
+    _validate_evaluation(artifact.get("evaluation"), classes, require_evidence)
     if require_group_evaluations:
-        _validate_group_evaluations(artifact.get("groupEvaluations"), classes)
-        _validate_temporal_evaluation(artifact.get("temporalEvaluation"), classes)
+        _validate_group_evaluations(
+            artifact.get("groupEvaluations"), classes, require_evidence
+        )
+        _validate_temporal_evaluation(
+            artifact.get("temporalEvaluation"), classes, require_evidence
+        )
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or audit.get("readyForTraining") is not True:
         raise ValueError("audit.readyForTraining is not true")
@@ -126,7 +131,9 @@ def _validate_common(
         raise ValueError("artifact manifest hash does not match the supplied manifest")
 
 
-def _validate_evaluation(value: Any, classes: list[str]) -> None:
+def _validate_evaluation(
+    value: Any, classes: list[str], require_evidence: bool = False
+) -> None:
     """Reject incomplete or internally inconsistent claimed metrics.
 
     Promotion still expects the candidate to come from the checked-in
@@ -203,6 +210,9 @@ def _validate_evaluation(value: Any, classes: list[str]) -> None:
     if abs(sum(f1_scores) / len(f1_scores) - metrics["macro_f1"]) > 1e-6:
         raise ValueError("evaluation.macro_f1 disagrees with confusion_matrix")
 
+    if require_evidence:
+        _validate_evidence(value.get("evidence"), recordings)
+
     if metrics["balanced_accuracy"] < MIN_DEPLOYABLE_BALANCED_ACCURACY:
         raise ValueError(
             "balanced accuracy is below the deployment gate "
@@ -210,7 +220,9 @@ def _validate_evaluation(value: Any, classes: list[str]) -> None:
         )
 
 
-def _validate_group_evaluations(value: Any, classes: list[str]) -> None:
+def _validate_group_evaluations(
+    value: Any, classes: list[str], require_evidence: bool = False
+) -> None:
     """Require scored metrics for every physical nuisance holdout."""
     if not isinstance(value, dict):
         raise ValueError("groupEvaluations is missing")
@@ -222,10 +234,15 @@ def _validate_group_evaluations(value: Any, classes: list[str]) -> None:
         report = value[field]
         if not isinstance(report, dict) or report.get("groupField") != field:
             raise ValueError(f"groupEvaluations[{field}] has the wrong groupField")
-        _validate_evaluation(report, classes)
+        valid_folds = report.get("validFolds")
+        if isinstance(valid_folds, bool) or not isinstance(valid_folds, int) or valid_folds <= 0:
+            raise ValueError(f"groupEvaluations[{field}] has no valid folds")
+        _validate_evaluation(report, classes, require_evidence)
 
 
-def _validate_temporal_evaluation(value: Any, classes: list[str]) -> None:
+def _validate_temporal_evaluation(
+    value: Any, classes: list[str], require_evidence: bool = False
+) -> None:
     """Require a scored calendar-day holdout for the ice production model."""
     if not isinstance(value, dict) or value.get("groupField") != "recorded_day":
         raise ValueError("temporalEvaluation must be a recorded_day holdout")
@@ -233,7 +250,82 @@ def _validate_temporal_evaluation(value: Any, classes: list[str]) -> None:
         raise ValueError("temporalEvaluation.validFolds is missing")
     if value["validFolds"] <= 0:
         raise ValueError("temporalEvaluation has no valid folds")
-    _validate_evaluation(value, classes)
+    _validate_evaluation(value, classes, require_evidence)
+
+
+def _validate_evidence(value: Any, recordings: int) -> None:
+    """Require uncertainty and abstention diagnostics for ice promotion."""
+    if not isinstance(value, dict):
+        raise ValueError("evaluation evidence is missing")
+    for name in (
+        "minimumClassRecall",
+        "meanConfidence",
+        "brierScore",
+        "expectedCalibrationError",
+    ):
+        score = _number(value.get(name), f"evaluation.evidence.{name}")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError(f"evaluation.evidence.{name} must be between 0 and 1")
+
+    bootstrap = value.get("bootstrap")
+    if not isinstance(bootstrap, dict):
+        raise ValueError("evaluation.evidence.bootstrap is missing")
+    samples = bootstrap.get("samples")
+    if isinstance(samples, bool) or not isinstance(samples, int) or samples < 100:
+        raise ValueError("evaluation.evidence.bootstrap.samples must be at least 100")
+    for name in ("balancedAccuracy95", "macroF195"):
+        interval = bootstrap.get(name)
+        if (
+            not isinstance(interval, list)
+            or len(interval) != 2
+            or any(
+                not isinstance(item, (int, float))
+                or isinstance(item, bool)
+                or not 0.0 <= float(item) <= 1.0
+                for item in interval
+            )
+            or float(interval[0]) > float(interval[1])
+        ):
+            raise ValueError(f"evaluation.evidence.bootstrap.{name} is invalid")
+
+    calibration_bins = value.get("calibrationBins")
+    if not isinstance(calibration_bins, list) or not calibration_bins:
+        raise ValueError("evaluation.evidence.calibrationBins is missing")
+
+    selective = value.get("selective")
+    if not isinstance(selective, dict):
+        raise ValueError("evaluation.evidence.selective is missing")
+    threshold = selective.get("0.65")
+    if not isinstance(threshold, dict):
+        raise ValueError("evaluation.evidence.selective.0.65 is missing")
+    accepted = threshold.get("accepted")
+    abstained = threshold.get("abstained")
+    if (
+        isinstance(accepted, bool)
+        or not isinstance(accepted, int)
+        or accepted < 0
+        or isinstance(abstained, bool)
+        or not isinstance(abstained, int)
+        or abstained < 0
+        or accepted + abstained != recordings
+    ):
+        raise ValueError("evaluation.evidence.selective.0.65 counts are invalid")
+    coverage = _number(
+        threshold.get("coverage"), "evaluation.evidence.selective.0.65.coverage"
+    )
+    expected_coverage = accepted / recordings
+    if abs(coverage - expected_coverage) > 1e-6:
+        raise ValueError("evaluation evidence coverage disagrees with recordings")
+    if accepted:
+        for name in ("accuracy", "balanced_accuracy", "macro_f1"):
+            score = _number(
+                threshold.get(name), f"evaluation.evidence.selective.0.65.{name}"
+            )
+            if not 0.0 <= score <= 1.0:
+                raise ValueError(
+                    f"evaluation.evidence.selective.0.65.{name} must be between 0 and 1"
+                )
+
 
 def validate_candidate(
     path: Path,
@@ -262,6 +354,7 @@ def validate_candidate(
             ["none", "few", "many"],
             expected_manifest_sha256,
             require_group_evaluations=True,
+            require_evidence=True,
         )
         schema = artifact.get("featureSchema")
         if not isinstance(schema, dict) or schema.get("name") != "log_mel_summary_v1" or schema.get("version") != 1:

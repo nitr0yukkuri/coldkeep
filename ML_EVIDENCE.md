@@ -57,6 +57,8 @@ A measured artifact can become `trained` only when all of the following hold:
 5. balanced accuracy is at least 0.67 on every required holdout;
 6. the report is reproduced from the same manifest SHA-256 by the promotion
    validator.
+7. every required holdout carries bootstrap, calibration, and 0.65 selective
+   evidence; a score-only hand-edited report is rejected.
 
 Until all gates pass, the product keeps the explicit `untrained`/`未判定`
 result and does not convert the estimate into hydration or temperature math.
