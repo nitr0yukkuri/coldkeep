@@ -16,6 +16,8 @@ import { ExpoDatasetRepository } from './datasetRepository';
 import { ExpoHydrationRepository } from './hydrationRepository';
 import { MODEL_RECORDING_ACTION } from '../../src/features/collection/domain/collection';
 import { isResearchPreviewMode } from '../../src/app/runtimeMode';
+import { NotificationUseCase } from '../../src/features/notifications/application/notificationUseCase';
+import { ExpoNotificationScheduler } from './notifications';
 
 export function createExpoAppDependencies(
   recorder: ExpoPcmRecorderAdapter,
@@ -43,5 +45,6 @@ export function createExpoAppDependencies(
       new ExpoShareGateway(),
     ),
     hydration: new HydrationUseCase(new ExpoHydrationRepository()),
+    notifications: new NotificationUseCase(new ExpoNotificationScheduler()),
   };
 }

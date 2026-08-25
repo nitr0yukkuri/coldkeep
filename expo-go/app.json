@@ -16,7 +16,8 @@
           "microphonePermission": "ColdKeep uses the microphone to check bottle audio and collect labeled samples."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-notifications"
     ],
     "android": {
       "permissions": [

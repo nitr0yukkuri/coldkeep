@@ -173,6 +173,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     };
   }, [app]);
 
+  useEffect(() => {
+    if (!hydrationReady || !hydrationState || !app.notifications) {
+      return;
+    }
+    app.notifications.syncHydration(hydrationState).catch(error => {
+      console.warn('通知の同期に失敗しました', error);
+    });
+  }, [app, hydrationReady, hydrationState]);
+
   const handleScan = useCallback(
     async (recording: RecordingRef) => {
       try {
