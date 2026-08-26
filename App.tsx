@@ -458,7 +458,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
           <View style={styles.scanScreen}>
             {activeTab === 'history' ? (
-              <HistoryScreen state={hydrationState} />
+              <HistoryScreen
+                state={hydrationState}
+                onOpenMeasure={() => setActiveTab('measure')}
+              />
             ) : null}
 
             {activeTab === 'home' ? (

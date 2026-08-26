@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import type {
   HydrationIntake,
@@ -9,6 +10,7 @@ import type {
 
 type HistoryScreenProps = {
   state: HydrationState | null;
+  onOpenMeasure(): void;
 };
 
 type HistoryRecord =
@@ -26,7 +28,7 @@ function recordTime(recordedAt: string): string {
   });
 }
 
-export function HistoryScreen({ state }: HistoryScreenProps) {
+export function HistoryScreen({ state, onOpenMeasure }: HistoryScreenProps) {
   const records: HistoryRecord[] = state
     ? [
         ...state.observations.map(value => ({
@@ -55,10 +57,25 @@ export function HistoryScreen({ state }: HistoryScreenProps) {
 
       {records.length === 0 ? (
         <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="time-outline" size={30} color="#087ea4" />
+          </View>
           <Text style={styles.emptyTitle}>まだ記録がありません</Text>
           <Text style={styles.emptyText}>
-            「振る」タブから測定すると、ここに履歴が表示されます。
+            水筒を振って測定すると、残量と飲水量がここに残ります。
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="振って測定する"
+            onPress={onOpenMeasure}
+            style={({ pressed }) => [
+              styles.measureButton,
+              pressed && styles.measureButtonPressed,
+            ]}
+          >
+            <Text style={styles.measureButtonText}>振って測定する</Text>
+            <Ionicons name="arrow-forward" size={16} color="#087ea4" />
+          </Pressable>
         </View>
       ) : (
         <View style={styles.list}>
@@ -114,12 +131,46 @@ const styles = StyleSheet.create({
   count: { color: '#087ea4', fontSize: 24, fontWeight: '800' },
   emptyState: {
     marginTop: 22,
-    padding: 18,
+    padding: 20,
     borderRadius: 12,
     backgroundColor: '#f4fafb',
+    alignItems: 'center',
   },
-  emptyTitle: { color: '#36515a', fontSize: 14, fontWeight: '800' },
-  emptyText: { color: '#73878c', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  emptyIcon: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 29,
+    backgroundColor: '#dff1f3',
+  },
+  emptyTitle: {
+    color: '#36515a',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+  emptyText: {
+    color: '#73878c',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  measureButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 42,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#b7dfe4',
+  },
+  measureButtonText: { color: '#087ea4', fontSize: 13, fontWeight: '800' },
+  measureButtonPressed: { opacity: 0.72 },
   list: { marginTop: 18 },
   row: {
     flexDirection: 'row',
