@@ -25,6 +25,7 @@ import {
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
 import { ThermalForecastCard } from './src/features/thermal/ui/ThermalForecastCard';
+import { CapabilityFooter } from './src/features/shared/ui/CapabilityFooter';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
 
 const MetricCard = ({
@@ -643,6 +644,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           <Text style={styles.resultNote}>
             結果は録音動作、距離、容器、周囲の音で変わります。残量は参考値として確認してください。
           </Text>
+
+          <CapabilityFooter />
         </View>
       </ScrollView>
     </SafeAreaView>
