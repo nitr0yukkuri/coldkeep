@@ -48,7 +48,7 @@ describe('HomeOverview', () => {
       .map(node => node.props.children)
       .filter(value => typeof value === 'string');
 
-    expect(values).toContain('今日のサマリー');
+    expect(values).toContain('現在の状態');
     expect(values).not.toContain('振って測定する');
     expect(
       renderer.root

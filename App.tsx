@@ -434,7 +434,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             <Text style={styles.eyebrow}>COLDKEEP</Text>
             <Text style={styles.headerTitle}>
               {activeTab === 'home'
-                ? '今日の水筒'
+                ? 'ホーム'
                 : activeTab === 'measure'
                   ? '振って測る'
                   : activeTab === 'hydration'
@@ -445,7 +445,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
             <Text style={styles.headerSubtitle}>
               {activeTab === 'home'
-                ? '水筒の状態をひと目で確認できます'
+                ? '水筒の状態と今日の飲水をまとめて確認'
                 : activeTab === 'measure'
                   ? '水筒を振った音から残量と氷を判定します'
                   : activeTab === 'hydration'

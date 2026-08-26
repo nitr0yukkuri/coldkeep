@@ -32,7 +32,7 @@ export function HomeOverview({
     <View style={styles.card}>
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>今日のサマリー</Text>
+          <Text style={styles.title}>現在の状態</Text>
           <Text style={styles.subtitle}>
             各機能の結果をここでまとめて確認できます
           </Text>
