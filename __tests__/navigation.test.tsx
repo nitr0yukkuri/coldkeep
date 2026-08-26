@@ -16,18 +16,11 @@ describe('BottomTabBar', () => {
       .map(node => node.props.children)
       .filter(value => typeof value === 'string');
 
-    expect(labels).toEqual([
-      '⌂',
-      'ホーム',
-      '⌁',
-      '振る',
-      '＋',
-      '水分',
-      '℃',
-      '温度',
-      '▥',
-      '履歴',
-    ]);
+    expect(
+      labels.filter(value =>
+        ['ホーム', '振る', '水分', '温度', '履歴'].includes(value as string),
+      ),
+    ).toEqual(['ホーム', '振る', '水分', '温度', '履歴']);
     const tabs = renderer.root.findAllByType(Pressable);
     expect(tabs).toHaveLength(5);
     expect(

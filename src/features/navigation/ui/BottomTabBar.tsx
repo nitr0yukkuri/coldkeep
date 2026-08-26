@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { APP_TABS, AppTab } from '../domain/appTab';
 
@@ -26,9 +27,13 @@ export function BottomTabBar({ activeTab, onChange }: BottomTabBarProps) {
               pressed && styles.tabPressed,
             ]}
           >
-            <Text style={[styles.icon, selected && styles.iconSelected]}>
-              {tab.icon}
-            </Text>
+            <Ionicons
+              name={tab.icon}
+              size={23}
+              color={selected ? '#087ea4' : '#8b9ba0'}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
             <Text style={[styles.label, selected && styles.labelSelected]}>
               {tab.label}
             </Text>
@@ -59,13 +64,7 @@ const styles = StyleSheet.create({
   },
   tabSelected: { backgroundColor: '#e8f4f6' },
   tabPressed: { opacity: 0.72 },
-  icon: {
-    color: '#8b9ba0',
-    fontSize: 21,
-    lineHeight: 23,
-    fontWeight: '700',
-  },
-  iconSelected: { color: '#087ea4' },
+
   label: {
     color: '#8b9ba0',
     fontSize: 11,

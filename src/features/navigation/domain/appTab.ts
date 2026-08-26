@@ -7,9 +7,9 @@ export type AppTabDefinition = {
 };
 
 export const APP_TABS: readonly AppTabDefinition[] = [
-  { key: 'home', label: 'ホーム', icon: '⌂' },
-  { key: 'measure', label: '振る', icon: '⌁' },
-  { key: 'hydration', label: '水分', icon: '＋' },
-  { key: 'thermal', label: '温度', icon: '℃' },
-  { key: 'history', label: '履歴', icon: '▥' },
+  { key: 'home', label: 'ホーム', icon: 'home-outline' },
+  { key: 'measure', label: '振る', icon: 'pulse-outline' },
+  { key: 'hydration', label: '水分', icon: 'water-outline' },
+  { key: 'thermal', label: '温度', icon: 'thermometer-outline' },
+  { key: 'history', label: '履歴', icon: 'time-outline' },
 ];
