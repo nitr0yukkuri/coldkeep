@@ -393,9 +393,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     let cleanupFailed = false;
     try {
       setStatus('確認中…');
-      recording = await app.recording.stop();
+      // Stop the UI timer as soon as recording ends from the user's point of
+      // view. Native stop may take a moment while the file is finalized, but
+      // that wait is processing time rather than additional recording time.
       setIsRecording(false);
       setRecordingStartedAt(null);
+      recording = await app.recording.stop();
       await handleScan(recording);
     } catch (error) {
       console.error(error);

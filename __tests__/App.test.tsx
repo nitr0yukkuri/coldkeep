@@ -64,6 +64,99 @@ async function openHydrationTab(renderer: ReactTestRenderer.ReactTestRenderer) {
   await openTab(renderer, '水分');
 }
 
+test('stops the recording timer when confirmation starts', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1_500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStop!: (recording: { uri: string }) => void;
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start: jest.fn(async () => ({ uri: 'file:///test.wav' })),
+      stop: jest.fn(
+        () =>
+          new Promise<{ uri: string }>(resolve => {
+            resolveStop = resolve;
+          }),
+      ),
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: {
+      execute: jest.fn(async () => ({
+        containsWater: true,
+        waterConfidence: 0.9,
+        fillLevel: 50,
+        fillConfidence: 0.8,
+        icePresence: null,
+        iceConfidence: null,
+        iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
+        engine: 'typescript',
+        measurementAction: 'shake',
+        measurementStatus: 'untrained',
+      })),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+    await Promise.resolve();
+  });
+  await openMeasureTab(renderer);
+
+  const textContent = (value: unknown): string => {
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map(textContent).join('');
+    }
+    return '';
+  };
+  const buttonFor = (label: string) =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => textContent(text.props.children) === label),
+      );
+
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('振って測定する')?.props.onPress();
+  });
+  let stopPromise!: Promise<void>;
+  await ReactTestRenderer.act(async () => {
+    stopPromise = buttonFor('停止して確認')?.props.onPress();
+    await Promise.resolve();
+  });
+
+  const processingTexts = renderer.root
+    .findAllByType(Text)
+    .map(text => textContent(text.props.children));
+  expect(processingTexts).toContain('確認中…');
+  expect(processingTexts.some(value => value.startsWith('● 録音'))).toBe(false);
+
+  resolveStop({ uri: 'file:///test.wav' });
+  await ReactTestRenderer.act(async () => {
+    await stopPromise;
+  });
+  renderer.unmount();
+});
 test('renders correctly', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
