@@ -47,9 +47,7 @@ type HydrationHistoryChartProps = {
   state: HydrationState | null;
 };
 
-export function HydrationHistoryChart({
-  state,
-}: HydrationHistoryChartProps) {
+export function HydrationHistoryChart({ state }: HydrationHistoryChartProps) {
   const points = state ? createDayPoints(state) : [];
   const maxMl = Math.max(...points.map(point => point.amountMl), 1);
 
@@ -71,9 +69,7 @@ export function HydrationHistoryChart({
           const height = Math.max(4, (point.amountMl / maxMl) * 100);
           return (
             <View key={point.key} style={styles.column}>
-              <Text style={styles.amountLabel}>
-                {point.amountMl > 0 ? point.amountMl : '—'}
-              </Text>
+              <Text style={styles.amountLabel}>{point.amountMl} mL</Text>
               <View style={styles.barTrack}>
                 <View
                   style={[
@@ -83,7 +79,9 @@ export function HydrationHistoryChart({
                   ]}
                 />
               </View>
-              <Text style={[styles.dayLabel, point.isToday && styles.todayLabel]}>
+              <Text
+                style={[styles.dayLabel, point.isToday && styles.todayLabel]}
+              >
                 {point.label}
               </Text>
             </View>
@@ -95,7 +93,7 @@ export function HydrationHistoryChart({
           <View style={[styles.legendSwatch, styles.todaySwatch]} />
           <Text style={styles.legendText}>今日</Text>
         </View>
-        <Text style={styles.legendText}>記録がある日のみ表示</Text>
+        <Text style={styles.legendText}>未記録日は0 mL</Text>
       </View>
     </View>
   );
