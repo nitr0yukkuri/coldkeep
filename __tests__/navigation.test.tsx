@@ -2,6 +2,7 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Pressable, Text } from 'react-native';
 
+import { HomeOverview } from '../src/features/home/ui/HomeOverview';
 import { BottomTabBar } from '../src/features/navigation/ui/BottomTabBar';
 
 describe('BottomTabBar', () => {
@@ -28,5 +29,31 @@ describe('BottomTabBar', () => {
     ).toHaveLength(1);
     tabs[1]?.props.onPress();
     expect(onChange).toHaveBeenCalledWith('measure');
+  });
+});
+
+describe('HomeOverview', () => {
+  it('keeps measurement controls in the measure tab', () => {
+    const renderer = ReactTestRenderer.create(
+      <HomeOverview
+        state={null}
+        waterDisplay="未判定"
+        iceDisplay="未判定"
+        hasScanResult={false}
+        onOpenMeasure={jest.fn()}
+      />,
+    );
+    const values = renderer.root
+      .findAllByType(Text)
+      .map(node => node.props.children)
+      .filter(value => typeof value === 'string');
+
+    expect(values).toContain('今日のサマリー');
+    expect(values).not.toContain('振って測定する');
+    expect(
+      renderer.root
+        .findAllByType(Pressable)
+        .filter(node => node.props.accessibilityLabel === '振るタブを開く'),
+    ).toHaveLength(1);
   });
 });

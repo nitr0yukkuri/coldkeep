@@ -4,7 +4,7 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { Pressable, Text, TouchableOpacity } from 'react-native';
 
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/test/documents',
@@ -43,6 +43,26 @@ jest.mock('../src/app/compositionRoot', () => ({
 
 import App from '../src/app/NativeApp';
 import ColdKeepScreen from '../App';
+
+async function openTab(
+  renderer: ReactTestRenderer.ReactTestRenderer,
+  label: string,
+) {
+  await ReactTestRenderer.act(async () => {
+    const tab = renderer.root
+      .findAllByType(Pressable)
+      .find(node => node.props.accessibilityLabel === label);
+    tab?.props.onPress();
+  });
+}
+
+async function openMeasureTab(renderer: ReactTestRenderer.ReactTestRenderer) {
+  await openTab(renderer, '振る');
+}
+
+async function openHydrationTab(renderer: ReactTestRenderer.ReactTestRenderer) {
+  await openTab(renderer, '水分');
+}
 
 test('renders correctly', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
@@ -112,6 +132,7 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
 
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
@@ -262,13 +283,12 @@ test('automatically records a reliable acoustic intake delta', async () => {
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
   const buttonFor = (label: string) =>
     renderer.root
       .findAllByType(TouchableOpacity)
       .find(button =>
-        button
-          .findAllByType(Text)
-          .some(text => text.props.children === label),
+        button.findAllByType(Text).some(text => text.props.children === label),
       );
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
@@ -286,6 +306,7 @@ test('automatically records a reliable acoustic intake delta', async () => {
   await ReactTestRenderer.act(async () => {
     await buttonFor('停止して確認')?.props.onPress();
   });
+  await openHydrationTab(renderer);
 
   const testApp = app as unknown as {
     hydration: { addEstimatedIntake: jest.Mock };
@@ -348,6 +369,7 @@ test('shows the preview shake estimate without recording experimental intake', a
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
       return String(value);
@@ -381,6 +403,9 @@ test('shows the preview shake estimate without recording experimental intake', a
   expect(textValues).toContain(
     '汎用の試験推定を表示しました。実測モデルで検証するまで水分量は自動記録しません',
   );
-  expect((app as never as { hydration: { addEstimatedIntake: jest.Mock } }).hydration.addEstimatedIntake).not.toHaveBeenCalled();
+  expect(
+    (app as never as { hydration: { addEstimatedIntake: jest.Mock } }).hydration
+      .addEstimatedIntake,
+  ).not.toHaveBeenCalled();
   renderer.unmount();
 });

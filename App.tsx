@@ -24,6 +24,7 @@ import {
   HydrationState,
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
+import { HomeOverview } from './src/features/home/ui/HomeOverview';
 import { HistoryScreen } from './src/features/history/ui/HistoryScreen';
 import type { AppTab } from './src/features/navigation/domain/appTab';
 import { BottomTabBar } from './src/features/navigation/ui/BottomTabBar';
@@ -443,11 +444,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                       : '記録の履歴'}
             </Text>
             <Text style={styles.headerSubtitle}>
-              {activeTab === 'thermal'
-                ? '現在の水温から4時間先までの変化を見通します'
-                : activeTab === 'history'
-                  ? '測定と飲水の記録をあとから確認できます'
-                  : '水筒を振るだけで、残量と氷の状態を記録できます'}
+              {activeTab === 'home'
+                ? '水筒の状態をひと目で確認できます'
+                : activeTab === 'measure'
+                  ? '水筒を振った音から残量と氷を判定します'
+                  : activeTab === 'hydration'
+                    ? '容量を設定すると飲水量を自動で記録します'
+                    : activeTab === 'thermal'
+                      ? '現在の水温から4時間先までの変化を見通します'
+                      : '測定と飲水の記録をあとから確認できます'}
             </Text>
           </View>
 
@@ -456,7 +461,17 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               <HistoryScreen state={hydrationState} />
             ) : null}
 
-            {activeTab === 'hydration' || activeTab === 'thermal' ? null : (
+            {activeTab === 'home' ? (
+              <HomeOverview
+                state={hydrationState}
+                waterDisplay={waterDisplay}
+                iceDisplay={iceDisplay}
+                hasScanResult={hasScanResult}
+                onOpenMeasure={() => setActiveTab('measure')}
+              />
+            ) : null}
+
+            {activeTab === 'measure' ? (
               <>
                 <View style={styles.heroCard}>
                   <Text style={styles.heroLabel}>現在の残量</Text>
@@ -647,9 +662,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   </>
                 ) : null}
               </>
-            )}
+            ) : null}
 
-            {activeTab === 'home' || activeTab === 'hydration' ? (
+            {activeTab === 'hydration' ? (
               <HydrationPanel
                 state={hydrationState}
                 capacityText={capacityText}
@@ -661,7 +676,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               />
             ) : null}
 
-            {activeTab === 'home' || activeTab === 'thermal' ? (
+            {activeTab === 'thermal' ? (
               <ThermalForecastCard
                 capacityMl={
                   hydrationState?.profile.capacityMl ??
@@ -677,7 +692,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
               />
             ) : null}
 
-            {activeTab === 'home' || activeTab === 'measure' ? (
+            {activeTab === 'measure' ? (
               <Text style={styles.resultNote}>
                 結果は録音動作、距離、容器、周囲の音で変わります。残量は参考値として確認してください。
               </Text>
