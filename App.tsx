@@ -24,8 +24,10 @@ import {
   HydrationState,
 } from './src/features/hydration/domain/hydration';
 import { HydrationPanel } from './src/features/hydration/ui/HydrationPanel';
+import { HistoryScreen } from './src/features/history/ui/HistoryScreen';
+import type { AppTab } from './src/features/navigation/domain/appTab';
+import { BottomTabBar } from './src/features/navigation/ui/BottomTabBar';
 import { ThermalForecastCard } from './src/features/thermal/ui/ThermalForecastCard';
-import { CapabilityFooter } from './src/features/shared/ui/CapabilityFooter';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
 
 const MetricCard = ({
@@ -102,6 +104,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [ambientTempText, setAmbientTempText] = useState('');
   const [elapsedMinutesText, setElapsedMinutesText] = useState('0');
   const [showMeasurementDetails, setShowMeasurementDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
 
@@ -218,8 +221,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         );
         setFillLevel(
           result.fillLevel === null ||
-          (!fillIsReliable &&
-            !(shakeMode && result.measurementStatus === 'experimental'))
+            (!fillIsReliable &&
+              !(shakeMode && result.measurementStatus === 'experimental'))
             ? 'N/A'
             : `${result.fillLevel}%`,
         );
@@ -421,239 +424,275 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>COLDKEEP</Text>
-          <Text style={styles.headerTitle}>水筒の状態を確認</Text>
-          <Text style={styles.headerSubtitle}>
-            水筒を振るだけで、残量と氷の状態を記録できます
-          </Text>
-        </View>
-
-        <View style={styles.scanScreen}>
-          <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>現在の残量</Text>
-            <Text
-              style={[
-                styles.heroValue,
-                waterDisplay.length > 8 && styles.heroValueCompact,
-              ]}
-            >
-              {waterDisplay}
+      <View style={styles.appShell}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>COLDKEEP</Text>
+            <Text style={styles.headerTitle}>
+              {activeTab === 'home'
+                ? '今日の水筒'
+                : activeTab === 'measure'
+                  ? '振って測る'
+                  : activeTab === 'hydration'
+                    ? '今日の水分'
+                    : activeTab === 'thermal'
+                      ? '水温の推移'
+                      : '記録の履歴'}
             </Text>
-            <Text style={styles.heroDescription}>
-              {!hasScanResult
-                ? '水筒を1秒以上振って測定します'
-                : content === 'SHAKE'
-                  ? measurementStatus === 'untrained'
-                    ? '振り音モデルは未学習のため、まだ残量を判定できません'
-                    : measurementStatus === 'experimental'
-                      ? fillLevel === 'N/A'
-                        ? '試験推定の信頼度が低いため、残量を表示できませんでした'
-                        : '学習前の試験推定です。飲水量の自動記録には使いません'
-                      : fillLevel === 'N/A'
-                        ? '振り音の信頼度が低いため残量を判定できませんでした'
-                        : '振り音から残量の3段階を判定しました'
-                  : content === 'UNKNOWN'
-                    ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
-                    : content === 'WATER'
-                      ? fillLevel === 'N/A'
-                        ? '水は検出されましたが、充填状態は未判定です'
-                        : '水が入っています'
-                      : '水が検出されませんでした'}
+            <Text style={styles.headerSubtitle}>
+              {activeTab === 'thermal'
+                ? '現在の水温から4時間先までの変化を見通します'
+                : activeTab === 'history'
+                  ? '測定と飲水の記録をあとから確認できます'
+                  : '水筒を振るだけで、残量と氷の状態を記録できます'}
             </Text>
           </View>
 
-          {hasScanResult ? (
-            <View style={styles.metricRow}>
-              {content === 'SHAKE' && fillLevel !== 'N/A' ? (
-                <MetricCard
-                  title="残量"
-                  value={fillLevel}
-                  unit={
-                    measurementStatus === 'experimental'
-                      ? '試験推定（自動記録には未使用）'
-                      : '容量に対する3段階の目安'
-                  }
-                  color="#087ea4"
-                />
-              ) : content === 'WATER' && fillLevel !== 'N/A' ? (
-                <MetricCard
-                  title="充填率"
-                  value={fillLevel}
-                  unit="50% / 90%の目安"
-                  color="#087ea4"
-                />
-              ) : null}
-              {content === 'SHAKE' ? (
-                <MetricCard
-                  title="氷量"
-                  value={iceAmount !== null ? iceDisplay : '未判定'}
-                  unit={
-                    iceAmountStatus === 'trained'
-                      ? iceAmount !== null
-                        ? `3段階の目安（${formatProbability(
-                            iceAmountConfidence,
-                          )}）`
-                        : '信頼度不足（再試行）'
-                      : iceAmountStatus === 'experimental'
-                        ? iceAmount !== null
-                          ? `研究プレビュー（${formatProbability(
-                              iceAmountConfidence,
-                            )}・自動記録には未使用）`
-                          : '研究プレビュー信頼度不足'
-                      : '学習前は未判定'
-                  }
-                  color="#168276"
-                />
-              ) : (
-                <MetricCard
-                  title="氷の有無"
-                  value={iceDisplay}
-                  unit={
-                    icePresence === 'UNKNOWN'
-                      ? iceStatus === 'trained'
-                        ? iceConfidence === null
-                          ? '信頼度不足（再試行）'
-                          : `信頼度不足（${formatProbability(iceConfidence)}）`
-                        : '学習前は未判定'
-                      : `音からの目安（${formatProbability(iceConfidence)}）`
-                  }
-                  color="#168276"
-                />
-              )}
-            </View>
-          ) : null}
-
-          <View style={styles.analysisCard}>
-            <Text style={styles.analysisDescription}>
-              水筒を振った音から残量を確認します
-            </Text>
-            <Text style={styles.analysisHint}>
-              {isProcessing
-                ? '確認中です。少しお待ちください'
-                : isRecording
-                  ? '振る動作が終わったら停止してください'
-                  : '1秒以上、一定の強さで振ってください'}
-            </Text>
-            <TouchableOpacity
-              disabled={isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isProcessing
-                  ? '音声を確認中'
-                  : isRecording
-                    ? '録音を停止して確認'
-                    : '水筒を振って測定する'
-              }
-              style={[
-                styles.analysisButton,
-                isRecording && styles.analysisButtonActive,
-                isProcessing && styles.analysisButtonDisabled,
-              ]}
-              onPress={isRecording ? stopRecording : startRecording}
-            >
-              <Text style={styles.analysisButtonText}>
-                {isProcessing
-                  ? '確認中…'
-                  : isRecording
-                    ? '停止して確認'
-                    : '振って測定する'}
-              </Text>
-            </TouchableOpacity>
-            {isRecording ? (
-              <Text style={styles.recordingDuration}>
-                ● 録音 {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
-              </Text>
+          <View style={styles.scanScreen}>
+            {activeTab === 'history' ? (
+              <HistoryScreen state={hydrationState} />
             ) : null}
-            {status !== '準備できました' && status !== '確認が完了しました' ? (
-              <Text style={styles.analysisStatus} accessibilityLiveRegion="polite">
-                {status}
-              </Text>
-            ) : null}
-          </View>
 
-          {hasScanResult ? (
-            <>
-              <TouchableOpacity
-                accessibilityRole="button"
-                style={styles.detailsToggle}
-                onPress={() => setShowMeasurementDetails(value => !value)}
-              >
-                <Text style={styles.detailsToggleText}>
-                  測定の詳細 {showMeasurementDetails ? '▲' : '▼'}
-                </Text>
-              </TouchableOpacity>
-              {showMeasurementDetails ? (
-                <View style={styles.inferenceCard}>
-                  <Text style={styles.inferenceTitle}>測定の詳細</Text>
-                  <Text style={styles.inferenceText}>
-                    {modelActionLabel}音モデル ·{' '}
-                    {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}経路
+            {activeTab === 'hydration' || activeTab === 'thermal' ? null : (
+              <>
+                <View style={styles.heroCard}>
+                  <Text style={styles.heroLabel}>現在の残量</Text>
+                  <Text
+                    style={[
+                      styles.heroValue,
+                      waterDisplay.length > 8 && styles.heroValueCompact,
+                    ]}
+                  >
+                    {waterDisplay}
                   </Text>
-                  <Text style={styles.inferenceText}>
-                    {content === 'SHAKE'
-                      ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
-                          measurementStatus === 'trained'
-                            ? '学習済み'
-                            : measurementStatus === 'experimental'
-                              ? '試験推定'
-                              : '未学習'
-                        }`
-                      : `水判定確率 ${formatProbability(waterConfidence)}${
-                          content === 'WATER'
-                            ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
-                            : ''
-                        }`}
-                  </Text>
-                  <Text style={styles.inferenceHint}>
-                    確率はこの録音に対するモデル出力で、正解率を意味しません。
+                  <Text style={styles.heroDescription}>
+                    {!hasScanResult
+                      ? '水筒を1秒以上振って測定します'
+                      : content === 'SHAKE'
+                        ? measurementStatus === 'untrained'
+                          ? '振り音モデルは未学習のため、まだ残量を判定できません'
+                          : measurementStatus === 'experimental'
+                            ? fillLevel === 'N/A'
+                              ? '試験推定の信頼度が低いため、残量を表示できませんでした'
+                              : '学習前の試験推定です。飲水量の自動記録には使いません'
+                            : fillLevel === 'N/A'
+                              ? '振り音の信頼度が低いため残量を判定できませんでした'
+                              : '振り音から残量の3段階を判定しました'
+                        : content === 'UNKNOWN'
+                          ? '信頼度が低いため判定できませんでした。条件をそろえて再試行してください'
+                          : content === 'WATER'
+                            ? fillLevel === 'N/A'
+                              ? '水は検出されましたが、充填状態は未判定です'
+                              : '水が入っています'
+                            : '水が検出されませんでした'}
                   </Text>
                 </View>
-              ) : null}
-            </>
-          ) : null}
 
-          <HydrationPanel
-            state={hydrationState}
-            capacityText={capacityText}
-            autoRecordedIntakeMl={autoRecordedIntakeMl}
-            onChangeCapacity={setCapacityText}
-            onSaveProfile={saveHydrationProfile}
-            modelActionLabel="振る"
-            disabled={isRecording || isProcessing || !hydrationReady}
-          />
+                {hasScanResult ? (
+                  <View style={styles.metricRow}>
+                    {content === 'SHAKE' && fillLevel !== 'N/A' ? (
+                      <MetricCard
+                        title="残量"
+                        value={fillLevel}
+                        unit={
+                          measurementStatus === 'experimental'
+                            ? '試験推定（自動記録には未使用）'
+                            : '容量に対する3段階の目安'
+                        }
+                        color="#087ea4"
+                      />
+                    ) : content === 'WATER' && fillLevel !== 'N/A' ? (
+                      <MetricCard
+                        title="充填率"
+                        value={fillLevel}
+                        unit="50% / 90%の目安"
+                        color="#087ea4"
+                      />
+                    ) : null}
+                    {content === 'SHAKE' ? (
+                      <MetricCard
+                        title="氷量"
+                        value={iceAmount !== null ? iceDisplay : '未判定'}
+                        unit={
+                          iceAmountStatus === 'trained'
+                            ? iceAmount !== null
+                              ? `3段階の目安（${formatProbability(
+                                  iceAmountConfidence,
+                                )}）`
+                              : '信頼度不足（再試行）'
+                            : iceAmountStatus === 'experimental'
+                              ? iceAmount !== null
+                                ? `研究プレビュー（${formatProbability(
+                                    iceAmountConfidence,
+                                  )}・自動記録には未使用）`
+                                : '研究プレビュー信頼度不足'
+                              : '学習前は未判定'
+                        }
+                        color="#168276"
+                      />
+                    ) : (
+                      <MetricCard
+                        title="氷の有無"
+                        value={iceDisplay}
+                        unit={
+                          icePresence === 'UNKNOWN'
+                            ? iceStatus === 'trained'
+                              ? iceConfidence === null
+                                ? '信頼度不足（再試行）'
+                                : `信頼度不足（${formatProbability(iceConfidence)}）`
+                              : '学習前は未判定'
+                            : `音からの目安（${formatProbability(iceConfidence)}）`
+                        }
+                        color="#168276"
+                      />
+                    )}
+                  </View>
+                ) : null}
 
-          <ThermalForecastCard
-            capacityMl={
-              hydrationState?.profile.capacityMl ??
-              DEFAULT_HYDRATION_PROFILE.capacityMl
-            }
-            iceAmount={iceAmount}
-            currentWaterTempText={currentWaterTempText}
-            ambientTempText={ambientTempText}
-            elapsedMinutesText={elapsedMinutesText}
-            onChangeCurrentWaterTemp={setCurrentWaterTempText}
-            onChangeAmbientTemp={setAmbientTempText}
-            onChangeElapsedMinutes={setElapsedMinutesText}
-          />
+                <View style={styles.analysisCard}>
+                  <Text style={styles.analysisDescription}>
+                    水筒を振った音から残量を確認します
+                  </Text>
+                  <Text style={styles.analysisHint}>
+                    {isProcessing
+                      ? '確認中です。少しお待ちください'
+                      : isRecording
+                        ? '振る動作が終わったら停止してください'
+                        : '1秒以上、一定の強さで振ってください'}
+                  </Text>
+                  <TouchableOpacity
+                    disabled={isProcessing}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isProcessing
+                        ? '音声を確認中'
+                        : isRecording
+                          ? '録音を停止して確認'
+                          : '水筒を振って測定する'
+                    }
+                    style={[
+                      styles.analysisButton,
+                      isRecording && styles.analysisButtonActive,
+                      isProcessing && styles.analysisButtonDisabled,
+                    ]}
+                    onPress={isRecording ? stopRecording : startRecording}
+                  >
+                    <Text style={styles.analysisButtonText}>
+                      {isProcessing
+                        ? '確認中…'
+                        : isRecording
+                          ? '停止して確認'
+                          : '振って測定する'}
+                    </Text>
+                  </TouchableOpacity>
+                  {isRecording ? (
+                    <Text style={styles.recordingDuration}>
+                      ● 録音 {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}
+                      秒
+                    </Text>
+                  ) : null}
+                  {status !== '準備できました' &&
+                  status !== '確認が完了しました' ? (
+                    <Text
+                      style={styles.analysisStatus}
+                      accessibilityLiveRegion="polite"
+                    >
+                      {status}
+                    </Text>
+                  ) : null}
+                </View>
 
-          <Text style={styles.resultNote}>
-            結果は録音動作、距離、容器、周囲の音で変わります。残量は参考値として確認してください。
-          </Text>
+                {hasScanResult ? (
+                  <>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={styles.detailsToggle}
+                      onPress={() => setShowMeasurementDetails(value => !value)}
+                    >
+                      <Text style={styles.detailsToggleText}>
+                        測定の詳細 {showMeasurementDetails ? '▲' : '▼'}
+                      </Text>
+                    </TouchableOpacity>
+                    {showMeasurementDetails ? (
+                      <View style={styles.inferenceCard}>
+                        <Text style={styles.inferenceTitle}>測定の詳細</Text>
+                        <Text style={styles.inferenceText}>
+                          {modelActionLabel}音モデル ·{' '}
+                          {inferenceEngine === 'rust' ? 'Rust' : 'TypeScript'}
+                          経路
+                        </Text>
+                        <Text style={styles.inferenceText}>
+                          {content === 'SHAKE'
+                            ? `振り音クラス確率 ${formatProbability(fillConfidence)} · ${
+                                measurementStatus === 'trained'
+                                  ? '学習済み'
+                                  : measurementStatus === 'experimental'
+                                    ? '試験推定'
+                                    : '未学習'
+                              }`
+                            : `水判定確率 ${formatProbability(waterConfidence)}${
+                                content === 'WATER'
+                                  ? ` · 充填クラス確率 ${formatProbability(fillConfidence)}`
+                                  : ''
+                              }`}
+                        </Text>
+                        <Text style={styles.inferenceHint}>
+                          確率はこの録音に対するモデル出力で、正解率を意味しません。
+                        </Text>
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
+              </>
+            )}
 
-          <CapabilityFooter />
-        </View>
-      </ScrollView>
+            {activeTab === 'home' || activeTab === 'hydration' ? (
+              <HydrationPanel
+                state={hydrationState}
+                capacityText={capacityText}
+                autoRecordedIntakeMl={autoRecordedIntakeMl}
+                onChangeCapacity={setCapacityText}
+                onSaveProfile={saveHydrationProfile}
+                modelActionLabel="振る"
+                disabled={isRecording || isProcessing || !hydrationReady}
+              />
+            ) : null}
+
+            {activeTab === 'home' || activeTab === 'thermal' ? (
+              <ThermalForecastCard
+                capacityMl={
+                  hydrationState?.profile.capacityMl ??
+                  DEFAULT_HYDRATION_PROFILE.capacityMl
+                }
+                iceAmount={iceAmount}
+                currentWaterTempText={currentWaterTempText}
+                ambientTempText={ambientTempText}
+                elapsedMinutesText={elapsedMinutesText}
+                onChangeCurrentWaterTemp={setCurrentWaterTempText}
+                onChangeAmbientTemp={setAmbientTempText}
+                onChangeElapsedMinutes={setElapsedMinutesText}
+              />
+            ) : null}
+
+            {activeTab === 'home' || activeTab === 'measure' ? (
+              <Text style={styles.resultNote}>
+                結果は録音動作、距離、容器、周囲の音で変わります。残量は参考値として確認してください。
+              </Text>
+            ) : null}
+          </View>
+        </ScrollView>
+        <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f4f7f8' },
+  appShell: { flex: 1 },
   container: {
     flexGrow: 1,
     backgroundColor: '#f4f7f8',
@@ -782,7 +821,12 @@ const styles = StyleSheet.create({
     borderColor: '#dce7e9',
   },
   inferenceTitle: { color: '#36515a', fontSize: 13, fontWeight: '800' },
-  inferenceText: { color: '#587177', fontSize: 12, lineHeight: 18, marginTop: 6 },
+  inferenceText: {
+    color: '#587177',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
   inferenceHint: {
     color: '#8b9ba0',
     fontSize: 11,
