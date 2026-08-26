@@ -1,10 +1,14 @@
 import type { IceAmountClass } from '../../scan/domain/iceAmount';
 
+export type ThermalEnvironment = 'outdoor' | 'indoor_unknown';
+
 export type ThermalForecastInput = {
   currentWaterTempC: number;
   ambientTempC: number;
   volumeMl: number;
   iceAmount: IceAmountClass | null;
+  /** Outdoor weather is only a proxy for the bottle's surroundings. */
+  environment?: ThermalEnvironment;
   /** Minutes since the current water-temperature measurement. */
   elapsedMinutes: number;
 };
@@ -19,7 +23,7 @@ export type ThermalForecast = {
   projectedTemperatureC: number | null;
   temperatureRangeC: { low: number; high: number } | null;
   iceHoldMinutesRange: { low: number; high: number } | null;
-  confidence: 'default' | 'assumption' | null;
+  confidence: 'default' | 'assumption' | 'reduced' | null;
   message: string;
 };
 
@@ -32,6 +36,9 @@ export const DEFAULT_COOLING_COEFFICIENT_PER_HOUR = 0.12;
 const WATER_HEAT_CAPACITY_J_PER_G_K = 4.186;
 const ICE_LATENT_HEAT_J_PER_G = 334;
 const ICE_TARGET_TEMPERATURE_C = 4;
+// Conservative display padding until bottle/environment curves are measured.
+const OUTDOOR_UNCERTAINTY_C = 2;
+const INDOOR_UNCERTAINTY_C = 5;
 
 /** Broad engineering ranges; these are not measured ice masses. */
 const ICE_MASS_RANGE_G: Record<
@@ -200,17 +207,30 @@ export function forecastTemperature(
     DEFAULT_COOLING_COEFFICIENT_PER_HOUR,
   );
   const iceAmount = input.iceAmount ?? null;
+  const environment = input.environment ?? 'outdoor';
+  if (environment !== 'outdoor' && environment !== 'indoor_unknown') {
+    return invalidForecast('環境設定が不正です');
+  }
+  const assumptionUncertaintyC =
+    environment === 'indoor_unknown'
+      ? INDOOR_UNCERTAINTY_C
+      : OUTDOOR_UNCERTAINTY_C;
+  const environmentUncertaintyC =
+    environment === 'indoor_unknown' ? INDOOR_UNCERTAINTY_C : 0;
   if (iceAmount === null) {
     return {
       status: 'ready',
       projectedTemperatureC: roundedTemperature(baseProjection),
       temperatureRangeC: {
-        low: roundedTemperature(baseProjection - 2),
-        high: roundedTemperature(baseProjection + 2),
+        low: roundedTemperature(baseProjection - assumptionUncertaintyC),
+        high: roundedTemperature(baseProjection + assumptionUncertaintyC),
       },
       iceHoldMinutesRange: { low: 0, high: 0 },
-      confidence: 'assumption',
-      message: '氷量未判定のため、氷なしを基準にした参考値です',
+      confidence: environment === 'indoor_unknown' ? 'reduced' : 'assumption',
+      message:
+        environment === 'indoor_unknown'
+          ? '外気温を周囲温度の目安にしています。屋内では予測幅を広げた参考値です'
+          : '氷量未判定のため、氷なしを基準にした参考値です',
     };
   }
 
@@ -244,14 +264,21 @@ export function forecastTemperature(
       (coolerProjection + warmerProjection) / 2,
     ),
     temperatureRangeC: {
-      low: roundedTemperature(Math.min(coolerProjection, warmerProjection)),
-      high: roundedTemperature(Math.max(coolerProjection, warmerProjection)),
+      low: roundedTemperature(
+        Math.min(coolerProjection, warmerProjection) - environmentUncertaintyC,
+      ),
+      high: roundedTemperature(
+        Math.max(coolerProjection, warmerProjection) + environmentUncertaintyC,
+      ),
     },
     iceHoldMinutesRange: {
       low: Math.round(Math.max(0, holdLow - elapsedMinutes)),
       high: Math.round(Math.max(0, holdHigh - elapsedMinutes)),
     },
-    confidence: 'default',
-    message: '標準係数と氷量クラスから計算した参考値です',
+    confidence: environment === 'indoor_unknown' ? 'reduced' : 'default',
+    message:
+      environment === 'indoor_unknown'
+        ? '外気温を周囲温度の目安にしています。屋内では予測幅を広げた参考値です'
+        : '標準係数と氷量クラスから計算した参考値です',
   };
 }

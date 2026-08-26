@@ -29,6 +29,7 @@ import { HistoryScreen } from './src/features/history/ui/HistoryScreen';
 import type { AppTab } from './src/features/navigation/domain/appTab';
 import { BottomTabBar } from './src/features/navigation/ui/BottomTabBar';
 import { ThermalForecastCard } from './src/features/thermal/ui/ThermalForecastCard';
+import type { ThermalEnvironment } from './src/features/thermal/domain/thermalForecast';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
 
 const MetricCard = ({
@@ -103,6 +104,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   >(null);
   const [currentWaterTempText, setCurrentWaterTempText] = useState('');
   const [ambientTempText, setAmbientTempText] = useState('');
+  const [thermalEnvironment, setThermalEnvironment] =
+    useState<ThermalEnvironment>('outdoor');
   const [elapsedMinutesText, setElapsedMinutesText] = useState('0');
   const [showMeasurementDetails, setShowMeasurementDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
@@ -686,9 +689,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                   DEFAULT_HYDRATION_PROFILE.capacityMl
                 }
                 iceAmount={iceAmount}
+                environment={thermalEnvironment}
                 currentWaterTempText={currentWaterTempText}
                 ambientTempText={ambientTempText}
                 elapsedMinutesText={elapsedMinutesText}
+                onChangeEnvironment={setThermalEnvironment}
                 onChangeCurrentWaterTemp={setCurrentWaterTempText}
                 onChangeAmbientTemp={setAmbientTempText}
                 onChangeElapsedMinutes={setElapsedMinutesText}

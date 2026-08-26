@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { IceAmountClass } from '../../scan/domain/iceAmount';
+import type { ThermalEnvironment } from '../domain/thermalForecast';
 import {
   THERMAL_FORECAST_GRAPH_POINTS_MINUTES,
   forecastTemperature,
@@ -11,9 +12,11 @@ import { ThermalForecastGraph } from './ThermalForecastGraph';
 type ThermalForecastCardProps = {
   capacityMl: number;
   iceAmount: IceAmountClass | null;
+  environment: ThermalEnvironment;
   currentWaterTempText: string;
   ambientTempText: string;
   elapsedMinutesText: string;
+  onChangeEnvironment(value: ThermalEnvironment): void;
   onChangeCurrentWaterTemp(value: string): void;
   onChangeAmbientTemp(value: string): void;
   onChangeElapsedMinutes(value: string): void;
@@ -40,9 +43,11 @@ function formatMinutes(minutes: number): string {
 export function ThermalForecastCard({
   capacityMl,
   iceAmount,
+  environment,
   currentWaterTempText,
   ambientTempText,
   elapsedMinutesText,
+  onChangeEnvironment,
   onChangeCurrentWaterTemp,
   onChangeAmbientTemp,
   onChangeElapsedMinutes,
@@ -52,12 +57,14 @@ export function ThermalForecastCard({
       currentWaterTempC: parseNumber(currentWaterTempText),
       ambientTempC: parseNumber(ambientTempText),
       volumeMl: capacityMl,
+      environment,
       iceAmount,
       elapsedMinutes: parseNumber(elapsedMinutesText),
     }),
     [
       ambientTempText,
       capacityMl,
+      environment,
       currentWaterTempText,
       elapsedMinutesText,
       iceAmount,
@@ -103,7 +110,9 @@ export function ThermalForecastCard({
         <View style={styles.headerCopy}>
           <Text style={styles.title}>冷却の目安</Text>
           <Text style={styles.subtitle}>
-            外気温と現在の水温から4時間の推移を参考計算
+            {environment === 'indoor_unknown'
+              ? '外気温を基準に、屋内は幅を広げて4時間の推移を参考計算'
+              : '外気温と現在の水温から4時間の推移を参考計算'}
           </Text>
         </View>
         <Text style={styles.horizon}>4時間の推移</Text>
@@ -155,6 +164,56 @@ export function ThermalForecastCard({
             <Text style={styles.unit}>分</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.environmentBlock}>
+        <Text style={styles.inputLabel}>利用環境</Text>
+        <View style={styles.environmentOptions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: environment === 'outdoor' }}
+            onPress={() => onChangeEnvironment('outdoor')}
+            style={[
+              styles.environmentOption,
+              environment === 'outdoor' && styles.environmentOptionSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.environmentOptionText,
+                environment === 'outdoor' &&
+                  styles.environmentOptionTextSelected,
+              ]}
+            >
+              屋外（外気温）
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: environment === 'indoor_unknown' }}
+            onPress={() => onChangeEnvironment('indoor_unknown')}
+            style={[
+              styles.environmentOption,
+              environment === 'indoor_unknown' &&
+                styles.environmentOptionSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.environmentOptionText,
+                environment === 'indoor_unknown' &&
+                  styles.environmentOptionTextSelected,
+              ]}
+            >
+              屋内（精度低下）
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={styles.environmentHint}>
+          {environment === 'indoor_unknown'
+            ? '室温の入力は不要です。外気温との差を考慮して予測幅を広げます。'
+            : '外気温を水筒の周囲温度の目安として使います。'}
+        </Text>
       </View>
 
       {forecast.status === 'ready' &&
@@ -224,6 +283,32 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   inputRow: { flexDirection: 'row', gap: 8, marginTop: 18 },
+  environmentBlock: { marginTop: 14 },
+  environmentOptions: { flexDirection: 'row', gap: 8 },
+  environmentOption: {
+    flex: 1,
+    alignItems: 'center',
+    borderColor: '#d4e1e3',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 9,
+  },
+  environmentOptionSelected: {
+    backgroundColor: '#e5f7f8',
+    borderColor: '#78cbd0',
+  },
+  environmentOptionText: {
+    color: '#587177',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  environmentOptionTextSelected: { color: '#087ea4' },
+  environmentHint: {
+    color: '#8b9ba0',
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 6,
+  },
   inputColumn: { flex: 1 },
   inputColumnSmall: { width: 78 },
   inputLabel: {
