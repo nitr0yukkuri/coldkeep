@@ -31,6 +31,7 @@ import type { AppTab } from './src/features/navigation/domain/appTab';
 import { BottomTabBar } from './src/features/navigation/ui/BottomTabBar';
 import { ThermalForecastCard } from './src/features/thermal/ui/ThermalForecastCard';
 import { MAX_CAPTURE_SECONDS } from './src/platform/audio/pcmCapture';
+import { isDemoMode } from './src/app/runtimeMode';
 
 const MetricCard = ({
   title,
@@ -512,6 +513,13 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             </Text>
           </View>
 
+          {isDemoMode ? (
+            <View style={styles.demoBanner} accessibilityRole="text">
+              <Text style={styles.demoBannerText}>
+                研究デモ：試験推定・自動記録には未使用
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.scanScreen}>
             {activeTab === 'history' ? (
               <HistoryScreen
@@ -805,6 +813,22 @@ const styles = StyleSheet.create({
     color: '#62747a',
     marginTop: 8,
     fontSize: 14,
+    textAlign: 'center',
+  },
+  demoBanner: {
+    width: '100%',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    borderRadius: 10,
+    backgroundColor: '#fff3d6',
+    borderWidth: 1,
+    borderColor: '#f0d49a',
+  },
+  demoBannerText: {
+    color: '#7b5a19',
+    fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
   },
   scanScreen: { width: '100%', alignItems: 'center' },

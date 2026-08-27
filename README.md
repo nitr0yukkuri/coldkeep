@@ -129,6 +129,13 @@ cd expo-go
 npm install
 npx expo start
 ```
+研究デモを起動する場合は、リポジトリのルートで次を実行します。
+
+```powershell
+npm run start:demo
+```
+
+デモでは研究用の汎用モデルによる「試験推定」だけを表示し、飲水量の自動記録には使いません。通常の `npm start`、debug、production build は従来どおり未学習モデルの `未判定` を維持します。
 
 詳細な制約、PCM経路、iOS/Androidのexport確認は [EXPO_GO.md](EXPO_GO.md) にまとめています。
 

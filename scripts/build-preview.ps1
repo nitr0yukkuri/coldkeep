@@ -46,6 +46,13 @@ New-Item -ItemType Directory -Force -Path $temporaryDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedOutput) | Out-Null
 
 try {
+  $previousAppMode = [Environment]::GetEnvironmentVariable('EXPO_PUBLIC_APP_MODE', 'Process')
+  $previousMlPreview = [Environment]::GetEnvironmentVariable('EXPO_PUBLIC_ML_PREVIEW', 'Process')
+  $previousNativeBundle = [Environment]::GetEnvironmentVariable('COLDKEEP_NATIVE_BUNDLE', 'Process')
+  # Preview is an explicitly labelled research demo; production builds never set these.
+  $env:EXPO_PUBLIC_APP_MODE = 'demo'
+  $env:EXPO_PUBLIC_ML_PREVIEW = 'research'
+  $env:COLDKEEP_NATIVE_BUNDLE = '1'
   & $keytoolCommand.Source -genkeypair -v `
     -keystore $storeFile `
     -storepass $storePassword `
@@ -89,6 +96,21 @@ try {
   Remove-Item Env:COLDKEEP_PREVIEW_STORE_PASSWORD -ErrorAction SilentlyContinue
   Remove-Item Env:COLDKEEP_PREVIEW_KEY_ALIAS -ErrorAction SilentlyContinue
   Remove-Item Env:COLDKEEP_PREVIEW_KEY_PASSWORD -ErrorAction SilentlyContinue
+  if ($null -eq $previousAppMode) {
+    Remove-Item Env:EXPO_PUBLIC_APP_MODE -ErrorAction SilentlyContinue
+  } else {
+    $env:EXPO_PUBLIC_APP_MODE = $previousAppMode
+  }
+  if ($null -eq $previousNativeBundle) {
+    Remove-Item Env:COLDKEEP_NATIVE_BUNDLE -ErrorAction SilentlyContinue
+  } else {
+    $env:COLDKEEP_NATIVE_BUNDLE = $previousNativeBundle
+  }
+  if ($null -eq $previousMlPreview) {
+    Remove-Item Env:EXPO_PUBLIC_ML_PREVIEW -ErrorAction SilentlyContinue
+  } else {
+    $env:EXPO_PUBLIC_ML_PREVIEW = $previousMlPreview
+  }
   if (Test-Path -LiteralPath $temporaryDirectory) {
     Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
   }
