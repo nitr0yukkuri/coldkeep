@@ -4,7 +4,7 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Pressable, Text, TouchableOpacity } from 'react-native';
+import { Pressable, ScrollView, Text, TouchableOpacity } from 'react-native';
 
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/test/documents',
@@ -116,7 +116,9 @@ test('stops the recording timer when confirmation starts', async () => {
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  const homeScrollView = renderer.root.findByType(ScrollView);
   await openMeasureTab(renderer);
+  expect(renderer.root.findByType(ScrollView)).not.toBe(homeScrollView);
 
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {

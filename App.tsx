@@ -452,6 +452,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.appShell}>
         <ScrollView
+          key={activeTab}
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
