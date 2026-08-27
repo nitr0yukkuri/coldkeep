@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -85,9 +86,23 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const stopInFlightRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
   const startInFlightRef = useRef(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextState;
+      if (
+        nextState !== previousState &&
+        (nextState === 'inactive' || nextState === 'background')
+      ) {
+        stopRecordingRef.current?.().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, []);
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
       return;

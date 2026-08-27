@@ -4,7 +4,13 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Pressable, ScrollView, Text, TouchableOpacity } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/test/documents',
@@ -564,4 +570,81 @@ test('ignores a duplicate recording start while the native start is pending', as
     await firstStart;
   });
   renderer.unmount();
+});
+test('stops recording when the app leaves the foreground', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  const stop = jest.fn(async () => ({ uri: 'file:///background.wav' }));
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start: jest.fn(async () => ({ uri: 'file:///background.wav' })),
+      stop,
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: {
+      execute: jest.fn(async () => ({
+        containsWater: false,
+        waterConfidence: 0,
+        fillLevel: null,
+        fillConfidence: null,
+        icePresence: null,
+        iceConfidence: null,
+        iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
+        engine: 'typescript',
+        measurementAction: 'shake',
+        measurementStatus: 'untrained',
+      })),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  const addEventListener = jest.spyOn(AppState, 'addEventListener');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  try {
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+      await Promise.resolve();
+    });
+    await openMeasureTab(renderer);
+
+    const recordButton = renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+    await ReactTestRenderer.act(async () => {
+      await recordButton?.props.onPress();
+    });
+
+    const onStateChange = addEventListener.mock.calls.at(-1)?.[1] as
+      | ((state: 'background') => void)
+      | undefined;
+    expect(onStateChange).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      onStateChange?.('background');
+      await Promise.resolve();
+    });
+
+    expect(stop).toHaveBeenCalledTimes(1);
+  } finally {
+    renderer?.unmount();
+    addEventListener.mockRestore();
+  }
 });

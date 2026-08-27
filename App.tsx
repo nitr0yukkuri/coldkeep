@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -113,6 +114,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
   const startInFlightRef = useRef(false);
 
   const waterDisplay =
@@ -137,6 +139,19 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const formatProbability = (value: number | null) =>
     value === null ? '—' : `${Math.round(value * 100)}%`;
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextState;
+      if (
+        nextState !== previousState &&
+        (nextState === 'inactive' || nextState === 'background')
+      ) {
+        stopRecordingRef.current?.().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, []);
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
       return;
