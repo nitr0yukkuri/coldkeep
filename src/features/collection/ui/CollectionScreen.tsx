@@ -143,9 +143,11 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
     let recording: RecordingRef | null = null;
     try {
       setStatus('音声とラベルを保存中…');
-      recording = await app.recording.stop();
+      // The microphone is being finalized now; stop the UI timer before the
+      // native stop promise resolves so saving time is not shown as recording.
       setIsRecording(false);
       setRecordingStartedAt(null);
+      recording = await app.recording.stop();
       if (!pendingLabels) {
         throw new Error('ラベルが保存されていません');
       }
@@ -306,9 +308,11 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
               <Text style={styles.cardTitle}>サンプル録音</Text>
               <Text style={styles.cardHint}>保存済み {savedRecordings}件</Text>
             </View>
-            <Text style={styles.duration}>
-              {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
-            </Text>
+            {isRecording ? (
+              <Text style={styles.duration}>
+                {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
+              </Text>
+            ) : null}
           </View>
           <TouchableOpacity
             disabled={isProcessing}
