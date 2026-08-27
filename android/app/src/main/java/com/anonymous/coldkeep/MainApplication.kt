@@ -22,6 +22,7 @@ class MainApplication : Application(), ReactApplication {
         packages.add(WavRecorderPackage())
         packages.add(RustAudioClassifierPackage())
         packages.add(FileSharePackage())
+        packages.add(ColdKeepNotificationPackage())
         return packages
       }
 

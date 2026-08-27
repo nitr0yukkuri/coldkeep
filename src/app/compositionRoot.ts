@@ -20,7 +20,7 @@ import { HydrationUseCase } from '../features/hydration/application/hydrationUse
 import { RnfsHydrationRepository } from '../platform/storage/rnfsHydrationRepository';
 import { isResearchPreviewMode } from './runtimeMode';
 import { NotificationUseCase } from '../features/notifications/application/notificationUseCase';
-import { NoopNotificationScheduler } from '../platform/notifications/noopNotificationScheduler';
+import { NativeNotificationScheduler } from '../platform/notifications/nativeNotificationScheduler';
 
 export function createAppDependencies() {
   const recorder =
@@ -60,6 +60,6 @@ export function createAppDependencies() {
       new ReactNativeShareGateway(),
     ),
     hydration: new HydrationUseCase(new RnfsHydrationRepository()),
-    notifications: new NotificationUseCase(new NoopNotificationScheduler()),
+    notifications: new NotificationUseCase(new NativeNotificationScheduler()),
   };
 }
