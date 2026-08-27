@@ -705,7 +705,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
             ) : null}
           </View>
         </ScrollView>
-        <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
+        <BottomTabBar
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          disabled={isRecording || isProcessing}
+        />
       </View>
     </SafeAreaView>
   );

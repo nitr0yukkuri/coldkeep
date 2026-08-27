@@ -7,9 +7,14 @@ import { APP_TABS, AppTab } from '../domain/appTab';
 type BottomTabBarProps = {
   activeTab: AppTab;
   onChange(tab: AppTab): void;
+  disabled?: boolean;
 };
 
-export function BottomTabBar({ activeTab, onChange }: BottomTabBarProps) {
+export function BottomTabBar({
+  activeTab,
+  onChange,
+  disabled = false,
+}: BottomTabBarProps) {
   return (
     <View style={styles.bar} accessibilityRole="tablist">
       {APP_TABS.map(tab => {
@@ -19,11 +24,17 @@ export function BottomTabBar({ activeTab, onChange }: BottomTabBarProps) {
             key={tab.key}
             accessibilityLabel={tab.label}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            onPress={() => onChange(tab.key)}
+            accessibilityState={{ selected, disabled }}
+            disabled={disabled}
+            onPress={() => {
+              if (!disabled) {
+                onChange(tab.key);
+              }
+            }}
             style={({ pressed }) => [
               styles.tab,
               selected && styles.tabSelected,
+              disabled && styles.tabDisabled,
               pressed && styles.tabPressed,
             ]}
           >
@@ -64,6 +75,7 @@ const styles = StyleSheet.create({
   },
   tabSelected: { backgroundColor: '#e8f4f6' },
   tabPressed: { opacity: 0.72 },
+  tabDisabled: { opacity: 0.5 },
 
   label: {
     color: '#8b9ba0',

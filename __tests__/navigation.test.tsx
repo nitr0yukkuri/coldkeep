@@ -32,6 +32,23 @@ describe('BottomTabBar', () => {
   });
 });
 
+it('disables every tab while an operation is active', () => {
+  const onChange = jest.fn();
+  const renderer = ReactTestRenderer.create(
+    <BottomTabBar activeTab="measure" onChange={onChange} disabled />,
+  );
+
+  const tabs = renderer.root.findAllByType(Pressable);
+  expect(tabs).toHaveLength(5);
+  expect(tabs.every(tab => tab.props.disabled === true)).toBe(true);
+  expect(
+    tabs.every(tab => tab.props.accessibilityState?.disabled === true),
+  ).toBe(true);
+
+  tabs[0]?.props.onPress();
+  expect(onChange).not.toHaveBeenCalled();
+  renderer.unmount();
+});
 describe('HomeOverview', () => {
   it('keeps measurement controls in the measure tab', () => {
     const renderer = ReactTestRenderer.create(
