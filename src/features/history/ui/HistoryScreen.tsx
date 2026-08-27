@@ -29,21 +29,21 @@ function recordTime(recordedAt: string): string {
 }
 
 export function HistoryScreen({ state, onOpenMeasure }: HistoryScreenProps) {
-  const records: HistoryRecord[] = state
+  const allRecords: HistoryRecord[] = state
     ? [
         ...state.observations.map(value => ({
           kind: 'observation' as const,
           value,
         })),
         ...state.intakes.map(value => ({ kind: 'intake' as const, value })),
-      ]
-        .sort(
-          (left, right) =>
-            new Date(right.value.recordedAt).getTime() -
-            new Date(left.value.recordedAt).getTime(),
-        )
-        .slice(0, 10)
+      ].sort(
+        (left, right) =>
+          new Date(right.value.recordedAt).getTime() -
+          new Date(left.value.recordedAt).getTime(),
+      )
     : [];
+
+  const records = allRecords.slice(0, 10);
 
   return (
     <View style={styles.card}>
@@ -52,7 +52,7 @@ export function HistoryScreen({ state, onOpenMeasure }: HistoryScreenProps) {
           <Text style={styles.title}>最近の記録</Text>
           <Text style={styles.subtitle}>振るだけで残量と飲水量を残せます</Text>
         </View>
-        <Text style={styles.count}>{records.length}</Text>
+        <Text style={styles.count}>{allRecords.length}</Text>
       </View>
 
       {records.length === 0 ? (
