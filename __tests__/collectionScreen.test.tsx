@@ -95,3 +95,52 @@ test('renders data collection as a standalone screen', async () => {
   expect(textContent).toContain('振り音を録音する');
   renderer.unmount();
 });
+test('ignores a duplicate recording start while the native start is pending', async () => {
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const app = {
+    recording: {
+      start,
+      stop: jest.fn(async () => ({ uri: 'file:///collection.wav' })),
+      cleanup: jest.fn(async () => undefined),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<CollectionScreen app={app} />);
+  });
+  const deviceInput = renderer.root
+    .findAllByType(TextInput)
+    .find(input => input.props.accessibilityLabel === '端末');
+  await ReactTestRenderer.act(async () => {
+    deviceInput?.props.onChangeText('test-device');
+  });
+
+  const recordButton = () =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(
+        button => button.props.accessibilityLabel === '振り音を録音して保存',
+      );
+  let firstStart!: Promise<void>;
+  await ReactTestRenderer.act(async () => {
+    firstStart = recordButton()?.props.onPress();
+    recordButton()?.props.onPress();
+    await Promise.resolve();
+  });
+
+  expect(start).toHaveBeenCalledTimes(1);
+  resolveStart({ uri: 'file:///collection.wav' });
+  await ReactTestRenderer.act(async () => {
+    await firstStart;
+  });
+  renderer.unmount();
+});

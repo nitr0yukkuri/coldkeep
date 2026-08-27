@@ -113,6 +113,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const stopInFlightRef = useRef(false);
+  const startInFlightRef = useRef(false);
 
   const waterDisplay =
     content === 'SHAKE'
@@ -378,9 +379,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     }
   }
   async function startRecording() {
-    if (isProcessing || isRecording) {
+    if (isProcessing || isRecording || startInFlightRef.current) {
       return;
     }
+    startInFlightRef.current = true;
     try {
       await app.recording.start();
       setIsRecording(true);
@@ -397,6 +399,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
     }
+    startInFlightRef.current = false;
   }
 
   async function stopRecording() {

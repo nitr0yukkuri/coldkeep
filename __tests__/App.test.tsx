@@ -502,3 +502,64 @@ test('shows the preview shake estimate without recording experimental intake', a
   ).not.toHaveBeenCalled();
   renderer.unmount();
 });
+test('ignores a duplicate recording start while the native start is pending', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start,
+      stop: jest.fn(async () => ({ uri: 'file:///test.wav' })),
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: { execute: jest.fn() },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+    await Promise.resolve();
+  });
+  await openMeasureTab(renderer);
+
+  const recordButton = () =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+  let firstStart!: Promise<void>;
+  await ReactTestRenderer.act(async () => {
+    firstStart = recordButton()?.props.onPress();
+    recordButton()?.props.onPress();
+    await Promise.resolve();
+  });
+
+  expect(start).toHaveBeenCalledTimes(1);
+  resolveStart({ uri: 'file:///test.wav' });
+  await ReactTestRenderer.act(async () => {
+    await firstStart;
+  });
+  renderer.unmount();
+});

@@ -85,6 +85,7 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const stopInFlightRef = useRef(false);
+  const startInFlightRef = useRef(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -116,9 +117,10 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
   }
 
   async function startRecording() {
-    if (isProcessing || isRecording) {
+    if (isProcessing || isRecording || startInFlightRef.current) {
       return;
     }
+    startInFlightRef.current = true;
     try {
       const labels = validateCollectionDraft(draft);
       await app.recording.start();
@@ -132,6 +134,7 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
     }
+    startInFlightRef.current = false;
   }
 
   async function stopRecording() {
