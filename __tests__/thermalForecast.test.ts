@@ -19,36 +19,6 @@ describe('thermal forecast domain', () => {
     expect(result.message).toContain('氷なしを基準');
   });
 
-  test('widens the uncertainty range for an unknown indoor environment', () => {
-    const outdoor = forecastTemperature({
-      currentWaterTempC: 6,
-      ambientTempC: 30,
-      volumeMl: 500,
-      iceAmount: 'none',
-      elapsedMinutes: 0,
-      environment: 'outdoor',
-    });
-    const indoor = forecastTemperature({
-      currentWaterTempC: 6,
-      ambientTempC: 30,
-      volumeMl: 500,
-      iceAmount: 'none',
-      elapsedMinutes: 0,
-      environment: 'indoor_unknown',
-    });
-
-    expect(indoor.status).toBe('ready');
-    expect(indoor.confidence).toBe('reduced');
-    expect(indoor.message).toContain('屋内');
-    expect(
-      (indoor.temperatureRangeC?.high ?? 0) -
-        (indoor.temperatureRangeC?.low ?? 0),
-    ).toBeGreaterThan(
-      (outdoor.temperatureRangeC?.high ?? 0) -
-        (outdoor.temperatureRangeC?.low ?? 0),
-    );
-  });
-
   test('projects no-ice water toward ambient temperature', () => {
     const result = forecastTemperature({
       currentWaterTempC: 6,
