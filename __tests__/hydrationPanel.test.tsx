@@ -39,3 +39,30 @@ test('explains loading and surfaces profile save feedback in the hydration tab',
   );
   renderer.unmount();
 });
+test('shows a retry action when hydration loading fails', () => {
+  const retry = jest.fn();
+  const renderer = ReactTestRenderer.create(
+    <HydrationPanel
+      state={null}
+      capacityText="500"
+      autoRecordedIntakeMl={null}
+      onChangeCapacity={jest.fn()}
+      onSaveProfile={jest.fn()}
+      modelActionLabel="振る"
+      loadError="保存済みデータを読み込めませんでした"
+      onRetryLoad={retry}
+    />,
+  );
+  const values = renderer.root
+    .findAllByType(Text)
+    .map(node => textContent(node.props.children));
+
+  expect(values).toContain('保存済みデータを読み込めませんでした');
+  const retryButton = renderer.root
+    .findAllByType(TouchableOpacity)
+    .find(node => node.props.accessibilityLabel === '水分データを再読み込み');
+  retryButton?.props.onPress();
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(renderer.root.findAllByType(TextInput)[0]?.props.editable).toBe(false);
+  renderer.unmount();
+});

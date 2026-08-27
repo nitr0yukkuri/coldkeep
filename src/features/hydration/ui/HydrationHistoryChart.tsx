@@ -46,11 +46,13 @@ function createDayPoints(state: HydrationState, now = new Date()): DayPoint[] {
 type HydrationHistoryChartProps = {
   state: HydrationState | null;
   loading?: boolean;
+  error?: string | null;
 };
 
 export function HydrationHistoryChart({
   state,
   loading = false,
+  error = null,
 }: HydrationHistoryChartProps) {
   const points = state ? createDayPoints(state) : [];
   const maxMl = Math.max(...points.map(point => point.amountMl), 1);
@@ -71,6 +73,10 @@ export function HydrationHistoryChart({
       {loading ? (
         <View style={styles.loadingBox}>
           <Text style={styles.loadingText}>保存済みデータを読み込み中…</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : (
         <View style={styles.chart}>
@@ -98,7 +104,7 @@ export function HydrationHistoryChart({
           })}
         </View>
       )}
-      {!loading ? (
+      {!loading && !error ? (
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendSwatch, styles.todaySwatch]} />
@@ -133,6 +139,21 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   loadingText: { color: '#73878c', fontSize: 12 },
+  errorBox: {
+    height: 156,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#fff7f3',
+    marginTop: 18,
+    paddingHorizontal: 16,
+  },
+  errorText: {
+    color: '#9b5f4c',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   chart: {
     height: 156,
     flexDirection: 'row',

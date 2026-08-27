@@ -96,6 +96,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     null,
   );
   const [hydrationReady, setHydrationReady] = useState(false);
+  const [hydrationLoadError, setHydrationLoadError] = useState<string | null>(
+    null,
+  );
   const [hydrationFeedback, setHydrationFeedback] = useState<string | null>(
     null,
   );
@@ -116,6 +119,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
   const stopInFlightRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
   const startInFlightRef = useRef(false);
+  const hydrationLoadAttemptRef = useRef(0);
 
   const waterDisplay =
     content === 'SHAKE'
@@ -173,33 +177,42 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     stopRecordingRef.current?.().catch(() => undefined);
   }, [isProcessing, isRecording, recordingElapsedMs]);
 
-  useEffect(() => {
-    let active = true;
-    app.hydration
-      .load()
-      .then(state => {
-        if (!active) {
-          return;
-        }
-        setHydrationState(state);
-        setCapacityText(String(state.profile.capacityMl));
-        setHydrationFeedback(null);
-        setHydrationReady(true);
-      })
-      .catch(error => {
-        if (active) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : '水分記録を読み込めませんでした';
-          setHydrationFeedback(message);
-          setStatus(message);
-        }
-      });
-    return () => {
-      active = false;
-    };
+  const loadHydrationState = useCallback(async () => {
+    const attempt = hydrationLoadAttemptRef.current + 1;
+    hydrationLoadAttemptRef.current = attempt;
+    setHydrationReady(false);
+    setHydrationLoadError(null);
+    try {
+      const state = await app.hydration.load();
+      if (attempt !== hydrationLoadAttemptRef.current) {
+        return;
+      }
+      setHydrationState(state);
+      setCapacityText(String(state.profile.capacityMl));
+      setHydrationFeedback(null);
+      setHydrationLoadError(null);
+      setHydrationReady(true);
+    } catch (error) {
+      if (attempt !== hydrationLoadAttemptRef.current) {
+        return;
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : '水分記録を読み込めませんでした';
+      setHydrationReady(false);
+      setHydrationLoadError(message);
+      setHydrationFeedback(null);
+      setStatus(message);
+    }
   }, [app]);
+
+  useEffect(() => {
+    loadHydrationState().catch(() => undefined);
+    return () => {
+      hydrationLoadAttemptRef.current += 1;
+    };
+  }, [loadHydrationState]);
 
   useEffect(() => {
     if (!hydrationReady || !hydrationState || !app.notifications) {
@@ -294,6 +307,8 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
           if (!hydrationState) {
             setHydrationState(currentHydrationState);
             setCapacityText(String(currentHydrationState.profile.capacityMl));
+            setHydrationLoadError(null);
+            setHydrationReady(true);
           }
           const capacity = currentHydrationState.profile.capacityMl;
           const remainingMl = shakeMode
@@ -716,8 +731,10 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 onChangeCapacity={setCapacityText}
                 onSaveProfile={saveHydrationProfile}
                 modelActionLabel="振る"
-                loading={!hydrationReady}
+                loading={!hydrationReady && !hydrationLoadError}
                 feedback={hydrationFeedback}
+                loadError={hydrationLoadError}
+                onRetryLoad={loadHydrationState}
                 disabled={
                   isRecording ||
                   isProcessing ||
