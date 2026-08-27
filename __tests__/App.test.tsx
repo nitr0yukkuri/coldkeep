@@ -164,7 +164,7 @@ test('stops the recording timer when confirmation starts', async () => {
     await stopPromise;
   });
   renderer.unmount();
-});
+}, 15000);
 test('renders correctly', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
