@@ -27,6 +27,11 @@ export function HomeOverview({
   const intakeMl = state ? todayIntakeMl(state) : 0;
   const capacityMl =
     state?.profile.capacityMl ?? DEFAULT_HYDRATION_PROFILE.capacityMl;
+  const waterValue = hasScanResult
+    ? waterDisplay
+    : observation
+      ? `残量 ${observation.remainingMl} mL`
+      : '未測定';
 
   return (
     <View style={styles.card}>
@@ -43,9 +48,7 @@ export function HomeOverview({
       <View style={styles.metricRow}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>残量</Text>
-          <Text style={styles.metricValue}>
-            {hasScanResult ? waterDisplay : '未測定'}
-          </Text>
+          <Text style={styles.metricValue}>{waterValue}</Text>
           <Text style={styles.metricHint}>
             {observation
               ? `最終測定 ${observation.remainingMl} mL`
