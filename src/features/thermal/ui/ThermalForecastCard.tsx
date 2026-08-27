@@ -188,10 +188,14 @@ export function ThermalForecastCard({
       ) : (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>
-            水温と周囲温度を入力してください
+            {forecast.status === 'invalid_input'
+              ? forecast.message
+              : '水温と周囲温度を入力してください'}
           </Text>
           <Text style={styles.emptyText}>
-            スマホのマイクは水温を測れないため、測定値がない間は予測を表示しません。
+            {forecast.status === 'invalid_input'
+              ? '入力値を確認してから、もう一度予測してください。'
+              : 'スマホのマイクは水温を測れないため、測定値がない間は予測を表示しません。'}
           </Text>
         </View>
       )}
