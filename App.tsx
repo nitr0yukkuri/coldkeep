@@ -95,6 +95,11 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     null,
   );
   const [hydrationReady, setHydrationReady] = useState(false);
+  const [hydrationFeedback, setHydrationFeedback] = useState<string | null>(
+    null,
+  );
+  const [isSavingHydrationProfile, setIsSavingHydrationProfile] =
+    useState(false);
   const [capacityText, setCapacityText] = useState(
     String(DEFAULT_HYDRATION_PROFILE.capacityMl),
   );
@@ -162,15 +167,17 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         }
         setHydrationState(state);
         setCapacityText(String(state.profile.capacityMl));
+        setHydrationFeedback(null);
         setHydrationReady(true);
       })
       .catch(error => {
         if (active) {
-          setStatus(
+          const message =
             error instanceof Error
               ? error.message
-              : '水分記録を読み込めませんでした',
-          );
+              : '水分記録を読み込めませんでした';
+          setHydrationFeedback(message);
+          setStatus(message);
         }
       });
     return () => {
@@ -336,9 +343,17 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
 
   async function saveHydrationProfile() {
     if (!hydrationReady) {
-      setStatus('水分設定を読み込み中です。少し待ってから保存してください');
+      const message =
+        '水分設定を読み込み中です。少し待ってから保存してください';
+      setHydrationFeedback(message);
+      setStatus(message);
       return;
     }
+    if (isSavingHydrationProfile) {
+      return;
+    }
+    setIsSavingHydrationProfile(true);
+    setHydrationFeedback('保存中…');
     try {
       const state = await app.hydration.updateProfile({
         capacityMl: Number(capacityText),
@@ -348,16 +363,20 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       });
       setHydrationState(state);
       setCapacityText(String(state.profile.capacityMl));
+      setAutoRecordedIntakeMl(null);
+      setHydrationFeedback('水分設定を保存しました');
       setStatus('水分設定を保存しました');
     } catch (error) {
-      setStatus(
+      const message =
         error instanceof Error
           ? error.message
-          : '水分設定を保存できませんでした',
-      );
+          : '水分設定を保存できませんでした';
+      setHydrationFeedback(message);
+      setStatus(message);
+    } finally {
+      setIsSavingHydrationProfile(false);
     }
   }
-
   async function startRecording() {
     if (isProcessing || isRecording) {
       return;
@@ -678,7 +697,14 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                 onChangeCapacity={setCapacityText}
                 onSaveProfile={saveHydrationProfile}
                 modelActionLabel="振る"
-                disabled={isRecording || isProcessing || !hydrationReady}
+                loading={!hydrationReady}
+                feedback={hydrationFeedback}
+                disabled={
+                  isRecording ||
+                  isProcessing ||
+                  !hydrationReady ||
+                  isSavingHydrationProfile
+                }
               />
             ) : null}
 

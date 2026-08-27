@@ -26,3 +26,15 @@ test('shows zero for each unrecorded day in the seven-day chart', () => {
   expect(values.filter(value => value === '0 mL')).toHaveLength(7);
   expect(values).toContain('未記録日は0 mL');
 });
+test('shows an explicit loading state before persisted hydration data arrives', () => {
+  const renderer = ReactTestRenderer.create(
+    <HydrationHistoryChart state={null} loading />,
+  );
+  const values = renderer.root
+    .findAllByType(Text)
+    .map(node => textContent(node.props.children));
+
+  expect(values).toContain('保存済みデータを読み込み中…');
+  expect(values).not.toContain('0 mL');
+  renderer.unmount();
+});

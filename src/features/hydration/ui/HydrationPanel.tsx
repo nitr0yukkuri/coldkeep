@@ -24,6 +24,8 @@ type HydrationPanelProps = {
   onSaveProfile(): void;
   modelActionLabel: string;
   disabled?: boolean;
+  loading?: boolean;
+  feedback?: string | null;
 };
 
 export function HydrationPanel({
@@ -34,6 +36,8 @@ export function HydrationPanel({
   onSaveProfile,
   modelActionLabel,
   disabled = false,
+  loading = false,
+  feedback = null,
 }: HydrationPanelProps) {
   const observation = state ? latestObservation(state) : null;
   const intakeMl = state ? todayIntakeMl(state) : 0;
@@ -49,18 +53,24 @@ export function HydrationPanel({
       <View style={styles.titleRow}>
         <View style={styles.titleCopy}>
           <Text style={styles.title}>今日の水分</Text>
-          <Text style={styles.subtitle}>振る音から自動で記録します</Text>
+          <Text style={styles.subtitle}>
+            {loading
+              ? '保存済みデータを読み込み中…'
+              : '振る音から自動で記録します'}
+          </Text>
         </View>
-        <Text style={styles.total}>{intakeMl} mL</Text>
+        <Text style={styles.total}>{loading ? '—' : intakeMl + ' mL'}</Text>
       </View>
 
-      <HydrationHistoryChart state={state} />
+      <HydrationHistoryChart state={state} loading={loading} />
 
       <View style={styles.capacitySection}>
         <View style={styles.capacityCopy}>
           <Text style={styles.inputLabel}>水筒容量</Text>
           <Text style={styles.capacityHint}>
-            容量だけ最初に設定してください
+            {loading
+              ? 'データを読み込み中です'
+              : '容量だけ最初に設定してください'}
           </Text>
         </View>
         <View style={styles.capacityInputRow}>
@@ -71,14 +81,17 @@ export function HydrationPanel({
               onChangeText={onChangeCapacity}
               keyboardType="number-pad"
               accessibilityLabel="水筒容量"
-              editable={!disabled}
+              editable={!disabled && !loading}
             />
             <Text style={styles.inputUnit}>mL</Text>
           </View>
           <TouchableOpacity
-            disabled={disabled}
+            disabled={disabled || loading}
             accessibilityRole="button"
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              (disabled || loading) && styles.saveButtonDisabled,
+            ]}
             onPress={onSaveProfile}
           >
             <Text style={styles.saveButtonText}>保存</Text>
@@ -86,6 +99,11 @@ export function HydrationPanel({
         </View>
       </View>
 
+      {feedback ? (
+        <Text style={styles.feedback} accessibilityLiveRegion="polite">
+          {feedback}
+        </Text>
+      ) : null}
       {observation && (observationIsToday || autoRecordedIntakeMl !== null) ? (
         <View style={styles.observationBox}>
           <Text style={styles.observationText}>
@@ -166,6 +184,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#087ea4',
   },
   saveButtonText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  saveButtonDisabled: { backgroundColor: '#9aa9ad' },
+  feedback: { color: '#087ea4', fontSize: 12, lineHeight: 18, marginTop: 10 },
   observationBox: {
     marginTop: 18,
     padding: 14,
