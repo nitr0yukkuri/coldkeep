@@ -138,6 +138,10 @@ fn shake_ice_class(class: &str) -> Option<&'static str> {
     }
 }
 
+fn ice_presence_from_amount(amount: Option<&str>) -> Option<bool> {
+    amount.map(|class| class != "none")
+}
+
 fn artifact() -> Result<ModelArtifact, String> {
     serde_json::from_str(MODEL_JSON).map_err(|error| format!("model artifact: {error}"))
 }
@@ -961,6 +965,14 @@ mod tests {
             assert!((actual - expected.as_f64().unwrap()).abs() < 1e-4);
         }
     }
+
+    #[test]
+    fn coarse_ice_amount_derives_presence_without_inventing_counts() {
+        assert_eq!(ice_presence_from_amount(Some("none")), Some(false));
+        assert_eq!(ice_presence_from_amount(Some("few")), Some(true));
+        assert_eq!(ice_presence_from_amount(Some("many")), Some(true));
+        assert_eq!(ice_presence_from_amount(None), None);
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -1085,8 +1097,10 @@ pub fn classify_shake_wav_bytes(bytes: &[u8]) -> Result<Prediction, String> {
         water_confidence: confidence,
         fill_level: Some(fill_level),
         fill_confidence: Some(confidence),
-        ice_presence: None,
-        ice_confidence: None,
+        // Keep the native payload aligned with the TypeScript fallback: a
+        // trained coarse amount also supplies the derived ice/no-ice signal.
+        ice_presence: ice_presence_from_amount(ice_amount),
+        ice_confidence: ice_amount_confidence,
         ice_status: if ice_status == "trained" {
             "trained"
         } else {
