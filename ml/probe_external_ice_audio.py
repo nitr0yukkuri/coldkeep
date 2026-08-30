@@ -41,7 +41,18 @@ except ImportError:  # Support direct execution from the ml directory.
 
 
 FORBIDDEN_AMOUNT_LABELS = {"none", "few", "many"}
-REQUIRED_COLUMNS = {"filename", "source_url", "label", "license", "usage"}
+REQUIRED_COLUMNS = {
+    "filename",
+    "source_url",
+    "label",
+    "license",
+    "usage",
+    # Make the safety boundary explicit in every external manifest.  An
+    # omitted opt-out must not be interpreted as permission to reuse a source
+    # description as a production amount label.
+    "production_label_eligible",
+}
+PRODUCTION_GUARD_COLUMN = "production_label_eligible"
 
 
 def _resolve_audio(root: Path, filename: str) -> Path:
@@ -91,7 +102,8 @@ def probe(manifest: Path, audio_root: Path) -> dict:
     diagnostics: list[str] = []
     with manifest.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
-        missing = sorted(REQUIRED_COLUMNS - set(reader.fieldnames or []))
+        fieldnames = set(reader.fieldnames or [])
+        missing = sorted(REQUIRED_COLUMNS - fieldnames)
         if missing:
             raise ValueError("external manifest is missing columns: " + ", ".join(missing))
 
@@ -101,6 +113,12 @@ def probe(manifest: Path, audio_root: Path) -> dict:
                 raise ValueError(
                     f"manifest line {line} contains forbidden amount label {label!r}; "
                     "external audio must not train none/few/many"
+                )
+            guard = (row.get(PRODUCTION_GUARD_COLUMN) or "").strip().lower()
+            if guard != "false":
+                raise ValueError(
+                    f"manifest line {line} must set "
+                    f"{PRODUCTION_GUARD_COLUMN}=false for external audio"
                 )
             filename = (row.get("filename") or "").strip()
             if not filename:
@@ -127,6 +145,13 @@ def probe(manifest: Path, audio_root: Path) -> dict:
                         "label": label or None,
                         "license": (row.get("license") or "").strip(),
                         "usage": (row.get("usage") or "").strip(),
+                        # A source description can be retained for audit, but
+                        # is never converted into a ColdKeep amount label.
+                        "authorClaimedCount": (
+                            row.get("author_claimed_count") or ""
+                        ).strip()
+                        or None,
+                        "claimText": (row.get("claim_text") or "").strip() or None,
                         "sha256": actual_hash,
                         "durationSeconds": len(samples) / TARGET_SAMPLE_RATE,
                         "windows": len(windows),

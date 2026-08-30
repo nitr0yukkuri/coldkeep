@@ -18,6 +18,15 @@
     "requiredClasses": ["none", "few", "many"],
     "minimumRecordingsPerClass": 2,
     "minimumSessionsPerClass": 2,
-    "activation": "Replace only after phone/water-bottle shake recordings pass held-out session evaluation with balanced accuracy >= 0.67."
+    "requiredMeasuredLabelSource": "coldkeep_measured_only",
+    "requiredScoredHoldouts": [
+      "session_id",
+      "container_id",
+      "device_id",
+      "room_id",
+      "operator_id"
+    ],
+    "minimumBalancedAccuracyPerHoldout": 0.67,
+    "activation": "Replace only after measured phone/water-bottle shake recordings pass scored session, container, device, room, and operator holdouts with balanced accuracy >= 0.67 for every holdout."
   }
 }

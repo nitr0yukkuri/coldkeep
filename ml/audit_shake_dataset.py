@@ -17,7 +17,13 @@ from collections import defaultdict
 from pathlib import Path
 
 from audio_features import read_pcm16_wav
-from train_shake_ice_amount import ICE_AMOUNT_NAMES, Capture, ice_amount_index, load_manifest
+from train_shake_ice_amount import (
+    ICE_AMOUNT_NAMES,
+    Capture,
+    ice_amount_index,
+    load_manifest,
+    recording_day,
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -68,15 +74,9 @@ def _holdout_report(captures: list[Capture], field: str) -> dict:
 
 
 def _recording_day(value: str | None) -> str | None:
-    if not value:
-        return None
-    day = value.strip()[:10]
-    # ISO dates are what the mobile collectors emit. Treat malformed values as
-    # missing rather than allowing an arbitrary timestamp to satisfy a day
-    # holdout gate.
-    if len(day) != 10 or day[4] != "-" or day[7] != "-":
-        return None
-    return day
+    # Keep the audit and trainer on one strict parser. A date-looking prefix
+    # without a valid timezone must not satisfy the temporal holdout gate.
+    return recording_day(value)
 
 
 def _temporal_coverage(captures: list[Capture]) -> dict:
@@ -197,7 +197,13 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         "skippedManifestRows": diagnostics,
         "holdouts": {
             field: _holdout_report(captures, field)
-            for field in ("session_id", "container_id", "device_id")
+            for field in (
+                "session_id",
+                "container_id",
+                "device_id",
+                "room_id",
+                "operator_id",
+            )
         },
         "audio": audio_metadata,
     }
@@ -206,7 +212,7 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["warnings"].append("same audio SHA256 appears under multiple recording IDs")
     if hash_label_conflicts:
         report["warnings"].append("identical audio has conflicting ice amount labels")
-    for field in ("session_id", "container_id", "device_id"):
+    for field in ("session_id", "container_id", "device_id", "room_id", "operator_id"):
         field_report = report["holdouts"][field]
         if not field_report["evaluatable"]:
             report["warnings"].append(f"{field} holdout has no complete valid fold")
@@ -248,6 +254,8 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["readyForAblation"]
         and report["holdouts"]["container_id"]["allFoldsEvaluatable"]
         and report["holdouts"]["device_id"]["allFoldsEvaluatable"]
+        and report["holdouts"]["room_id"]["allFoldsEvaluatable"]
+        and report["holdouts"]["operator_id"]["allFoldsEvaluatable"]
         and temporal_holdout_ready
     )
     report["temporalHoldoutReady"] = temporal_holdout_ready
@@ -263,7 +271,7 @@ def audit(captures: list[Capture], diagnostics: list[str]) -> dict:
         report["warnings"].append("dataset is not safe for ablation")
     if not report["readyForTraining"]:
         report["warnings"].append(
-            "dataset is not deployable: complete container and device holdouts are required"
+            "dataset is not deployable: complete container, device, room, and operator holdouts are required"
         )
     if not temporal_holdout_ready:
         report["warnings"].append(

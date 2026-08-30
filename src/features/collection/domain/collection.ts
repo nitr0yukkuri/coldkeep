@@ -29,6 +29,8 @@ export type CollectionDraft = {
   sessionId: string;
   containerId: string;
   deviceId: string;
+  roomId: string;
+  operatorId: string;
   capacityMl: string;
   waterMl: string;
   iceCount: string;
@@ -42,6 +44,8 @@ export type CollectionLabels = {
   sessionId: string;
   containerId: string;
   deviceId: string;
+  roomId: string;
+  operatorId: string;
   capacityMl: number;
   waterMl: number;
   iceCount: number;
@@ -84,6 +88,8 @@ export const COLLECTION_CSV_HEADER = [
   'duration_seconds',
   'platform',
   'label_source',
+  'room_id',
+  'operator_id',
 ].join(',');
 
 /**
@@ -225,6 +231,8 @@ export function validateCollectionDraft(draft: CollectionDraft): CollectionLabel
     sessionId: requiredText(draft.sessionId, 'Session ID'),
     containerId: requiredText(draft.containerId, 'Container ID'),
     deviceId: requiredText(draft.deviceId, 'Device ID'),
+    roomId: requiredText(draft.roomId, 'Room ID'),
+    operatorId: requiredText(draft.operatorId, 'Operator ID'),
     capacityMl: numberInRange(draft.capacityMl, 'Capacity', 1, 10_000),
     waterMl: numberInRange(draft.waterMl, 'Water amount', 0, 10_000),
     iceCount: numberInRange(draft.iceCount, 'Ice count', 0, 100, true),
@@ -290,6 +298,8 @@ export function collectionRecordToCsv(record: CollectionRecord): string {
     record.durationSeconds.toFixed(3),
     record.platform,
     record.labelSource,
+    record.roomId,
+    record.operatorId,
   ]
     .map(csvCell)
     .join(',');

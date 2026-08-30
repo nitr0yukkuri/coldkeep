@@ -18,6 +18,7 @@ import {
 } from '../features/collection/domain/collection';
 import { HydrationUseCase } from '../features/hydration/application/hydrationUseCase';
 import { RnfsHydrationRepository } from '../platform/storage/rnfsHydrationRepository';
+import { isResearchPreviewMode } from './runtimeMode';
 
 export function createAppDependencies() {
   const recorder =
@@ -32,17 +33,24 @@ export function createAppDependencies() {
   );
   const reader = new RnfsWavReader();
   const repository = new RnfsDatasetRepository();
+  const shakeClassifiers = isResearchPreviewMode
+    ? [
+        new TypeScriptClassifierAdapter({
+          allowExperimentalPreview: true,
+          allowExperimentalIcePreview: true,
+        }),
+        new RustClassifierAdapter(),
+      ]
+    : [new RustClassifierAdapter(), new TypeScriptClassifierAdapter()];
 
   return {
     collectionActions: COLLECTION_ACTIONS,
     recording,
     scan: new ScanBottleUseCase(
       reader,
-      [
-        new RustClassifierAdapter(),
-        new TypeScriptClassifierAdapter({ allowExperimentalPreview: true }),
-      ],
+      shakeClassifiers,
       MODEL_RECORDING_ACTION,
+      { allowExperimentalIceAmount: isResearchPreviewMode },
     ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(

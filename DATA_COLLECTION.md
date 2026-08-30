@@ -9,6 +9,9 @@ measured before each recording.
 - One container and one phone
 - Enter a stable, operator-chosen device ID (for example `pixel7-lab-a`);
   never use only a platform name such as `android` or `ios`.
+- Enter stable `room_id` and `operator_id` values as well. These are required
+  holdout keys, not optional UI decoration: without them, room or operator can
+  become an accidental proxy for the ice label.
 - Water: 25%, 50%, and 75% of capacity
 - Ice: 0 g, 50 g, and 100 g
 - Temperature: 5 °C, 20 °C, and 50 °C
@@ -111,7 +114,8 @@ The app never claims an exact cube count or ice mass. Collect at least two
 recordings in at least two independent sessions for every band; vary bottles,
 phones, rooms, and operators before treating the result as a product model.
 The checked-in artifact is manifest-only and the scan screen remains
-`未判定` until the session-held-out balanced-accuracy gate passes.
+`未判定` until the scored session/container/device/room/operator holdout gate
+passes.
 
 Every supervised row must carry `label_source=coldkeep_measured`. External
 CORSMAL/Freesound rows use `label_source=external_unlabeled` and leave
@@ -131,10 +135,11 @@ python ml/train_shake_ice_amount.py `
 The command refuses to train when a band is missing, when a band has fewer than
 two recordings, when a band appears in fewer than two sessions, when manifest
 rows are malformed/unlabeled, or when audio is duplicated. A `trained` artifact
-also requires every session/container/device fold to contain all classes and
-at least two valid calendar days per class. This prevents a class recorded on a
-single day from becoming a date/room shortcut. Until those gates pass, only an
-`experimental` result is written and the product scan remains untrained.
+also requires every session/container/device/room/operator fold to contain all
+classes and at least two valid calendar days per class. This prevents a class
+recorded on a single day or by one operator in one room from becoming a
+shortcut. Until those gates pass, only an `experimental` result is written and
+the product scan remains untrained.
 
 ## Ice-count matrix for generalisation
 
@@ -178,7 +183,8 @@ python ml/run_shake_ice_ablation.py `
 ```
 
 The ablation report evaluates the same recordings under session-, container-,
-and device-held-out folds, with and without gain normalisation. It does not
-write a model artifact. Only after the report has been reviewed and the
-balanced-accuracy/recall/shortcut gates pass may the existing trainer be run
-to produce a `trained` artifact.
+device-, room-, and operator-held-out folds, with and without gain
+normalisation. It does not write a model artifact. Only after the report has
+been reviewed and the balanced-accuracy/recall/shortcut gates pass for all
+five holdout groups may the existing trainer be run to produce a `trained`
+artifact.

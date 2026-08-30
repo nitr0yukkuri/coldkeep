@@ -54,3 +54,25 @@ test('ice amount is only trusted for a matching shake result', () => {
   );
   expect(result.iceAmount).toBeNull();
 });
+
+test('experimental ice amount requires an explicit research opt-in', () => {
+  const input = {
+    containsWater: false,
+    waterConfidence: 0,
+    measurementAction: 'shake' as const,
+    measurementStatus: 'untrained' as const,
+    iceAmount: 'few' as const,
+    iceAmountConfidence: 0.59,
+    iceAmountStatus: 'experimental' as const,
+    engine: 'typescript' as const,
+  };
+
+  expect(normalizeScanResult(input, 'shake').iceAmount).toBeNull();
+  const preview = normalizeScanResult(input, 'shake', {
+    allowExperimentalIceAmount: true,
+  });
+  expect(preview.iceAmount).toBe('few');
+  expect(preview.iceAmountStatus).toBe('experimental');
+  expect(preview.icePresence).toBe(true);
+  expect(preview.iceConfidence).toBe(0.59);
+});

@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -26,11 +28,26 @@ from audio_features import (
     resample,
     segment_audio,
 )
-from train_baseline import SoftmaxClassifier, metrics
+from train_baseline import SoftmaxClassifier, class_balanced_weights, metrics
 
 
 ICE_AMOUNT_NAMES = ("none", "few", "many")
 MIN_DEPLOYABLE_BALANCED_ACCURACY = 0.67
+HOLDOUT_FIELDS = (
+    "session_id",
+    "container_id",
+    "device_id",
+    "room_id",
+    "operator_id",
+)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -41,6 +58,12 @@ class Capture:
     device_id: str
     ice_count: int
     path: Path
+    # The CSV loader requires these fields so physical/environment holdouts
+    # cannot silently disappear.  Defaults preserve compatibility for small
+    # in-memory fixtures and external research scripts that predate the
+    # expanded collection schema; such fixtures are never deployable data.
+    room_id: str = "unknown-room"
+    operator_id: str = "unknown-operator"
     capacity_ml: float | None = None
     water_ml: float | None = None
     temperature_c: float | None = None
@@ -66,6 +89,20 @@ def _required(row: dict[str, str], name: str, line: int) -> str:
     return value
 
 
+def recording_day(value: str | None) -> str | None:
+    """Return an ISO calendar day only for a timezone-aware timestamp."""
+    if not value:
+        return None
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.date().isoformat()
+
+
 def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list[str]]:
     """Load shake rows and skip malformed rows without guessing labels."""
     captures: list[Capture] = []
@@ -79,6 +116,8 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
             "session_id",
             "container_id",
             "device_id",
+            "room_id",
+            "operator_id",
             "ice_count",
             "action",
             "audio_filename",
@@ -117,12 +156,20 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         raise ValueError(f"{name} must be finite")
                     return value
 
+                recorded_at = row.get("recorded_at", "").strip() or None
+                if recorded_at is not None and recording_day(recorded_at) is None:
+                    raise ValueError(
+                        "recorded_at must be a valid ISO 8601 timestamp with a timezone"
+                    )
+
                 captures.append(
                     Capture(
                         recording_id=recording_id,
                         session_id=_required(row, "session_id", line),
                         container_id=_required(row, "container_id", line),
                         device_id=_required(row, "device_id", line),
+                        room_id=_required(row, "room_id", line),
+                        operator_id=_required(row, "operator_id", line),
                         ice_count=ice_count,
                         path=audio,
                         capacity_ml=optional_number("capacity_ml"),
@@ -131,7 +178,7 @@ def load_manifest(manifest: Path, audio_root: Path) -> tuple[list[Capture], list
                         microphone_distance_cm=optional_number(
                             "microphone_distance_cm"
                         ),
-                        recorded_at=row.get("recorded_at", "").strip() or None,
+                        recorded_at=recorded_at,
                         platform=row.get("platform", "").strip() or None,
                         label_source=label_source,
                     )
@@ -150,10 +197,14 @@ def validate_dataset(captures: list[Capture]) -> dict:
     counts = Counter(labels.values())
     sessions_by_class: dict[int, set[str]] = defaultdict(set)
     containers_by_class: dict[int, set[str]] = defaultdict(set)
+    rooms_by_class: dict[int, set[str]] = defaultdict(set)
+    operators_by_class: dict[int, set[str]] = defaultdict(set)
     for item in captures:
         label = labels[item.recording_id]
         sessions_by_class[label].add(item.session_id)
         containers_by_class[label].add(item.container_id)
+        rooms_by_class[label].add(item.room_id)
+        operators_by_class[label].add(item.operator_id)
     report = {
         "totalShakeRows": len(captures),
         "classCounts": {ICE_AMOUNT_NAMES[index]: counts[index] for index in range(3)},
@@ -162,6 +213,12 @@ def validate_dataset(captures: list[Capture]) -> dict:
         },
         "containersPerClass": {
             ICE_AMOUNT_NAMES[index]: len(containers_by_class[index]) for index in range(3)
+        },
+        "roomsPerClass": {
+            ICE_AMOUNT_NAMES[index]: len(rooms_by_class[index]) for index in range(3)
+        },
+        "operatorsPerClass": {
+            ICE_AMOUNT_NAMES[index]: len(operators_by_class[index]) for index in range(3)
         },
         "deviceCount": len({item.device_id for item in captures}),
         "recordedAtCount": len({item.recorded_at for item in captures if item.recorded_at}),
@@ -193,7 +250,7 @@ def validate_dataset(captures: list[Capture]) -> dict:
         )
     report["holdoutCoverage"] = {}
     all_classes = set(range(3))
-    for field in ("session_id", "container_id", "device_id"):
+    for field in ("session_id", "container_id", "device_id", "room_id", "operator_id"):
         groups = sorted({getattr(item, field) for item in captures})
         valid = []
         invalid = {}
@@ -253,24 +310,41 @@ def recording_arrays(
             for item in captures
         ]
     )
-    return features, labels, weights
+    return features, labels, class_balanced_weights(labels, weights)
 
 
-def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> dict:
+def evaluate(
+    captures: list[Capture],
+    feature_cache: dict[str, np.ndarray],
+    group_field: str = "session_id",
+) -> dict:
+    """Evaluate one complete leave-one-group-out split.
+
+    The previous trainer only computed session-held-out metrics while the
+    audit checked physical holdout coverage structurally.  A candidate could
+    therefore pass the deployment gate without any measured container/device
+    generalisation score.  Keep the split logic in one function and record a
+    metric report for every required nuisance group.
+    """
+    if group_field not in HOLDOUT_FIELDS:
+        raise ValueError(f"unsupported holdout field: {group_field}")
     classes = [0, 1, 2]
     true: list[int] = []
     predicted: list[int] = []
     predictions: list[dict] = []
-    for held_out_session in sorted({item.session_id for item in captures}):
-        train = [item for item in captures if item.session_id != held_out_session]
-        test = [item for item in captures if item.session_id == held_out_session]
+    held_out_groups = sorted({getattr(item, group_field) for item in captures})
+    for held_out_group in held_out_groups:
+        train = [item for item in captures if getattr(item, group_field) != held_out_group]
+        test = [item for item in captures if getattr(item, group_field) == held_out_group]
         if (
             {ice_amount_index(item.ice_count) for item in train} != set(classes)
             or {ice_amount_index(item.ice_count) for item in test} != set(classes)
         ):
             continue
         x_train, y_train, weights = recording_arrays(train, feature_cache)
-        seed = zlib.crc32(held_out_session.encode("utf-8")) & 0xFFFF
+        seed = zlib.crc32(
+            f"{group_field}:{held_out_group}".encode("utf-8")
+        ) & 0xFFFF
         classifier = SoftmaxClassifier(classes, seed=seed)
         classifier.fit(x_train, y_train, weights)
         for item in test:
@@ -282,7 +356,8 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
             predictions.append(
                 {
                     "recordingId": item.recording_id,
-                    "heldOutSession": held_out_session,
+                    "heldOutGroupField": group_field,
+                    "heldOutGroup": held_out_group,
                     "actual": ICE_AMOUNT_NAMES[actual],
                     "predicted": ICE_AMOUNT_NAMES[estimate],
                     "probabilities": probabilities.round(6).tolist(),
@@ -290,8 +365,43 @@ def evaluate(captures: list[Capture], feature_cache: dict[str, np.ndarray]) -> d
             )
     result = metrics(true, predicted, classes)
     result["classes"] = list(ICE_AMOUNT_NAMES)
+    result["groupField"] = group_field
+    result["validFolds"] = sum(
+        1
+        for held_out_group in held_out_groups
+        if {
+            ice_amount_index(item.ice_count)
+            for item in captures
+            if getattr(item, group_field) != held_out_group
+        }
+        == set(classes)
+        and {
+            ice_amount_index(item.ice_count)
+            for item in captures
+            if getattr(item, group_field) == held_out_group
+        }
+        == set(classes)
+    )
     result["predictions"] = predictions
     return result
+
+
+def group_evaluations_pass_gate(evaluations: dict[str, dict]) -> bool:
+    """Return true only when every required holdout has scored the gate.
+
+    Structural holdout coverage and measured performance are intentionally
+    separate checks.  This function requires both a non-empty evaluation and
+    balanced accuracy >= the production threshold for every nuisance group.
+    """
+    return all(
+        isinstance(report, dict)
+        and int(report.get("recordings", 0)) > 0
+        and int(report.get("validFolds", 0)) > 0
+        and float(report.get("balanced_accuracy", 0.0))
+        >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+        for field in HOLDOUT_FIELDS
+        for report in [evaluations.get(field)]
+    )
 
 
 def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
@@ -307,6 +417,10 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
     from audit_shake_dataset import audit
 
     audit_report = audit(captures, diagnostics)
+    # Keep provenance in the candidate itself so the promotion command cannot
+    # accidentally accept a model whose labels were inferred from public
+    # effects or another task.
+    audit_report["labelSource"] = "coldkeep_measured_only"
     if audit_report["fileErrors"]:
         raise ValueError(
             "audio audit failed; refusing to train: "
@@ -319,7 +433,11 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         )
     filters = mel_filterbank(TARGET_SAMPLE_RATE)
     feature_cache = {item.recording_id: features_for(item, filters) for item in captures}
-    evaluation = evaluate(captures, feature_cache)
+    group_evaluations = {
+        field: evaluate(captures, feature_cache, field)
+        for field in HOLDOUT_FIELDS
+    }
+    evaluation = group_evaluations["session_id"]
     x, y, weights = recording_arrays(captures, feature_cache)
     classifier = SoftmaxClassifier([0, 1, 2], seed=7)
     classifier.fit(x, y, weights)
@@ -327,7 +445,7 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "trained"
         if (
             audit_report["readyForTraining"]
-            and evaluation["balanced_accuracy"] >= MIN_DEPLOYABLE_BALANCED_ACCURACY
+            and group_evaluations_pass_gate(group_evaluations)
         )
         else "experimental"
     )
@@ -346,16 +464,26 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
             "description": "32 normalized log-mel bands plus mean/std and first differences",
             "gainNormalization": "per-window RMS target 0.05, clip [-1,1]",
         },
+        "training": {
+            "classifier": "weighted linear softmax",
+            "weighting": "equal class mass after equal recording mass",
+        },
         "model": classifier.serializable("shake_ice_amount"),
         "dataset": report,
         "audit": audit_report,
+        "provenance": {
+            "manifestSha256": _file_sha256(manifest),
+            "trainer": "ml/train_shake_ice_amount.py",
+            "trainerVersion": "shake_ice_amount_v1",
+        },
         "evaluation": evaluation,
+        "groupEvaluations": group_evaluations,
         "warnings": [
-            "Pilot only: collect new sessions across phones, bottles, and rooms.",
+            "Pilot only: collect new sessions across phones, bottles, rooms, and operators.",
             "Public output is none/few/many; exact ice cube counts are not estimated.",
             f"Deployment status is {status}; balanced accuracy gate is "
             f"{MIN_DEPLOYABLE_BALANCED_ACCURACY:.2f}.",
-            "A trained artifact requires complete session/container/device holdouts and a clean audio audit.",
+            "A trained artifact requires complete session/container/device/room/operator holdouts and a clean audio audit.",
         ],
     }
     if diagnostics:

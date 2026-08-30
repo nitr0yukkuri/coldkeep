@@ -51,8 +51,11 @@ artifact:
 | B | transient/onset descriptors | 21 |
 | C | A concatenated with B | 149 |
 
-All candidates use the same recording-level fold list and equal total weight
-per recording (overlapping windows are never split across a fold). Each result
+All candidates use the same recording-level fold list. Overlapping windows are
+never split across a fold. Training first gives each recording equal total
+weight, then equalizes the total weight of the observed `none`/`few`/`many`
+classes so the exact-count design's 1:2:3 band imbalance cannot become a
+majority-class shortcut. Each result
 contains accuracy, balanced accuracy, macro F1, class recall/precision, and a
 confusion matrix. The report also compares direct 3-class classification with
 the experimental two-stage `ice/no-ice` → `few/many` design.
@@ -66,7 +69,7 @@ python ml/run_shake_ice_ablation.py `
   --output ml/reports/shake_ice_ablation.json
 ```
 
-It evaluates session-, container-, and device-held-out groups, plus
+It evaluates session-, container-, device-, room-, and operator-held-out groups, plus
 gain-normalised and raw waveform variants. A fold is not silently filled in:
 if its train or test side lacks a class, it is reported as skipped. The audit
 script reports the same issue before fitting.
@@ -80,6 +83,11 @@ checked-in amount artifact is `untrained`. Consequently:
 - no two-stage score exists;
 - no shortcut conclusion can be drawn;
 - no production model is generated.
+
+The checked-in reproduction of that gate is
+[`ml/reports/shake_ice_ablation.json`](ml/reports/shake_ice_ablation.json);
+it records `status=insufficient_data` because the legacy manifest has no
+measured shake schema.
 
 ### External descriptive-audio feature probe (not an amount experiment)
 
@@ -112,30 +120,152 @@ TypeScript. Their SHA256 values and source/license records are in
 feature extraction and the shortcut warning only; it does not change
 `shake_ice_amount_pilot.json` and cannot satisfy the ColdKeep deployment gate.
 
+### Checked-in exact-count preview probe
+
+Five additional CC0 previews are now stored under
+`dataset/external/ice-count-references/`. Their descriptions claim one (soft),
+one (loud), three, four, and three cubes respectively (the last is the
+BigSoundBank whisky-glass reference). The reproducible probe output
+is [`ml/reports/exact_count_ice_feature_probe.json`](ml/reports/exact_count_ice_feature_probe.json).
+All five decoded successfully with zero diagnostics, but the mean onset counts
+were 4.60, 5.00, 4.45, 5.33, and 2.00 per one-second window. The four-cube
+clip is not more event-dense than the one-cube clips, and the three-cube
+BigSoundBank clip has only one short window, so even explicit author-count
+descriptions do not justify a `none/few/many` classifier. The report remains
+`research_only` with no model and no production-artifact update.
+
 The reproducible command was also run against the checked-out
 `dataset/external/ice-references/manifest.csv` using the optional `miniaudio`
 decoder. It produced 17 finite feature records and 5 decoder diagnostics (the
 five Google OGG previews were not decodable by that optional backend). The
-report remained `status=research_only`, with `model=null`,
+reproducible output is
+[`ml/reports/ice_references_feature_probe.json`](ml/reports/ice_references_feature_probe.json).
+The report remained `status=research_only`, with `model=null`,
 `labelsUsedForTraining=false`, and `productionArtifactUpdated=false`. Decoder
 failures are intentionally recorded as diagnostics rather than treated as
 negative or amount labels.
 
+### Checked-in shake-domain reference pack
+
+Ten additional CC0 previews from one Freesound author were decoded through the
+same probe. They describe ice rolling, dropping, stirring, or shaking in a
+glass/jar, but do not provide measured cube counts. The mean values below are
+per one-second window and are descriptive only:
+
+| source clip | duration (s) | windows | mean onset count | mean spectral flux | mean centroid (Hz) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| #437324 | 2.000 | 3 | 7.33 | 0.0739 | 1,678 |
+| #437323 | 4.000 | 7 | 5.29 | 0.0722 | 1,723 |
+| #437322 | 1.571 | 3 | 4.00 | 0.0759 | 1,793 |
+| #437321 | 1.286 | 2 | 6.50 | 0.0783 | 1,884 |
+| #436972 | 1.429 | 2 | 5.50 | 0.0666 | 2,748 |
+| #436971 | 2.258 | 4 | 5.00 | 0.0660 | 3,480 |
+| #436970 | 5.321 | 10 | 6.20 | 0.0694 | 2,398 |
+| #436969 | 1.772 | 3 | 5.00 | 0.0616 | 3,721 |
+| #436968 | 23.857 | 47 | 5.19 | 0.0785 | 1,215 |
+| #436967 | 1.661 | 3 | 5.33 | 0.0652 | 2,573 |
+
+The spread in onset density and centroid occurs within one author/pack and is
+not an ice-count signal. The probe report is
+[`ml/reports/ice_shake_reference_probe.json`](ml/reports/ice_shake_reference_probe.json),
+with `status=research_only`, no model, and no production-artifact update.
+
 This is an intentional `insufficient_data` result, not a zero or fabricated
-accuracy. The old session-held-out BA gate of 0.67 remains the minimum public
-contract, but a model also needs complete container/device holdouts, no
-duplicate-audio label conflicts, and acceptable per-class recall before it can
-move from research to `trained`.
+accuracy. The 0.67 balanced-accuracy gate remains the minimum public
+contract. The trainer now scores every session/container/device/room/operator
+holdout independently; all five balanced accuracies must reach 0.67 alongside
+complete folds, no duplicate-audio label conflicts, and acceptable per-class
+recall before an artifact can move from research to `trained`.
+
+### Synthetic physics sanity check (research-only)
+
+Because no measured ColdKeep recordings are available, the feature hypothesis
+was also tested with `ml/run_synthetic_shake_ice_experiment.py`. It generates
+two-second mono signals from exact synthetic counts 0--5 using damped collision
+responses, matched class-independent background/rattle/gain realizations, and
+independent container/device/room/operator holdout assignments. The labels are generated parameters,
+not external audio annotations. The run used 216 recordings, three groups per
+holdout factor, two repetitions, and 350 optimizer epochs:
+
+| features | normalization | session BA | container BA | device BA | room BA | operator BA |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| log-mel | gain-normalized | 0.619 | 0.569 | 0.608 | 0.602 | 0.606 |
+| log-mel | raw | 0.617 | 0.560 | 0.597 | 0.627 | 0.628 |
+| transient | gain-normalized | 0.674 | 0.640 | 0.657 | 0.651 | 0.651 |
+| transient | raw | 0.657 | 0.651 | 0.664 | 0.670 | 0.656 |
+| log-mel + transient | gain-normalized | 0.613 | 0.551 | 0.614 | 0.608 | 0.636 |
+| log-mel + transient | raw | 0.616 | 0.571 | 0.642 | 0.611 | 0.628 |
+
+Class balancing improves the transient-only sanity check, with session and
+room folds reaching the threshold, but no configuration passes all five
+holdouts. That is still a useful negative result: even a controlled
+collision-density hypothesis is fragile once nuisance response and
+missed/bounced impacts are introduced. It does not prove that real bottles are
+impossible to classify, and it must not be reported as ColdKeep accuracy. The complete reproducible output is
+[`ml/reports/synthetic_shake_ice_experiment.json`](ml/reports/synthetic_shake_ice_experiment.json).
+The report is marked `research_only`, records
+`labelsUsedForProductionTraining=false`, and does not alter the production
+artifact.
+
+The same run is also materialized as a transient-only preview artifact at
+[`ml/artifacts/research_synthetic_transient_shake_ice_amount.json`](ml/artifacts/research_synthetic_transient_shake_ice_amount.json), with its full report in
+[`ml/reports/synthetic_transient_ice_experiment.json`](ml/reports/synthetic_transient_ice_experiment.json).
+This artifact is for explicit UX/inference-path testing only; its score is not
+used as a production gate.
+
+### External single-event mixture sanity check (research-only)
+
+`ml/run_external_mixture_experiment.py` uses two CC0 previews whose author
+descriptions mention one cube only as **waveform seeds**. It copies short
+fragments into new two-second signals and labels the number of generated
+copies; the source descriptions are never used as `none`/`few`/`many` labels.
+The run produced 216 synthetic recordings and evaluated A/B/C, raw versus
+gain-normalised input, and an additional source-held-out fold:
+
+As in the synthetic sanity check, the classifier uses equal class mass after
+equal recording mass. This removes the generated 1:2:3 band imbalance from the
+training objective; it does not add labels or make the source descriptions
+ground truth.
+
+| combined + gain-normalized holdout | balanced accuracy | macro F1 |
+| --- | ---: | ---: |
+| session | 0.390 | 0.376 |
+| container | 0.404 | 0.399 |
+| device | 0.449 | 0.450 |
+| room | 0.440 | 0.444 |
+| operator | 0.377 | 0.365 |
+| source seed | 0.431 | 0.428 |
+
+The best balanced accuracy across every configuration and holdout was only
+0.449, so this augmentation does not support a production model. It is useful
+as a negative robustness check: repeating a real ice-like fragment is not a
+valid substitute for measuring separate cubes in a ColdKeep bottle. The
+reproducible report and fitted model are explicitly research-only:
+[`ml/reports/external_mixture_experiment.json`](ml/reports/external_mixture_experiment.json)
+and
+[`ml/artifacts/research_external_mixture_shake_ice_amount.json`](ml/artifacts/research_external_mixture_shake_ice_amount.json).
+Neither file changes
+[`ml/artifacts/shake_ice_amount_pilot.json`](ml/artifacts/shake_ice_amount_pilot.json).
 
 ## Shortcut and leakage audit
 
 `ml/audit_shake_dataset.py` computes SHA256 for every audio file, detects the
 same bytes under multiple recording IDs, records class coverage by session,
-container, device, and timestamp, and enumerates valid/invalid group folds.
+container, device, room, operator, and timestamp, and enumerates valid/invalid group folds.
 Review these warnings before looking at accuracy. In particular, a model that
-loses performance when RMS normalisation is removed, or whose container/device
-holdout collapses while session holdout is high, is likely learning energy,
-bottle, phone, or room identity rather than ice amount.
+loses performance when RMS normalisation is removed, or whose
+container/device/room/operator holdout collapses while session holdout is high,
+is likely learning energy, bottle, phone, operator, or room identity rather than
+ice amount.
+
+The count-adjacent public-data audit follows the same rule. Run
+`ml/audit_count_adjacent_metadata.py` against a local JSONL metadata snapshot to
+record label balance, duplicate IDs/audio references, object/material/sensor
+coverage, and provenance. Its output always carries
+`productionLabelEligible=false`; it cannot create `few`/`many` labels or update
+the production artifact. The checked-in Laser Vibrations report has only 0/1/2
+object counts in a laser-speckle/cardboard-box setup, so it is evidence for
+feature research—not ColdKeep accuracy.
 
 The collection protocol therefore keeps all six measured counts across each
 baseline water level and repeats them across independent sessions before any
@@ -151,3 +281,21 @@ the Python/Jest/Rust tests use the same deterministic PCM impulse fixture.
 The TypeScript and Python tests pass in this checkout; Cargo is not installed
 in this Windows environment, so Rust execution remains a required CI/device
 step rather than an unreported claim.
+
+## Research-only runtime preview
+
+The synthetic transient artifact can be exercised end to end through the
+TypeScript path by setting `EXPO_PUBLIC_ML_PREVIEW=research`. This is an
+explicit opt-in: the normal build keeps the measured ice artifact untrained and
+shows `未判定`. The preview uses the 21-dimensional transient schema, caps its
+confidence below the production threshold, and marks the result
+`iceAmountStatus=experimental`. The external-mixture artifact remains checked
+in as a comparison experiment and is not silently treated as a production
+label source.
+
+The UI labels this value as a research preview and the hydration use case never
+consumes it. The flag does not change
+`ml/artifacts/shake_ice_amount_pilot.json`, does not add external audio to
+supervised ColdKeep training, and does not establish phone/water-bottle
+accuracy. It exists only to verify model loading, feature extraction, and the
+presentation boundary before measured recordings are available.

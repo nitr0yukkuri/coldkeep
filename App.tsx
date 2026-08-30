@@ -485,6 +485,12 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
                             iceAmountConfidence,
                           )}）`
                         : '信頼度不足（再試行）'
+                      : iceAmountStatus === 'experimental'
+                        ? iceAmount !== null
+                          ? `研究プレビュー（${formatProbability(
+                              iceAmountConfidence,
+                            )}・自動記録には未使用）`
+                          : '研究プレビュー信頼度不足'
                       : '学習前は未判定'
                   }
                   color="#168276"

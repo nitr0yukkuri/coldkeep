@@ -41,6 +41,10 @@ class Capture:
     device_id: str
     ice_presence: int
     path: Path
+    # Keep the legacy binary trainer closed to public/external effect audio.
+    # The default preserves compatibility with small in-memory test fixtures;
+    # manifest rows are required to state the provenance explicitly below.
+    label_source: str = "coldkeep_measured"
 
 
 def _required(row: dict[str, str], name: str, line: int) -> str:
@@ -64,6 +68,12 @@ def load_manifest(manifest: Path, audio_root: Path | None) -> tuple[list[Capture
                 recording_id = _required(row, "recording_id", line)
                 if recording_id in seen_recording_ids:
                     raise ValueError(f"duplicate recording_id: {recording_id}")
+                label_source = _required(row, "label_source", line)
+                if label_source != "coldkeep_measured":
+                    raise ValueError(
+                        "label_source must be coldkeep_measured for supervised training; "
+                        f"got {label_source!r}"
+                    )
                 path = (root / filename).resolve()
                 if path != root and root not in path.parents:
                     raise ValueError("audio_filename escapes the audio root")
@@ -81,6 +91,7 @@ def load_manifest(manifest: Path, audio_root: Path | None) -> tuple[list[Capture
                         device_id=_required(row, "device_id", line),
                         ice_presence=int(ice_count > 0),
                         path=path,
+                        label_source=label_source,
                     )
                 )
             except (TypeError, ValueError) as error:

@@ -415,6 +415,11 @@ def train(manifest: Path, audio_root: Path, output: Path | None) -> dict:
         "dataset": report,
         "evaluation": evaluation,
         "audit": audit,
+        "provenance": {
+            "manifestSha256": _file_sha256(manifest),
+            "trainer": "ml/train_shake_level.py",
+            "trainerVersion": "shake_fill_level_v1",
+        },
         "warnings": [
             "Pilot only: use a new session for every phone/room/operator change.",
             "Classifies broad fill bands; it does not estimate arbitrary mL.",

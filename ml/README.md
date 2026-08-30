@@ -47,10 +47,11 @@ screen and only trains when empty/half/full recordings exist in at least two
 sessions per class. The 10--30% and 70--90% transition bands are rejected
 instead of being guessed. Malformed rows, non-`coldkeep_measured` labels,
 duplicate audio SHA256 values, missing timezone-aware timestamps, and invalid
-WAV files block training. Evaluation holds out complete sessions and reports
-container/device folds; a `trained` artifact additionally requires all three
-physical holdouts and at least two calendar days per class. Otherwise the
-artifact is explicitly `experimental` and must not feed hydration math.
+WAV files block training. The ice-amount trainer scores complete
+session/container/device/room/operator holdouts; a `trained` artifact requires
+every holdout balanced accuracy to reach `0.67`, in addition to the structural
+folds and at least two calendar days per class. Otherwise the artifact is
+explicitly `experimental` and must not feed hydration math.
 
 The checked-in ACM-S2 data contains only two shake recordings (empty and 50%
 pasta in one muesli box), so it cannot produce a trustworthy three-class shake
@@ -140,18 +141,23 @@ raw archive or share the derived cache/weights until its terms are checked.
 `train_shake_ice_amount.py` uses the exact `ice_count` field only as collection
 ground truth, then maps it to `none` (0), `few` (1--2), or `many` (3+). It
 requires at least two recordings of every band across at least two sessions and
-reports session-held-out metrics. The artifact remains `experimental` below
-the balanced-accuracy gate and is not exposed by the UI as a trained result.
+reports scored session/container/device/room/operator-held-out metrics. The
+training weights first equalize each recording and then equalize the observed
+class mass, preventing an imbalanced 0--5 collection matrix from teaching a
+majority-band shortcut. The artifact remains `experimental` below the
+balanced-accuracy gate and is not exposed by the UI as a trained result.
 Exact cube counts and ice mass are never inferred.
 
 The older `train_ice_presence.py` binary task remains available for the legacy
-pour contract, but its artifact is not applied to the shake product path.
+pour contract, but its artifact is not applied to the shake product path. It
+also requires `label_source=coldkeep_measured`; external effect manifests are
+rejected even for this legacy binary task.
 
 ## Shake ice research harness
 
 `audit_shake_dataset.py` checks the exported ColdKeep manifest for duplicate
 audio hashes, label conflicts, class/group confounds, valid
-session/container/device holdouts, and at least two valid recording days per
+session/container/device/room/operator holdouts, and at least two valid recording days per
 class. `run_shake_ice_ablation.py` compares three
 feature sets on exactly those recording-level folds:
 
@@ -165,11 +171,103 @@ reports direct three-class and experimental two-stage (`ice/no-ice` then
 and never writes a production artifact. With no exported ColdKeep recordings,
 the correct result is `status=insufficient_data`.
 
+### Count-adjacent metadata audit
+
+For public datasets that expose a numeric object-count field, use
+`audit_count_adjacent_metadata.py` with a local JSONL metadata snapshot. It
+reports provenance, class balance, duplicate IDs/audio references, and sensor
+or container coverage while explicitly setting `productionLabelEligible=false`.
+It never maps a public count to ColdKeep's `none`/`few`/`many` labels and never
+updates `shake_ice_amount_pilot.json`. Example:
+
+```powershell
+python ml/audit_count_adjacent_metadata.py `
+  --input <laser-vibrations-metadata.jsonl> `
+  --output ml/reports/laser_vibrations_count_audit.json `
+  --dataset-name "Laser Vibrations" `
+  --source-url https://huggingface.co/datasets/eturok-weizmann/laser-vibrations `
+  --license "dataset card (verify before redistribution)" `
+  --audio-field speckle_shifts_ifft_audio_file_name
+```
+
+For transient-only inspection, the checked-in
+`dataset/external/ice-shake-references/manifest.csv` contains ten CC0
+Freesound shake-like previews. Run the guarded probe with an optional
+`miniaudio` research install:
+
+```powershell
+python ml/probe_external_ice_audio.py `
+  --manifest dataset/external/ice-shake-references/manifest.csv `
+  --audio-root dataset/external/ice-shake-references `
+  --output ml/reports/ice_shake_reference_probe.json
+```
+
+The same feature-only probe can be run on the close-domain water-bottle hard
+negatives:
+
+```powershell
+python ml/probe_external_ice_audio.py `
+  --manifest dataset/external/hard-negative-references/manifest.csv `
+  --audio-root dataset/external/hard-negative-references `
+  --output ml/reports/hard_negative_water_bottle_probe.json
+```
+
+Those previews remain external, research-only, and explicitly ineligible for
+`none`/`few`/`many` training.
+
+For a stricter augmentation sanity check, two author-described single-cube
+previews can be used only as waveform seeds:
+
+```powershell
+python ml/run_external_mixture_experiment.py `
+  --manifest dataset/external/ice-count-references/manifest.csv `
+  --audio-root dataset/external/ice-count-references `
+  --output ml/reports/external_mixture_experiment.json `
+  --research-artifact ml/artifacts/research_external_mixture_shake_ice_amount.json
+```
+
+This generates synthetic event-copy labels and always writes `research_only`;
+it never promotes or overwrites the production amount artifact. Decoding the
+MP3 previews requires the optional research dependency in
+`requirements-external-shake.txt`.
+
+The probe requires `production_label_eligible=false` on every external row,
+records decoder/feature diagnostics, and always emits `status=research_only`.
+These previews are not amount labels or ColdKeep accuracy evidence.
+
 The shared transient schema is implemented in NumPy, TypeScript, and Rust and
 is covered by `ml/fixtures/audio_features_golden.json`. The fixture is a
 deterministic PCM impulse vector used to detect runtime drift, not to claim
-model accuracy. Rust parity still needs to be run on a machine with Cargo and
-the Android/Rust toolchain available.
+model accuracy. The Rust parity test runs in the repository's Rust CI; a local
+Cargo/Android toolchain is only needed when reproducing that check manually.
+
+### Synthetic feature sanity check (never production training)
+
+When a measured ColdKeep corpus is absent, run the physics-inspired research
+experiment to test the feature hypothesis without assigning labels to public
+effect sounds:
+
+```powershell
+python ml/run_synthetic_shake_ice_experiment.py `
+  --output ml/reports/synthetic_shake_ice_experiment.json `
+  --research-artifact ml/artifacts/research_synthetic_shake_ice_amount.json `
+  --groups 3 `
+  --repetitions 2 `
+  --epochs 350
+```
+
+The generator uses exact synthetic counts and nuisance factors only to test
+whether collision-density features are learnable in principle. Its output is
+`status=research_only`; it never updates
+`ml/artifacts/shake_ice_amount_pilot.json`, and its scores are not evidence for
+phone/water-bottle generalization. The default optional research artifact uses
+the combined 149-feature schema. A transient-only preview can be regenerated
+with `--research-feature-mode transient`; its 21-feature artifact is the
+explicit opt-in preview loaded by the TypeScript research runtime. In the
+checked-in run, transient-only reaches 0.674 session balanced accuracy but
+only 0.640/0.657/0.651/0.651 on container/device/room/operator holdouts, so it
+still cannot be promoted. The honest next step remains measured ColdKeep
+collection.
 
 ## Public shake-data candidate
 
@@ -191,3 +289,30 @@ its microphone geometry differs from a phone, and the CCM test split must not
 be used for training. If it is added later, only the annotated training split
 will be converted into the manifest format above, with container/session
 holdouts and a separate phone-recorded validation set.
+
+### Promotion gate
+
+Training never implicitly makes a model production-ready. After a measured
+ColdKeep run produces a candidate with `status=trained`, promote it through
+the same gate used by release automation:
+
+```powershell
+python ml/promote_shake_artifacts.py `
+  --manifest C:\path\to\coldkeep-dataset\manifest.csv `
+  --fill-candidate C:\tmp\shake_fill_level.json `
+  --ice-candidate C:\tmp\shake_ice_amount.json
+```
+
+Promotion requires the exact manifest used for training. The trainer records
+its SHA256 in the candidate and the promotion command verifies that hash,
+alongside measured-label provenance, complete session/container/device/room/operator and
+temporal holdouts, scored physical holdouts (each with balanced accuracy of at
+least `0.67`), the shared feature schema, internally consistent confusion
+metrics, a valid model tensor shape, and session-held-out balanced accuracy of
+at least `0.67` (with every required physical holdout also meeting the same
+gate).
+All candidates are validated before either target is written, and each target
+is replaced atomically. An `untrained` or `experimental` candidate is rejected
+and the checked-in artifact is left untouched. With the current repository data
+the command is expected to reject because the production candidates are still
+untrained; that is a data-availability result, not a model score.

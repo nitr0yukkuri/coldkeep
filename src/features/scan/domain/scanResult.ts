@@ -34,6 +34,14 @@ export type ScanResult = {
  * deployable by default. */
 export type ScanResultInput = Partial<ScanResult>;
 
+export type ScanResultNormalizationOptions = {
+  /**
+   * Research-only opt-in.  Experimental ice values stay hidden by default so
+   * an unvalidated artifact cannot become a normal product claim.
+   */
+  allowExperimentalIceAmount?: boolean;
+};
+
 /**
  * The public baseline is not calibrated enough to turn every softmax output
  * into a user-facing claim. Keep the threshold explicit at the boundary so
@@ -41,6 +49,7 @@ export type ScanResultInput = Partial<ScanResult>;
  */
 export const MIN_SCAN_CONFIDENCE = 0.65;
 export const MIN_ICE_CONFIDENCE = 0.65;
+export const MIN_EXPERIMENTAL_ICE_CONFIDENCE = 0.34;
 
 export function unknownScanResult(
   engine: InferenceEngine = 'typescript',
@@ -108,6 +117,7 @@ function normalizeIceAmount(value: unknown): IceAmountClass | null {
 export function normalizeScanResult(
   result: ScanResultInput,
   expectedAction?: ScanAction,
+  options: ScanResultNormalizationOptions = {},
 ): ScanResult {
   const action =
     expectedAction ??
@@ -149,6 +159,24 @@ export function normalizeScanResult(
     normalizedIceAmount !== null &&
     candidateIceAmountConfidence !== null &&
     candidateIceAmountConfidence >= ICE_AMOUNT_CONFIDENCE_THRESHOLD;
+  const iceAmountIsExperimental =
+    options.allowExperimentalIceAmount === true &&
+    action === 'shake' &&
+    actionMatches &&
+    result.iceAmountStatus === 'experimental' &&
+    normalizedIceAmount !== null &&
+    candidateIceAmountConfidence !== null &&
+    candidateIceAmountConfidence >= MIN_EXPERIMENTAL_ICE_CONFIDENCE;
+  const normalizedIcePresence = iceIsReliable
+    ? (result.icePresence as boolean)
+    : iceAmountIsExperimental
+      ? normalizedIceAmount !== 'none'
+      : null;
+  const normalizedIceConfidence = iceIsReliable
+    ? candidateIceConfidence
+    : iceAmountIsExperimental
+      ? candidateIceAmountConfidence
+      : null;
 
   return {
     containsWater,
@@ -157,11 +185,13 @@ export function normalizeScanResult(
     fillConfidence,
     measurementAction: action,
     measurementStatus,
-    icePresence: iceIsReliable ? (result.icePresence as boolean) : null,
-    iceConfidence: iceIsReliable ? candidateIceConfidence : null,
+    icePresence: normalizedIcePresence,
+    iceConfidence: normalizedIceConfidence,
     iceStatus: result.iceStatus === 'trained' ? 'trained' : 'untrained',
-    iceAmount: iceAmountIsReliable ? normalizedIceAmount : null,
-    iceAmountConfidence: iceAmountIsReliable
+    iceAmount: iceAmountIsReliable || iceAmountIsExperimental
+      ? normalizedIceAmount
+      : null,
+    iceAmountConfidence: iceAmountIsReliable || iceAmountIsExperimental
       ? candidateIceAmountConfidence
       : null,
     iceAmountStatus:

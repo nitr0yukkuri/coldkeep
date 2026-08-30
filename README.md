@@ -9,7 +9,7 @@ ColdKeep は、スマートフォンのマイクで水筒を振った音を解�
 現在の提出版が持つ判定契約は次の範囲です。
 
 - 振り音の残量クラス: `0%` / `50%` / `100%`
-- 通常画面では学習済みモデルがない場合も、composition rootで明示的にopt-inした汎用の試験推定を表示できる。試験推定は飲水量の自動記録には使わない
+- 通常版は学習済みモデルがない場合に `未判定` を表示する。研究・展示用の汎用試験推定は、`EXPO_PUBLIC_ML_PREVIEW=research` を明示した composition root でだけ表示でき、飲水量の自動記録には使わない
 - 信頼度が閾値未満、または振り音アーティファクトがない場合: `未判定`
 - 振り音の氷量: 学習済みなら `なし` / `少ない` / `多い` の3段階。未学習・低信頼度は `未判定`
 
@@ -43,8 +43,9 @@ ColdKeep は、スマートフォンのマイクで水筒を振った音を解�
 
 既存の公開ベースラインはACM-S2の注ぐ音（pouring）で学習・評価した研究用アーティファクトです。
 個人向け画面は`shake`（振る）を入力動作に固定し、注ぐモデルを振り音へ流用しません。
-`ml/artifacts/shake_fill_level_pilot.json`は現在`untrained`です。アプリのcomposition rootでは
-`allowExperimentalPreview`を明示的に有効化しているため、汎用の低信頼度ヒューリスティックを
+`ml/artifacts/shake_fill_level_pilot.json`は現在`untrained`です。通常版では
+`未判定`を表示します。研究・展示用に`EXPO_PUBLIC_ML_PREVIEW=research`を明示した場合だけ、
+composition rootが`allowExperimentalPreview`を有効化し、汎用の低信頼度ヒューリスティックを
 `experimental`として表示できます。ただし飲水量の自動記録には使いません。
 phone/water-bottleデータでセッションホールドアウト評価を通過したモデルへ置き換えた場合だけ、
 `trained`として残量差分を自動記録します。

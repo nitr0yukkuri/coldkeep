@@ -15,21 +15,27 @@ import {
 import { ExpoDatasetRepository } from './datasetRepository';
 import { ExpoHydrationRepository } from './hydrationRepository';
 import { MODEL_RECORDING_ACTION } from '../../src/features/collection/domain/collection';
+import { isResearchPreviewMode } from '../../src/app/runtimeMode';
 
 export function createExpoAppDependencies(
   recorder: ExpoPcmRecorderAdapter,
 ): AppDependencies {
   const reader = new ExpoAudioReader();
   const repository = new ExpoDatasetRepository();
+  const shakeOptions = {
+    allowExperimentalPreview: isResearchPreviewMode,
+    allowExperimentalIcePreview: isResearchPreviewMode,
+  };
   return {
     collectionActions: COLLECTION_ACTIONS,
     recording: new RecordingUseCase(new ExpoMicrophonePermission(), recorder),
     scan: new ScanBottleUseCase(
       reader,
       [
-        new TypeScriptClassifierAdapter({ allowExperimentalPreview: true }),
+        new TypeScriptClassifierAdapter(shakeOptions),
       ],
       MODEL_RECORDING_ACTION,
+      { allowExperimentalIceAmount: isResearchPreviewMode },
     ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(

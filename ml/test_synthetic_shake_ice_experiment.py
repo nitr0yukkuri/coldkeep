@@ -1,0 +1,90 @@
+import unittest
+
+import numpy as np
+
+from run_synthetic_shake_ice_experiment import (
+    CLASS_NAMES,
+    GROUP_FIELDS,
+    generate_recordings,
+    research_artifact,
+    run_experiment,
+)
+
+
+class SyntheticShakeIceExperimentTests(unittest.TestCase):
+    def test_balanced_groups_and_deterministic_waveforms(self):
+        first = generate_recordings(groups=2, repetitions=1, seed=123)
+        second = generate_recordings(groups=2, repetitions=1, seed=123)
+        self.assertEqual(len(first), len(second))
+        self.assertEqual(len(first), 48)
+        self.assertEqual(len({item.recording_id for item in first}), len(first))
+        for left, right in zip(first, second):
+            self.assertEqual(left.recording_id, right.recording_id)
+            np.testing.assert_array_equal(left.samples, right.samples)
+            self.assertEqual(left.samples.shape, (32_000,))
+            self.assertTrue(np.isfinite(left.samples).all())
+
+        for field in GROUP_FIELDS:
+            for group in sorted({getattr(item, field) for item in first}):
+                classes = {
+                    CLASS_NAMES[item.ice_count if item.ice_count == 0 else 1]
+                    if item.ice_count <= 2
+                    else CLASS_NAMES[2]
+                    for item in first
+                    if getattr(item, field) == group
+                }
+                self.assertEqual(classes, set(CLASS_NAMES))
+
+    def test_experiment_is_explicitly_research_only(self):
+        report = run_experiment(groups=2, repetitions=1, epochs=12, seed=456)
+        self.assertEqual(report["status"], "research_only")
+        self.assertEqual(report["holdoutGroups"], list(GROUP_FIELDS))
+        self.assertFalse(report["labelsUsedForProductionTraining"])
+        self.assertFalse(report["productionArtifactUpdated"])
+        self.assertEqual(
+            report["training"]["weighting"],
+            "equal class mass after equal recording mass",
+        )
+        self.assertEqual(set(report["results"]), {
+            f"{mode}:{normalization}"
+            for mode in ("log_mel", "transient", "combined")
+            for normalization in ("gain_normalized", "raw")
+        })
+        self.assertEqual(len(report["researchModel"]["featureMean"]), 149)
+
+    def test_research_artifact_is_explicitly_separate_from_production(self):
+        artifact = research_artifact(
+            run_experiment(groups=2, repetitions=1, epochs=4, seed=789)
+        )
+        self.assertEqual(artifact["status"], "research_only")
+        self.assertEqual(artifact["featureSize"], 149)
+        self.assertEqual(
+            artifact["featureSchema"]["name"],
+            "synthetic_log_mel_transient_v1",
+        )
+        self.assertFalse(artifact["provenance"]["labelsUsedForProductionTraining"])
+        self.assertFalse(artifact["provenance"]["productionArtifactUpdated"])
+
+    def test_transient_research_artifact_has_cross_runtime_schema(self):
+        report = run_experiment(
+            groups=2,
+            repetitions=1,
+            epochs=4,
+            seed=790,
+            research_feature_mode="transient",
+        )
+        artifact = research_artifact(report)
+        self.assertEqual(artifact["featureMode"], "transient")
+        self.assertEqual(artifact["featureSize"], 21)
+        self.assertEqual(
+            artifact["featureSchema"]["name"], "synthetic_transient_v1"
+        )
+        self.assertEqual(
+            set(artifact["evaluation"]["results"]), {"transient:gain_normalized"}
+        )
+        self.assertEqual(len(artifact["model"]["featureMean"]), 21)
+        self.assertFalse(artifact["provenance"]["labelsUsedForProductionTraining"])
+
+
+if __name__ == "__main__":
+    unittest.main()

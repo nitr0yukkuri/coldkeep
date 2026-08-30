@@ -24,6 +24,10 @@ export class TypeScriptClassifierAdapter implements AudioClassifier {
           this.shakeOptions,
         ),
         'shake',
+        {
+          allowExperimentalIceAmount:
+            this.shakeOptions.allowExperimentalIcePreview === true,
+        },
       );
     }
     return normalizeScanResult(

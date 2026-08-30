@@ -21,7 +21,8 @@ The shake path derives a coarse amount class from the collection manifest:
 `none` (0), `few` (1--2), or `many` (3+). Exact cube counts and ice mass are
 not part of the Rust prediction. The checked-in artifact is manifest-only, so
 the prediction is `iceAmountStatus: "untrained"` and `iceAmount: null` until
-phone/water-bottle recordings pass the session-held-out gate:
+phone/water-bottle recordings pass scored session/container/device/room/operator
+holdouts (balanced accuracy >= 0.67 for every required holdout):
 
 ```powershell
 python ml/train_shake_ice_amount.py --manifest <exported-manifest.csv> --audio-root <dataset-root> --output ml/artifacts/shake_ice_amount_pilot.json
