@@ -58,4 +58,3 @@ describe('runtime demo mode', () => {
     expect(runtime.isResearchPreviewEnabled).toBe(true);
   });
 });
-
