@@ -571,6 +571,80 @@ test('ignores a duplicate recording start while the native start is pending', as
   });
   renderer.unmount();
 });
+test('cancels a recording that finishes starting after background transition', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const stop = jest.fn(async () => ({ uri: 'file:///background.wav' }));
+  const cleanup = jest.fn(async () => undefined);
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: { start, stop, cleanup },
+    scan: { execute: jest.fn() },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  const addEventListener = jest.spyOn(AppState, 'addEventListener');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  try {
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+      await Promise.resolve();
+    });
+    await openMeasureTab(renderer);
+    const recordButton = renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+    let startPromise!: Promise<void>;
+    await ReactTestRenderer.act(async () => {
+      startPromise = recordButton?.props.onPress();
+      await Promise.resolve();
+    });
+
+    const onStateChange = addEventListener.mock.calls.at(-1)?.[1] as
+      | ((state: 'background') => void)
+      | undefined;
+    expect(onStateChange).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      onStateChange?.('background');
+      await Promise.resolve();
+    });
+
+    resolveStart({ uri: 'file:///background.wav' });
+    await ReactTestRenderer.act(async () => {
+      await startPromise;
+    });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledWith({ uri: 'file:///background.wav' });
+    expect((app as never as { scan: { execute: jest.Mock } }).scan.execute).not.toHaveBeenCalled();
+  } finally {
+    await ReactTestRenderer.act(async () => {
+      renderer?.unmount();
+    });
+    addEventListener.mockRestore();
+  }
+});
 test('stops recording when the app leaves the foreground', async () => {
   const hydrationState = {
     profile: { capacityMl: 500, dailyGoalMl: 1500 },

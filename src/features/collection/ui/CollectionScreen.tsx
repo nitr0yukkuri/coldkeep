@@ -101,7 +101,7 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
         stopRecordingRef.current?.().catch(() => undefined);
       }
     });
-    return () => subscription.remove();
+    return () => subscription?.remove();
   }, []);
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
@@ -139,6 +139,15 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
     try {
       const labels = validateCollectionDraft(draft);
       await app.recording.start();
+      if (
+        appStateRef.current === 'inactive' ||
+        appStateRef.current === 'background'
+      ) {
+        const recording = await app.recording.stop();
+        await app.recording.cleanup(recording);
+        setStatus('アプリがバックグラウンドに移行したため録音を中断しました');
+        return;
+      }
       setPendingLabels(labels);
       setIsRecording(true);
       setRecordingStartedAt(Date.now());
@@ -148,8 +157,9 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
       setStatus(
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
+    } finally {
+      startInFlightRef.current = false;
     }
-    startInFlightRef.current = false;
   }
 
   async function stopRecording() {

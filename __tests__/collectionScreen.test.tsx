@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { AppState, Text, TextInput, TouchableOpacity } from 'react-native';
 
 import { CollectionScreen } from '../src/features/collection/ui/CollectionScreen';
 
@@ -143,4 +143,66 @@ test('ignores a duplicate recording start while the native start is pending', as
     await firstStart;
   });
   renderer.unmount();
+});
+test('cancels a recording that finishes starting after background transition', async () => {
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const stop = jest.fn(async () => ({ uri: 'file:///background.wav' }));
+  const cleanup = jest.fn(async () => undefined);
+  const app = {
+    recording: { start, stop, cleanup },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+  } as never;
+
+  const addEventListener = jest.spyOn(AppState, 'addEventListener');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  try {
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(<CollectionScreen app={app} />);
+      await Promise.resolve();
+    });
+    const deviceInput = renderer.root
+      .findAllByType(TextInput)
+      .find(input => input.props.accessibilityLabel === '端末');
+    await ReactTestRenderer.act(async () => {
+      deviceInput?.props.onChangeText('test-device');
+    });
+    const recordButton = () =>
+      renderer.root
+        .findAllByType(TouchableOpacity)
+        .find(
+          button => button.props.accessibilityLabel === '振り音を録音して保存',
+        );
+    let startPromise!: Promise<void>;
+    await ReactTestRenderer.act(async () => {
+      startPromise = recordButton()?.props.onPress();
+      await Promise.resolve();
+    });
+
+    const onStateChange = addEventListener.mock.calls.at(-1)?.[1] as
+      | ((state: 'background') => void)
+      | undefined;
+    expect(onStateChange).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      onStateChange?.('background');
+      await Promise.resolve();
+    });
+    resolveStart({ uri: 'file:///background.wav' });
+    await ReactTestRenderer.act(async () => {
+      await startPromise;
+    });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledWith({ uri: 'file:///background.wav' });
+  } finally {
+    await ReactTestRenderer.act(async () => {
+      renderer?.unmount();
+    });
+    addEventListener.mockRestore();
+  }
 });

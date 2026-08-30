@@ -155,7 +155,7 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
         stopRecordingRef.current?.().catch(() => undefined);
       }
     });
-    return () => subscription.remove();
+    return () => subscription?.remove();
   }, []);
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
@@ -416,6 +416,15 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
     startInFlightRef.current = true;
     try {
       await app.recording.start();
+      if (
+        appStateRef.current === 'inactive' ||
+        appStateRef.current === 'background'
+      ) {
+        const recording = await app.recording.stop();
+        await app.recording.cleanup(recording);
+        setStatus('アプリがバックグラウンドに移行したため録音を中断しました');
+        return;
+      }
       setIsRecording(true);
       setRecordingStartedAt(Date.now());
       setRecordingElapsedMs(0);
@@ -429,8 +438,9 @@ export default function ColdKeepScreen({ app }: { app: AppDependencies }) {
       setStatus(
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
+    } finally {
+      startInFlightRef.current = false;
     }
-    startInFlightRef.current = false;
   }
 
   async function stopRecording() {
