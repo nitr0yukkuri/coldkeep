@@ -18,7 +18,9 @@ import {
 } from '../features/collection/domain/collection';
 import { HydrationUseCase } from '../features/hydration/application/hydrationUseCase';
 import { RnfsHydrationRepository } from '../platform/storage/rnfsHydrationRepository';
-import { isResearchPreviewMode } from './runtimeMode';
+import { isResearchPreviewEnabled } from './runtimeMode';
+import { NotificationUseCase } from '../features/notifications/application/notificationUseCase';
+import { NativeNotificationScheduler } from '../platform/notifications/nativeNotificationScheduler';
 
 export function createAppDependencies() {
   const recorder =
@@ -33,7 +35,7 @@ export function createAppDependencies() {
   );
   const reader = new RnfsWavReader();
   const repository = new RnfsDatasetRepository();
-  const shakeClassifiers = isResearchPreviewMode
+  const shakeClassifiers = isResearchPreviewEnabled
     ? [
         new TypeScriptClassifierAdapter({
           allowExperimentalPreview: true,
@@ -50,7 +52,7 @@ export function createAppDependencies() {
       reader,
       shakeClassifiers,
       MODEL_RECORDING_ACTION,
-      { allowExperimentalIceAmount: isResearchPreviewMode },
+      { allowExperimentalIceAmount: isResearchPreviewEnabled },
     ),
     collect: new CollectSampleUseCase(reader, repository),
     exportDataset: new ExportDatasetUseCase(
@@ -58,5 +60,6 @@ export function createAppDependencies() {
       new ReactNativeShareGateway(),
     ),
     hydration: new HydrationUseCase(new RnfsHydrationRepository()),
+    notifications: new NotificationUseCase(new NativeNotificationScheduler()),
   };
 }

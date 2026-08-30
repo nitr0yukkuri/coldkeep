@@ -24,8 +24,15 @@ from audio_features import (
     resample,
     segment_audio,
 )
+from evaluation_evidence import evidence_metrics
 from train_baseline import SoftmaxClassifier, class_balanced_weights, metrics
-from train_shake_ice_amount import ICE_AMOUNT_NAMES, Capture, ice_amount_index, load_manifest
+from train_shake_ice_amount import (
+    ICE_AMOUNT_NAMES,
+    Capture,
+    holdout_value,
+    ice_amount_index,
+    load_manifest,
+)
 
 
 FEATURE_MODES = ("log_mel", "transient", "combined")
@@ -36,6 +43,7 @@ GROUP_FIELDS = (
     "device_id",
     "room_id",
     "operator_id",
+    "recorded_day",
 )
 
 
@@ -85,14 +93,32 @@ def _arrays(
 
 def _folds(captures: list[Capture], field: str) -> list[dict]:
     folds = []
-    for held_out in sorted({getattr(capture, field) for capture in captures}):
-        train = [capture for capture in captures if getattr(capture, field) != held_out]
-        test = [capture for capture in captures if getattr(capture, field) == held_out]
+    groups = sorted(
+        {
+            value
+            for capture in captures
+            if (value := holdout_value(capture, field)) is not None
+        }
+    )
+    for held_out in groups:
+        train = [
+            capture
+            for capture in captures
+            if holdout_value(capture, field) != held_out
+        ]
+        test = [
+            capture
+            for capture in captures
+            if holdout_value(capture, field) == held_out
+        ]
         folds.append({"heldOut": str(held_out), "train": train, "test": test})
     return folds
 
-
-def _metric_report(true: list[int], predicted: list[int]) -> dict:
+def _metric_report(
+    true: list[int],
+    predicted: list[int],
+    probabilities: list[list[float]] | None = None,
+) -> dict:
     result = metrics(true, predicted, [0, 1, 2])
     confusion = np.asarray(result["confusion_matrix"], dtype=np.int64)
     recall = {}
@@ -105,8 +131,15 @@ def _metric_report(true: list[int], predicted: list[int]) -> dict:
         precision[name] = tp / max(tp + fp, 1)
     result["recall"] = recall
     result["precision"] = precision
+    if probabilities is not None:
+        result["evidence"] = evidence_metrics(
+            true,
+            predicted,
+            probabilities,
+            [0, 1, 2],
+            bootstrap_samples=0,
+        )
     return result
-
 
 def _train_classifier(
     captures: list[Capture],
@@ -131,6 +164,7 @@ def _direct_three_class(
     true: list[int] = []
     predicted: list[int] = []
     predictions: list[dict] = []
+    probabilities_by_recording: list[list[float]] = []
     skipped_folds: dict[str, str] = {}
     valid_fold_count = 0
     for fold in _folds(captures, field):
@@ -166,13 +200,14 @@ def _direct_three_class(
                     "probabilities": probabilities.round(6).tolist(),
                 }
             )
+            probabilities_by_recording.append(probabilities.tolist())
     if not true:
         return {
             "status": "insufficient_data",
             "skippedFolds": skipped_folds,
             "validFolds": 0,
         }
-    result = _metric_report(true, predicted)
+    result = _metric_report(true, predicted, probabilities_by_recording)
     result.update({"status": "ok", "validFolds": valid_fold_count, "predictions": predictions})
     if skipped_folds:
         result["skippedFolds"] = skipped_folds

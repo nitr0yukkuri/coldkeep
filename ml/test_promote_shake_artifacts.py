@@ -24,6 +24,37 @@ def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
         "confusion_matrix": confusion,
         "recall": {str(index): score for index in range(3)},
         "precision": {str(index): score for index in range(3)},
+        "evidence": {
+            "minimumClassRecall": score,
+            "meanConfidence": score,
+            "brierScore": 1.0 - score,
+            "expectedCalibrationError": 1.0 - score,
+            "calibrationBins": [
+                {
+                    "lower": 0.0,
+                    "upper": 1.0,
+                    "count": 300,
+                    "confidence": score,
+                    "accuracy": score,
+                }
+            ],
+            "bootstrap": {
+                "samples": 200,
+                "balancedAccuracy95": [max(0.0, score - 0.05), score],
+                "macroF195": [max(0.0, score - 0.05), score],
+            },
+            "selective": {
+                "0.65": {
+                    "threshold": 0.65,
+                    "accepted": 300,
+                    "abstained": 0,
+                    "coverage": 1.0,
+                    "accuracy": score,
+                    "balanced_accuracy": score,
+                    "macro_f1": score,
+                }
+            },
+        },
     }
     model = {
         "task": task,
@@ -70,6 +101,11 @@ def candidate(task: str, status: str = "trained", score: float = 0.8) -> dict:
                 "operator_id",
             )
         }
+        artifact["temporalEvaluation"] = {
+            **evaluation,
+            "groupField": "recorded_day",
+            "validFolds": 2,
+        }
     return artifact
 
 
@@ -93,6 +129,23 @@ class ShakeArtifactPromotionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "below the deployment gate"):
                 validate_candidate(path, "shake_ice_amount")
 
+    def test_ice_candidate_requires_uncertainty_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_ice_amount")
+            value["evaluation"].pop("evidence")
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "evaluation evidence is missing"):
+                validate_candidate(path, "shake_ice_amount")
+
+    def test_ice_candidate_requires_scored_calendar_day_holdout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            value = candidate("shake_ice_amount")
+            value.pop("temporalEvaluation")
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "temporalEvaluation"):
+                validate_candidate(path, "shake_ice_amount")
     def test_ice_candidate_requires_scored_physical_holdouts(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "candidate.json"

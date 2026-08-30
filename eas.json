@@ -4,7 +4,12 @@
   },
   "build": {
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_MODE": "demo",
+        "EXPO_PUBLIC_ML_PREVIEW": "research",
+        "COLDKEEP_NATIVE_BUNDLE": "1"
+      }
     },
     "collector": {
       "distribution": "internal",

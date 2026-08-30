@@ -45,10 +45,14 @@ function createDayPoints(state: HydrationState, now = new Date()): DayPoint[] {
 
 type HydrationHistoryChartProps = {
   state: HydrationState | null;
+  loading?: boolean;
+  error?: string | null;
 };
 
 export function HydrationHistoryChart({
   state,
+  loading = false,
+  error = null,
 }: HydrationHistoryChartProps) {
   const points = state ? createDayPoints(state) : [];
   const maxMl = Math.max(...points.map(point => point.amountMl), 1);
@@ -66,37 +70,49 @@ export function HydrationHistoryChart({
         </View>
         <Text style={styles.unit}>mL</Text>
       </View>
-      <View style={styles.chart}>
-        {points.map(point => {
-          const height = Math.max(4, (point.amountMl / maxMl) * 100);
-          return (
-            <View key={point.key} style={styles.column}>
-              <Text style={styles.amountLabel}>
-                {point.amountMl > 0 ? point.amountMl : '—'}
-              </Text>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: `${height}%` },
-                    point.isToday && styles.todayBar,
-                  ]}
-                />
-              </View>
-              <Text style={[styles.dayLabel, point.isToday && styles.todayLabel]}>
-                {point.label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-      <View style={styles.legendRow}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, styles.todaySwatch]} />
-          <Text style={styles.legendText}>今日</Text>
+      {loading ? (
+        <View style={styles.loadingBox}>
+          <Text style={styles.loadingText}>保存済みデータを読み込み中…</Text>
         </View>
-        <Text style={styles.legendText}>記録がある日のみ表示</Text>
-      </View>
+      ) : error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : (
+        <View style={styles.chart}>
+          {points.map(point => {
+            const height = Math.max(4, (point.amountMl / maxMl) * 100);
+            return (
+              <View key={point.key} style={styles.column}>
+                <Text style={styles.amountLabel}>{point.amountMl} mL</Text>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.bar,
+                      { height: `${height}%` },
+                      point.isToday && styles.todayBar,
+                    ]}
+                  />
+                </View>
+                <Text
+                  style={[styles.dayLabel, point.isToday && styles.todayLabel]}
+                >
+                  {point.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {!loading && !error ? (
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, styles.todaySwatch]} />
+            <Text style={styles.legendText}>今日</Text>
+          </View>
+          <Text style={styles.legendText}>未記録日は0 mL</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -114,6 +130,30 @@ const styles = StyleSheet.create({
   title: { color: '#17323b', fontSize: 18, fontWeight: '800' },
   subtitle: { color: '#73878c', fontSize: 12, marginTop: 5 },
   unit: { color: '#087ea4', fontSize: 12, fontWeight: '800' },
+  loadingBox: {
+    height: 156,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#f4fafb',
+    marginTop: 18,
+  },
+  loadingText: { color: '#73878c', fontSize: 12 },
+  errorBox: {
+    height: 156,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#fff7f3',
+    marginTop: 18,
+    paddingHorizontal: 16,
+  },
+  errorText: {
+    color: '#9b5f4c',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   chart: {
     height: 156,
     flexDirection: 'row',

@@ -4,7 +4,13 @@
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/test/documents',
@@ -44,6 +50,121 @@ jest.mock('../src/app/compositionRoot', () => ({
 import App from '../src/app/NativeApp';
 import ColdKeepScreen from '../App';
 
+async function openTab(
+  renderer: ReactTestRenderer.ReactTestRenderer,
+  label: string,
+) {
+  await ReactTestRenderer.act(async () => {
+    const tab = renderer.root
+      .findAllByType(Pressable)
+      .find(node => node.props.accessibilityLabel === label);
+    tab?.props.onPress();
+  });
+}
+
+async function openMeasureTab(renderer: ReactTestRenderer.ReactTestRenderer) {
+  await openTab(renderer, '振る');
+}
+
+async function openHydrationTab(renderer: ReactTestRenderer.ReactTestRenderer) {
+  await openTab(renderer, '水分');
+}
+
+test('stops the recording timer when confirmation starts', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1_500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStop!: (recording: { uri: string }) => void;
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start: jest.fn(async () => ({ uri: 'file:///test.wav' })),
+      stop: jest.fn(
+        () =>
+          new Promise<{ uri: string }>(resolve => {
+            resolveStop = resolve;
+          }),
+      ),
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: {
+      execute: jest.fn(async () => ({
+        containsWater: true,
+        waterConfidence: 0.9,
+        fillLevel: 50,
+        fillConfidence: 0.8,
+        icePresence: null,
+        iceConfidence: null,
+        iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
+        engine: 'typescript',
+        measurementAction: 'shake',
+        measurementStatus: 'untrained',
+      })),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+    await Promise.resolve();
+  });
+  const homeScrollView = renderer.root.findByType(ScrollView);
+  await openMeasureTab(renderer);
+  expect(renderer.root.findByType(ScrollView)).not.toBe(homeScrollView);
+
+  const textContent = (value: unknown): string => {
+    if (typeof value === 'string' || typeof value === 'number') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map(textContent).join('');
+    }
+    return '';
+  };
+  const buttonFor = (label: string) =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => textContent(text.props.children) === label),
+      );
+
+  await ReactTestRenderer.act(async () => {
+    await buttonFor('振って測定する')?.props.onPress();
+  });
+  let stopPromise!: Promise<void>;
+  await ReactTestRenderer.act(async () => {
+    stopPromise = buttonFor('停止して確認')?.props.onPress();
+    await Promise.resolve();
+  });
+
+  const processingTexts = renderer.root
+    .findAllByType(Text)
+    .map(text => textContent(text.props.children));
+  expect(processingTexts).toContain('確認中…');
+  expect(processingTexts.some(value => value.startsWith('● 録音'))).toBe(false);
+
+  resolveStop({ uri: 'file:///test.wav' });
+  await ReactTestRenderer.act(async () => {
+    await stopPromise;
+  });
+  renderer.unmount();
+}, 15000);
 test('renders correctly', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
@@ -112,6 +233,7 @@ test('shows an explicit unknown ice result after a successful scan', async () =>
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
 
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
@@ -262,13 +384,12 @@ test('automatically records a reliable acoustic intake delta', async () => {
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
   const buttonFor = (label: string) =>
     renderer.root
       .findAllByType(TouchableOpacity)
       .find(button =>
-        button
-          .findAllByType(Text)
-          .some(text => text.props.children === label),
+        button.findAllByType(Text).some(text => text.props.children === label),
       );
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
@@ -286,6 +407,7 @@ test('automatically records a reliable acoustic intake delta', async () => {
   await ReactTestRenderer.act(async () => {
     await buttonFor('停止して確認')?.props.onPress();
   });
+  await openHydrationTab(renderer);
 
   const testApp = app as unknown as {
     hydration: { addEstimatedIntake: jest.Mock };
@@ -348,6 +470,7 @@ test('shows the preview shake estimate without recording experimental intake', a
     renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
     await Promise.resolve();
   });
+  await openMeasureTab(renderer);
   const textContent = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') {
       return String(value);
@@ -381,6 +504,221 @@ test('shows the preview shake estimate without recording experimental intake', a
   expect(textValues).toContain(
     '汎用の試験推定を表示しました。実測モデルで検証するまで水分量は自動記録しません',
   );
-  expect((app as never as { hydration: { addEstimatedIntake: jest.Mock } }).hydration.addEstimatedIntake).not.toHaveBeenCalled();
+  expect(
+    (app as never as { hydration: { addEstimatedIntake: jest.Mock } }).hydration
+      .addEstimatedIntake,
+  ).not.toHaveBeenCalled();
   renderer.unmount();
+});
+test('ignores a duplicate recording start while the native start is pending', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start,
+      stop: jest.fn(async () => ({ uri: 'file:///test.wav' })),
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: { execute: jest.fn() },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+    await Promise.resolve();
+  });
+  await openMeasureTab(renderer);
+
+  const recordButton = () =>
+    renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+  let firstStart!: Promise<void>;
+  await ReactTestRenderer.act(async () => {
+    firstStart = recordButton()?.props.onPress();
+    recordButton()?.props.onPress();
+    await Promise.resolve();
+  });
+
+  expect(start).toHaveBeenCalledTimes(1);
+  resolveStart({ uri: 'file:///test.wav' });
+  await ReactTestRenderer.act(async () => {
+    await firstStart;
+  });
+  renderer.unmount();
+});
+test('cancels a recording that finishes starting after background transition', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  let resolveStart!: (recording: { uri: string }) => void;
+  const start = jest.fn(
+    () =>
+      new Promise<{ uri: string }>(resolve => {
+        resolveStart = resolve;
+      }),
+  );
+  const stop = jest.fn(async () => ({ uri: 'file:///background.wav' }));
+  const cleanup = jest.fn(async () => undefined);
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: { start, stop, cleanup },
+    scan: { execute: jest.fn() },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  const addEventListener = jest.spyOn(AppState, 'addEventListener');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  try {
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+      await Promise.resolve();
+    });
+    await openMeasureTab(renderer);
+    const recordButton = renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+    let startPromise!: Promise<void>;
+    await ReactTestRenderer.act(async () => {
+      startPromise = recordButton?.props.onPress();
+      await Promise.resolve();
+    });
+
+    const onStateChange = addEventListener.mock.calls.at(-1)?.[1] as
+      | ((state: 'background') => void)
+      | undefined;
+    expect(onStateChange).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      onStateChange?.('background');
+      await Promise.resolve();
+    });
+
+    resolveStart({ uri: 'file:///background.wav' });
+    await ReactTestRenderer.act(async () => {
+      await startPromise;
+    });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledWith({ uri: 'file:///background.wav' });
+    expect((app as never as { scan: { execute: jest.Mock } }).scan.execute).not.toHaveBeenCalled();
+  } finally {
+    await ReactTestRenderer.act(async () => {
+      renderer?.unmount();
+    });
+    addEventListener.mockRestore();
+  }
+});
+test('stops recording when the app leaves the foreground', async () => {
+  const hydrationState = {
+    profile: { capacityMl: 500, dailyGoalMl: 1500 },
+    observations: [],
+    intakes: [],
+  };
+  const stop = jest.fn(async () => ({ uri: 'file:///background.wav' }));
+  const app = {
+    collectionActions: ['pour', 'shake', 'still'],
+    recording: {
+      start: jest.fn(async () => ({ uri: 'file:///background.wav' })),
+      stop,
+      cleanup: jest.fn(async () => undefined),
+    },
+    scan: {
+      execute: jest.fn(async () => ({
+        containsWater: false,
+        waterConfidence: 0,
+        fillLevel: null,
+        fillConfidence: null,
+        icePresence: null,
+        iceConfidence: null,
+        iceStatus: 'untrained',
+        iceAmount: null,
+        iceAmountConfidence: null,
+        iceAmountStatus: 'untrained',
+        engine: 'typescript',
+        measurementAction: 'shake',
+        measurementStatus: 'untrained',
+      })),
+    },
+    collect: { execute: jest.fn() },
+    exportDataset: { execute: jest.fn() },
+    hydration: {
+      load: jest.fn(async () => hydrationState),
+      updateProfile: jest.fn(),
+      addManualIntake: jest.fn(),
+      recordObservation: jest.fn(),
+      addEstimatedIntake: jest.fn(),
+    },
+  } as never;
+
+  const addEventListener = jest.spyOn(AppState, 'addEventListener');
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  try {
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(<ColdKeepScreen app={app} />);
+      await Promise.resolve();
+    });
+    await openMeasureTab(renderer);
+
+    const recordButton = renderer.root
+      .findAllByType(TouchableOpacity)
+      .find(button =>
+        button
+          .findAllByType(Text)
+          .some(text => text.props.children === '振って測定する'),
+      );
+    await ReactTestRenderer.act(async () => {
+      await recordButton?.props.onPress();
+    });
+
+    const onStateChange = addEventListener.mock.calls.at(-1)?.[1] as
+      | ((state: 'background') => void)
+      | undefined;
+    expect(onStateChange).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      onStateChange?.('background');
+      await Promise.resolve();
+    });
+
+    expect(stop).toHaveBeenCalledTimes(1);
+  } finally {
+    renderer?.unmount();
+    addEventListener.mockRestore();
+  }
 });

@@ -4,6 +4,7 @@ import type { CollectionAction } from '../features/collection/domain/collection'
 import type { RecordingUseCase } from '../features/scan/application/recordingUseCase';
 import type { ScanBottleUseCase } from '../features/scan/application/scanBottleUseCase';
 import type { HydrationUseCase } from '../features/hydration/application/hydrationUseCase';
+import type { NotificationUseCase } from '../features/notifications/application/notificationUseCase';
 
 export type AppDependencies = {
   collectionActions: readonly CollectionAction[];
@@ -12,4 +13,5 @@ export type AppDependencies = {
   collect: CollectSampleUseCase;
   exportDataset: ExportDatasetUseCase;
   hydration: HydrationUseCase;
+  notifications?: NotificationUseCase;
 };

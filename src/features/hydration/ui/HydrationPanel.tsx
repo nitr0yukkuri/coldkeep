@@ -24,6 +24,10 @@ type HydrationPanelProps = {
   onSaveProfile(): void;
   modelActionLabel: string;
   disabled?: boolean;
+  loading?: boolean;
+  feedback?: string | null;
+  loadError?: string | null;
+  onRetryLoad?(): void;
 };
 
 export function HydrationPanel({
@@ -34,6 +38,10 @@ export function HydrationPanel({
   onSaveProfile,
   modelActionLabel,
   disabled = false,
+  loading = false,
+  feedback = null,
+  loadError = null,
+  onRetryLoad,
 }: HydrationPanelProps) {
   const observation = state ? latestObservation(state) : null;
   const intakeMl = state ? todayIntakeMl(state) : 0;
@@ -49,18 +57,28 @@ export function HydrationPanel({
       <View style={styles.titleRow}>
         <View style={styles.titleCopy}>
           <Text style={styles.title}>今日の水分</Text>
-          <Text style={styles.subtitle}>振る音から自動で記録します</Text>
+          <Text style={styles.subtitle}>
+            {loading
+              ? '保存済みデータを読み込み中…'
+              : loadError
+                ? '保存済みデータを読み込めませんでした'
+                : '振る音から自動で記録します'}
+          </Text>
         </View>
-        <Text style={styles.total}>{intakeMl} mL</Text>
+        <Text style={styles.total}>{loading || loadError ? '—' : intakeMl + ' mL'}</Text>
       </View>
 
-      <HydrationHistoryChart state={state} />
+      <HydrationHistoryChart state={state} loading={loading} error={loadError} />
 
       <View style={styles.capacitySection}>
         <View style={styles.capacityCopy}>
           <Text style={styles.inputLabel}>水筒容量</Text>
           <Text style={styles.capacityHint}>
-            容量だけ最初に設定してください
+            {loading
+              ? 'データを読み込み中です'
+              : loadError
+                ? '読み込みに失敗しました'
+                : '容量だけ最初に設定してください'}
           </Text>
         </View>
         <View style={styles.capacityInputRow}>
@@ -71,14 +89,17 @@ export function HydrationPanel({
               onChangeText={onChangeCapacity}
               keyboardType="number-pad"
               accessibilityLabel="水筒容量"
-              editable={!disabled}
+              editable={!disabled && !loading && !loadError}
             />
             <Text style={styles.inputUnit}>mL</Text>
           </View>
           <TouchableOpacity
-            disabled={disabled}
+            disabled={disabled || loading || !!loadError}
             accessibilityRole="button"
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              (disabled || loading || loadError) && styles.saveButtonDisabled,
+            ]}
             onPress={onSaveProfile}
           >
             <Text style={styles.saveButtonText}>保存</Text>
@@ -86,6 +107,27 @@ export function HydrationPanel({
         </View>
       </View>
 
+      {loadError ? (
+        <View style={styles.loadErrorBox}>
+          <Text style={styles.loadErrorText} accessibilityLiveRegion="polite">
+            {loadError}
+          </Text>
+          {onRetryLoad ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="水分データを再読み込み"
+              style={styles.retryButton}
+              onPress={onRetryLoad}
+            >
+              <Text style={styles.retryButtonText}>再読み込み</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : feedback ? (
+        <Text style={styles.feedback} accessibilityLiveRegion="polite">
+          {feedback}
+        </Text>
+      ) : null}
       {observation && (observationIsToday || autoRecordedIntakeMl !== null) ? (
         <View style={styles.observationBox}>
           <Text style={styles.observationText}>
@@ -166,6 +208,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#087ea4',
   },
   saveButtonText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  saveButtonDisabled: { backgroundColor: '#9aa9ad' },
+  feedback: { color: '#087ea4', fontSize: 12, lineHeight: 18, marginTop: 10 },
+  loadErrorBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff7f3',
+  },
+  loadErrorText: { color: '#9b5f4c', fontSize: 12, lineHeight: 18 },
+  retryButton: {
+    alignSelf: 'flex-start',
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    marginTop: 10,
+    borderRadius: 9,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2b9aa',
+  },
+  retryButtonText: { color: '#9b5f4c', fontSize: 12, fontWeight: '800' },
   observationBox: {
     marginTop: 18,
     padding: 14,

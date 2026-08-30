@@ -306,3 +306,21 @@ test('scan result normalization hides untrained or low-confidence ice claims', (
     }).icePresence,
   ).toBe(false);
 });
+test('times out when scan audio or classification never resolves', async () => {
+  jest.useFakeTimers();
+  try {
+    const reader: AudioReader = {
+      read: jest.fn(() => new Promise<never>(() => undefined)),
+    };
+    const useCase = new ScanBottleUseCase(reader, [], 'pour', {}, 10);
+    const scan = useCase.execute({ uri: 'file:///hung.wav' });
+    const failure = expect(scan).rejects.toThrow(
+      '音声解析がタイムアウトしました。もう一度お試しください',
+    );
+
+    await jest.advanceTimersByTimeAsync(10);
+    await failure;
+  } finally {
+    jest.useRealTimers();
+  }
+});

@@ -97,3 +97,6 @@ dataset/*
 # --- Generated application materials / scratch outputs ---
 output/
 tmp/
+
+# --- Local UI screenshots ---
+artifacts/screenshots/

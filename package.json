@@ -7,12 +7,14 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
+    "start:demo": "node scripts/start-demo.cjs",
     "test": "jest"
   },
   "dependencies": {
     "react": "18.3.1",
     "react-native": "0.76.6",
-    "react-native-fs": "^2.20.0"
+    "react-native-fs": "^2.20.0",
+    "react-native-vector-icons": "^10.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

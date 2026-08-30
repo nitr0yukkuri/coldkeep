@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -85,8 +86,23 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const stopInFlightRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+  const startInFlightRef = useRef(false);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextState;
+      if (
+        nextState !== previousState &&
+        (nextState === 'inactive' || nextState === 'background')
+      ) {
+        stopRecordingRef.current?.().catch(() => undefined);
+      }
+    });
+    return () => subscription?.remove();
+  }, []);
   useEffect(() => {
     if (!isRecording || recordingStartedAt === null) {
       return;
@@ -116,12 +132,22 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
   }
 
   async function startRecording() {
-    if (isProcessing || isRecording) {
+    if (isProcessing || isRecording || startInFlightRef.current) {
       return;
     }
+    startInFlightRef.current = true;
     try {
       const labels = validateCollectionDraft(draft);
       await app.recording.start();
+      if (
+        appStateRef.current === 'inactive' ||
+        appStateRef.current === 'background'
+      ) {
+        const recording = await app.recording.stop();
+        await app.recording.cleanup(recording);
+        setStatus('アプリがバックグラウンドに移行したため録音を中断しました');
+        return;
+      }
       setPendingLabels(labels);
       setIsRecording(true);
       setRecordingStartedAt(Date.now());
@@ -131,6 +157,8 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
       setStatus(
         error instanceof Error ? error.message : '録音を開始できませんでした',
       );
+    } finally {
+      startInFlightRef.current = false;
     }
   }
 
@@ -143,9 +171,11 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
     let recording: RecordingRef | null = null;
     try {
       setStatus('音声とラベルを保存中…');
-      recording = await app.recording.stop();
+      // The microphone is being finalized now; stop the UI timer before the
+      // native stop promise resolves so saving time is not shown as recording.
       setIsRecording(false);
       setRecordingStartedAt(null);
+      recording = await app.recording.stop();
       if (!pendingLabels) {
         throw new Error('ラベルが保存されていません');
       }
@@ -306,9 +336,11 @@ export function CollectionScreen({ app }: CollectionScreenProps) {
               <Text style={styles.cardTitle}>サンプル録音</Text>
               <Text style={styles.cardHint}>保存済み {savedRecordings}件</Text>
             </View>
-            <Text style={styles.duration}>
-              {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
-            </Text>
+            {isRecording ? (
+              <Text style={styles.duration}>
+                {Math.max(0, recordingElapsedMs / 1000).toFixed(1)}秒
+              </Text>
+            ) : null}
           </View>
           <TouchableOpacity
             disabled={isProcessing}
